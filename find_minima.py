@@ -5,8 +5,7 @@ from matplotlib import pyplot as plt
 import spock_reg_model
 spock_reg_model.HACK_MODEL = True
 from pytorch_lightning import Trainer
-from pytorch_lightning import Trainer
-from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
 import torch
 import numpy as np
@@ -29,7 +28,8 @@ TRAIN_LEN = 78660
 batch_size = 2000 #ilog_rand(32, 3200)
 steps_per_epoch = int(1+TRAIN_LEN/batch_size)
 epochs = int(1+TOTAL_STEPS/steps_per_epoch)
-epochs, epochs//10
+epochs = 200
+
 args = {
     'seed': seed,
     'batch_size': batch_size,
@@ -62,10 +62,12 @@ args = {
     'power_transform': args.power_transform,
     'lower_std': args.lower_std,
     'train_all': args.train_all,
+    'no_log': args.no_log,
 }
 
 name = 'full_swag_pre_' + checkpoint_filename
-logger = TensorBoardLogger("tb_logs", name=name)
+# logger = TensorBoardLogger("tb_logs", name=name)
+logger = WandbLogger(project='bnn chaos model SR', name=name)
 checkpointer = ModelCheckpoint(filepath=checkpoint_filename + '/{version}')
 model = spock_reg_model.VarModel(args)
 model.make_dataloaders()
@@ -75,7 +77,7 @@ labels = ['time', 'e+_near', 'e-_near', 'max_strength_mmr_near', 'e+_far', 'e-_f
 max_l2_norm = args['gradient_clip']*sum(p.numel() for p in model.parameters() if p.requires_grad)
 trainer = Trainer(
     gpus=1, num_nodes=1, max_epochs=args['epochs'],
-    logger=logger,
+    logger=logger if not args['no_log'] else False,
     checkpoint_callback=checkpointer, benchmark=True,
     terminate_on_nan=True, gradient_clip_val=max_l2_norm
 )
@@ -85,7 +87,10 @@ try:
 except ValueError:
     model.load_state_dict(torch.load(checkpointer.best_model_path)['state_dict'])
 
-logger.log_hyperparams(params=model.hparams, metrics={'val_loss': checkpointer.best_model_score.item()})
+# logger.log_hyperparams(params=model.hparams, metrics={'val_loss': checkpointer.best_model_score.item()})
+
+logger.experiment.config['val_loss'] = checkpointer.best_model_score.item()
+
 logger.save()
 logger.finalize('success')
 

@@ -3,3 +3,8 @@ data
 *.png
 *.pdf
 __pycache__
+*.sw*
+results
+wandb
+out
+tb_logs
