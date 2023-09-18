@@ -17,7 +17,7 @@ import math
 import pytorch_lightning as pl
 from pytorch_lightning import Trainer
 import math
-from torch._six import inf
+from torch import inf
 from functools import wraps
 import warnings
 from torch.optim.optimizer import Optimizer

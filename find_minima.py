@@ -66,7 +66,7 @@ args = {
 
 name = 'full_swag_pre_' + checkpoint_filename
 logger = TensorBoardLogger("tb_logs", name=name)
-checkpointer = ModelCheckpoint(filepath=checkpoint_filename + '/{version}')
+checkpointer = ModelCheckpoint(filename=checkpoint_filename + '/{version}')
 model = spock_reg_model.VarModel(args)
 model.make_dataloaders()
 
@@ -74,7 +74,8 @@ labels = ['time', 'e+_near', 'e-_near', 'max_strength_mmr_near', 'e+_far', 'e-_f
     
 max_l2_norm = args['gradient_clip']*sum(p.numel() for p in model.parameters() if p.requires_grad)
 trainer = Trainer(
-    gpus=1, num_nodes=1, max_epochs=args['epochs'],
+    accelerator="auto",
+    num_nodes=1, max_epochs=args['epochs'],
     logger=logger,
     checkpoint_callback=checkpointer, benchmark=True,
     terminate_on_nan=True, gradient_clip_val=max_l2_norm
