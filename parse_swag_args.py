@@ -22,6 +22,7 @@ def parse(glob=False):
     parser.add_argument('--plot_random', action='store_true', default=False, help='default=False')
     parser.add_argument('--train_all', action='store_true', default=False, help='default=False')
     parser.add_argument('--lower_std', action='store_true', default=False, help='default=False')
+    parser.add_argument('--no_log', action='store_true', default=False, help='disable logging')
     args = parser.parse_args()
     extra = ''
     if args.no_nan:
@@ -32,7 +33,7 @@ def parse(glob=False):
         extra += '_train_all=1' 
 
     checkpoint_filename = (
-            'steps=%d_megno=%d_angles=%d_power=%d_hidden=%d_latent=%d_nommr=%d' %
+            "results/steps=%d_megno=%d_angles=%d_power=%d_hidden=%d_latent=%d_nommr=%d" %
             (args.total_steps, args.megno, args.angles, args.power_transform, args.hidden, args.latent, args.no_mmr)
         + extra + '_v' + str(args.version)
     )

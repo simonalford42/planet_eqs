@@ -381,7 +381,7 @@ class VarModel(pl.LightningModule):
         hparams['noisy_val'] = True if 'noisy_val' not in hparams else hparams['noisy_val']
 
         self.hparams = hparams
-        self.save_hyperparameters()
+        self.save_hyperparameters(hparams)
         self.steps = hparams['steps']
         self.batch_size = hparams['batch_size']
         self.lr = hparams['lr'] #init_lr
@@ -527,6 +527,32 @@ class VarModel(pl.LightningModule):
 
         return torch.cat((mu, std), dim=1)
 
+    def forward_to_summary_only(self, x, noisy_val=False):
+        # exact same as forward, but we just return the summary stats after calculating them
+        if self.fix_megno or self.fix_megno2:
+            if self.fix_megno:
+                megno_avg_std = self.summarize_megno(x)
+            #(batch, 2)
+            x = self.zero_megno(x)
+
+        if not self.include_mmr:
+            x = self.zero_mmr(x)
+
+        if not self.include_nan:
+            x = self.zero_nan(x)
+
+        if not self.include_eplusminus:
+            x = self.zero_eplusminus(x)
+
+        if self.random_sample:
+            x = self.augment(x)
+        #x is (batch, time, feature)
+        if noisy_val:
+            x = self.add_input_noise(x)
+
+        summary_stats = self.feature_nn(x)
+        return x, summary_stats
+
     def sample(self, x, samples=10):
         all_samp = []
         init_settings = [self.random_sample, self.device]
@@ -591,6 +617,15 @@ class VarModel(pl.LightningModule):
 
     def summary_kl(self):
         return self._summary_kl.sum()
+
+    def generate_f1_inputs_and_targets(self, batch, batch_idx):
+        fraction = self.global_step / self.hparams['steps']
+        beta_in = min([1, fraction/0.3]) * self.beta_in
+        beta_out = min([1, fraction/0.3]) * self.beta_out
+
+        X_sample, y_sample = batch
+        inputs, summary_stats = self.forward_to_summary_only(X_sample, noisy_val=False)
+        return inputs, summary_stats
 
     def training_step(self, batch, batch_idx):
         fraction = self.global_step / self.hparams['steps']
@@ -743,6 +778,7 @@ class SWAGModel(VarModel):
             else:
                 p_vec = torch.cat((p_vec, p.reshape(-1)))
 
+        print(f"p_vec.shape={p_vec.shape}")
         return p_vec
 
     def load(self, p_vec):
@@ -772,7 +808,7 @@ class SWAGModel(VarModel):
             else:
                 self.w_avg = (self.w_avg * self.n_models + cur_w) / (self.n_models + 1)
                 self.w2_avg = (self.w2_avg * self.n_models + cur_w2) / (self.n_models + 1)
-
+            
             if self.pre_D is None:
                 self.pre_D = cur_w.clone()[:, None]
             elif self.current_epoch % self.c == 0:

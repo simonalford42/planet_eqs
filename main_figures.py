@@ -2,14 +2,16 @@
 # coding: utf-8
 import glob
 import seaborn as sns
+import scienceplots
 from matplotlib import pyplot as plt
 import pandas as pd
 plt.style.use('science')
 
 import spock_reg_model
 from pytorch_lightning import Trainer
-from pytorch_lightning.loggers import TensorBoardLogger
-from pytorch_lightning.callbacks import LearningRateLogger, ModelCheckpoint
+# from pytorch_lightning.loggers import TensorBoardLogger
+# from pytorch_lightning.callbacks import LearningRateLogger, ModelCheckpoint
+from pytorch_lightning.callbacks import ModelCheckpoint
 
 import torch
 import numpy as np
@@ -36,10 +38,15 @@ import sys
 from parse_swag_args import parse
 args, checkpoint_filename = parse(glob=True)
 
+s = checkpoint_filename + "*output.pkl"
 swag_ensemble = [
     spock_reg_model.load_swag(fname).cuda()
-    for fname in glob.glob('*' + checkpoint_filename + '*output.pkl') #
+    for fname in glob.glob(s) #
 ]
+
+if len(swag_ensemble) == 0:
+    raise ValueError(s + " not found!")
+
 
 if args.plot_random:
     checkpoint_filename += '_random'
@@ -98,9 +105,6 @@ for l in colorstr.replace(' ', '').split('\n'):
         colors.append(np.array(new_color))
         shade = 0
 colors = np.array(colors)/255.0
-
-if len(swag_ensemble) == 0:
-    raise ValueError(checkpoint_filename + " not found!")
 
 swag_ensemble[0].make_dataloaders()
 if args.plot_random:

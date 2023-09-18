@@ -6,8 +6,8 @@ from matplotlib import pyplot as plt
 import spock_reg_model
 spock_reg_model.HACK_MODEL = True
 from pytorch_lightning import Trainer
-from pytorch_lightning.loggers import TensorBoardLogger
-from pytorch_lightning.callbacks import LearningRateLogger, ModelCheckpoint
+from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 import torch
 import numpy as np
 from scipy.stats import truncnorm
@@ -29,6 +29,7 @@ TRAIN_LEN = 78660
 batch_size = 2000 #ilog_rand(32, 3200)
 steps_per_epoch = int(1+TRAIN_LEN/batch_size)
 epochs = int(1+TOTAL_STEPS/steps_per_epoch)
+epochs = 200
 
 swa_args = {
     'swa_lr' : 1e-4, #1e-4 is largest before NaN
@@ -48,7 +49,7 @@ total_attempts_to_record
 try:
     swag_model = (
         spock_reg_model.SWAGModel.load_from_checkpoint(
-        checkpoint_filename + '/version=0_v0.ckpt')
+        checkpoint_filename + '/version=0-v0.ckpt')
         .init_params(swa_args)
     )
 except FileNotFoundError:
@@ -63,9 +64,9 @@ max_l2_norm = 0.1*sum(p.numel() for p in swag_model.parameters() if p.requires_g
 swag_model.hparams.steps = TOTAL_STEPS
 swag_model.hparams.epochs = epochs
 
-lr_logger = LearningRateLogger()
+lr_logger = LearningRateMonitor()
 name = 'full_swag_post_' + checkpoint_filename
-logger = TensorBoardLogger("tb_logs", name=name)
+logger = WandbLogger(project='bnn chaos model SR', name=name)
 checkpointer = ModelCheckpoint(
     filepath=checkpoint_filename + '.ckpt',
     monitor='swa_loss_no_reg'
@@ -73,7 +74,7 @@ checkpointer = ModelCheckpoint(
 
 trainer = Trainer(
     gpus=1, num_nodes=1, max_epochs=epochs,
-    logger=logger, callbacks=[lr_logger],
+    logger=logger if not args.no_log else False, callbacks=[lr_logger],
     checkpoint_callback=checkpointer, benchmark=True,
     terminate_on_nan=True, gradient_clip_val=max_l2_norm
 )
@@ -86,12 +87,12 @@ except ValueError:
 
 # Save model:
 
-logger.log_hyperparams(
-    params=swag_model.hparams,
-    metrics={'swa_loss_no_reg': checkpointer.best_model_score.item()})
+logger.log_hyperparams(params=swag_model.hparams)
+logger.log_metrics(metrics={'swa_loss_no_reg': checkpointer.best_model_score.item()})
 logger.save()
 logger.finalize('success')
 
 spock_reg_model.save_swag(swag_model, output_filename + '.pkl')
+
 import pickle as pkl
 pkl.dump(swag_model.ssX, open(output_filename + '_ssX.pkl', 'wb'))
