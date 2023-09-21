@@ -24,6 +24,6 @@ set -e
 # Generate a random number between 1 and 9999
 random_number=$(shuf -i 1-9999 -n 1)
 
-python find_minima.py --total_steps 300000 --swa_steps 50000 --version $random_number --angles --no_mmr --no_nan --no_eplusminus "$@"
-python run_swag.py --total_steps 300000 --swa_steps 50000 --version $random_number --angles --no_mmr --no_nan --no_eplusminus "$@"
+python find_minima.py --total_steps 300000 --swa_steps 50000 --version $random_number --angles --no_mmr --no_nan --no_eplusminus --slurm_id $SLURM_JOB_ID "$@"
+python run_swag.py --total_steps 300000 --swa_steps 50000 --version $random_number --angles --no_mmr --no_nan --no_eplusminus --slurm_id $SLURM_JOB_ID "$@"
 # done

@@ -2,10 +2,10 @@
 # coding: utf-8
 import glob
 import seaborn as sns
-import scienceplots
+# import scienceplots
 from matplotlib import pyplot as plt
 import pandas as pd
-plt.style.use('science')
+# plt.style.use('science')
 
 import spock_reg_model
 from pytorch_lightning import Trainer
@@ -26,6 +26,9 @@ import fit_trunc_dist
 from custom_cmap import custom_cmap
 
 import sys
+import utils
+
+utils.print_and_return_command()
 
 # +
 # manual_argv = "--version 50 --total_steps 300000 --swa_steps 50000 --angles --no_mmr --no_nan --no_eplusminus --seed -1 --plot".split(' ')
@@ -434,6 +437,7 @@ for confidence in confidences_to_plot:
     alpha = 1.0
 
     #colors[2, 3]
+    main_color = main_color.tolist()
     g = sns.jointplot(ppx, ppy,
                     alpha=alpha,# ax=ax,
                       color=main_color,
@@ -526,7 +530,7 @@ plt.savefig(checkpoint_filename + 'colorbar.png', dpi=300)
 # -
 
 plt.style.use('default')
-plt.style.use('science')
+# plt.style.use('science')
 
 
 
@@ -568,7 +572,7 @@ truths.shape#.reshape(-1)
 
 from sklearn.metrics import roc_curve, roc_auc_score
 plt.style.use('default')
-plt.style.use('science')
+# plt.style.use('science')
 fpr, tpr, _ = roc_curve(y_true=(truths>=9).reshape(-1),
                         y_score=np.average(np.tile(sample_preds, (2, 1, 1))>9, 1).transpose(1, 0).reshape(-1))
 fig = plt.figure(figsize=(4, 4))

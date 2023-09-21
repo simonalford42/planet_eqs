@@ -92,9 +92,10 @@ labels = [all_labels[i] for i in included_ixs]
 assert np.all(X[..., [i for i in range(len(all_labels)) if i not in included_ixs]] == 0)
 
 X = X[..., included_ixs]
-agssert X.shape[-1] == 31
+assert X.shape[-1] == 31
 
 model = pysr.PySRRegressor(
+    equation_file='results/',
     niterations=400,  # < Increase me for better results
     binary_operators=["+", "*", '/', '-', '^'],
     unary_operators=[

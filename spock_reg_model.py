@@ -842,7 +842,8 @@ class SWAGModel(VarModel):
         #fraction = self.global_step / self.hparams['steps']
         #if fraction > 0.5:
         if self.global_step > self.hparams['swa_start']:
-
+            print('aggregating model')
+            print('self.pre_D.shape: ', self.pre_D.shape)
             self.aggregate_model()
 
         # Record validation loss, and aggregated model loss

@@ -13,6 +13,9 @@ import numpy as np
 from scipy.stats import truncnorm
 import time
 from tqdm.notebook import tqdm
+import utils
+
+utils.print_args()
 
 rand = lambda lo, hi: np.random.rand()*(hi-lo) + lo
 irand = lambda lo, hi: int(np.random.rand()*(hi-lo) + lo)
@@ -29,9 +32,12 @@ TRAIN_LEN = 78660
 batch_size = 2000 #ilog_rand(32, 3200)
 steps_per_epoch = int(1+TRAIN_LEN/batch_size)
 epochs = int(1+TOTAL_STEPS/steps_per_epoch)
-epochs = 200
+# epochs = 200
 
 swa_args = {
+    'slurm_id': args.slurm_id,
+    'command': utils.print_and_return_command(),
+    'version': args.version,
     'swa_lr' : 1e-4, #1e-4 is largest before NaN
     'swa_start' : int(0.5*TOTAL_STEPS), #step
     'swa_recording_lr_factor': 0.5,
@@ -96,3 +102,5 @@ spock_reg_model.save_swag(swag_model, output_filename + '.pkl')
 
 import pickle as pkl
 pkl.dump(swag_model.ssX, open(output_filename + '_ssX.pkl', 'wb'))
+
+print('Finished running')
