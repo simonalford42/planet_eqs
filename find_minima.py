@@ -12,6 +12,7 @@ import numpy as np
 from scipy.stats import truncnorm
 import sys
 from parse_swag_args import parse
+import utils
 
 rand = lambda lo, hi: np.random.rand()*(hi-lo) + lo
 irand = lambda lo, hi: int(np.random.rand()*(hi-lo) + lo)
@@ -28,9 +29,13 @@ TRAIN_LEN = 78660
 batch_size = 2000 #ilog_rand(32, 3200)
 steps_per_epoch = int(1+TRAIN_LEN/batch_size)
 epochs = int(1+TOTAL_STEPS/steps_per_epoch)
-epochs = 200
+# epochs = 200
+
 
 args = {
+    'slurm_id': args.slurm_id,
+    'command': utils.print_and_return_command(),
+    'version': args.version,
     'seed': seed,
     'batch_size': batch_size,
     'hidden': args.hidden,#ilog_rand(50, 1000),
@@ -98,3 +103,5 @@ logger.save()
 
 model.load_state_dict(torch.load(checkpointer.best_model_path)['state_dict'])
 model.make_dataloaders()
+
+print('Finished running')

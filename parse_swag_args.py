@@ -23,6 +23,7 @@ def parse(glob=False):
     parser.add_argument('--train_all', action='store_true', default=False, help='default=False')
     parser.add_argument('--lower_std', action='store_true', default=False, help='default=False')
     parser.add_argument('--no_log', action='store_true', default=False, help='disable logging')
+    parser.add_argument('--slurm_id', type=int, default=-1, help='slurm job id')
     args = parser.parse_args()
     extra = ''
     if args.no_nan:

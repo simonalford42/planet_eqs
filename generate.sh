@@ -15,9 +15,12 @@ gen_scatterplot_figures=true
 # gen_feature_importances=true
 
 
+# 3948 worked
+# 6428 doesnt work 
+# # 1409 worked, 
 if [ "$gen_scatterplot_figures" = true ] ; then
-    python main_figures.py --version 3948 --total_steps 300000 --swa_steps 50000 --angles --no_mmr --no_nan --no_eplusminus --seed 1 --plot
-    python main_figures.py --version 3948 --total_steps 300000 --swa_steps 50000 --angles --no_mmr --no_nan --no_eplusminus --seed 1 --plot --plot_random
+    python main_figures.py --version 1409 --total_steps 300000 --swa_steps 50000 --angles --no_mmr --no_nan --no_eplusminus --seed 1 --plot "$@"
+    python main_figures.py --version 1409 --total_steps 300000 --swa_steps 50000 --angles --no_mmr --no_nan --no_eplusminus --seed 1 --plot --plot_random "$@"
 fi
 
 if [ "$gen_5p_figures" = true ] ; then
