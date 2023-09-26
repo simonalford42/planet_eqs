@@ -32,7 +32,6 @@ TRAIN_LEN = 78660
 batch_size = 2000 #ilog_rand(32, 3200)
 steps_per_epoch = int(1+TRAIN_LEN/batch_size)
 epochs = int(1+TOTAL_STEPS/steps_per_epoch)
-# epochs = 200
 
 swa_args = {
     'slurm_id': args.slurm_id,
@@ -102,5 +101,6 @@ spock_reg_model.save_swag(swag_model, output_filename + '.pkl')
 
 import pickle as pkl
 pkl.dump(swag_model.ssX, open(output_filename + '_ssX.pkl', 'wb'))
+print('saved model to ' + output_filename + '.pkl ...')
 
 print('Finished running')

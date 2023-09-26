@@ -10,7 +10,7 @@
 #SBATCH -n 1
 #SBATCH --requeue
  # total limit (hh:mm:ss)
-#SBATCH -t 08:00:00
+#SBATCH -t 24:00:00
 #SBATCH --mem=100G
 #SBATCH --gres=gpu:1
 #SBATCH --partition=ellis

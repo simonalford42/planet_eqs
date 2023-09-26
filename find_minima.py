@@ -68,6 +68,7 @@ args = {
     'lower_std': args.lower_std,
     'train_all': args.train_all,
     'no_log': args.no_log,
+    'pysr_model': args.pysr_model,
 }
 
 name = 'full_swag_pre_' + checkpoint_filename

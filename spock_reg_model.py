@@ -356,7 +356,12 @@ class VarModel(pl.LightningModule):
         self.include_angles = False if 'include_angles' not in hparams else hparams['include_angles']
 
         self.n_features = hparams['time_series_features'] * (1 + int(hparams['include_derivatives']))
-        self.feature_nn = mlp(self.n_features, hparams['latent'], hparams['hidden'], hparams['in'])
+        if 'pysr_model' in hparams and hparams['pysr_model']:
+            self.feature_nn = PySRRegressor.from_file(hparams['pysr_model']).pytorch()
+            if hparams['freeze_pysr']:
+                self.feature_nn.requires_grad(False)
+        else:
+            self.feature_nn = mlp(self.n_features, hparams['latent'], hparams['hidden'], hparams['in'])
         self.regress_nn = mlp(hparams['latent']*2 + int(self.fix_megno)*2, 2, hparams['hidden'], hparams['out'])
         self.input_noise_logvar = nn.Parameter(torch.zeros(self.n_features)-2)
         self.summary_noise_logvar = nn.Parameter(torch.zeros(hparams['latent'] * 2 + int(self.fix_megno)*2) - 2) # add to summaries, not direct latents
