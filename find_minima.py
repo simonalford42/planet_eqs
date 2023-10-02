@@ -29,12 +29,14 @@ TRAIN_LEN = 78660
 batch_size = 2000 #ilog_rand(32, 3200)
 steps_per_epoch = int(1+TRAIN_LEN/batch_size)
 epochs = int(1+TOTAL_STEPS/steps_per_epoch)
+print(f"epochs: {epochs}")
 # epochs = 200
 
+command = utils.get_script_execution_command()
+print(command)
 
 args = {
     'slurm_id': args.slurm_id,
-    'command': utils.print_and_return_command(),
     'version': args.version,
     'seed': seed,
     'batch_size': batch_size,
@@ -69,6 +71,7 @@ args = {
     'train_all': args.train_all,
     'no_log': args.no_log,
     'pysr_model': args.pysr_model,
+    'swag': False,
 }
 
 name = 'full_swag_pre_' + checkpoint_filename
@@ -90,7 +93,9 @@ trainer = Trainer(
 
 try:
     trainer.fit(model)
-except ValueError:
+except ValueError as e:
+    print('Error while training')
+    print(e)
     model.load_state_dict(torch.load(checkpointer.best_model_path)['state_dict'])
 
 # logger.log_hyperparams(params=model.hparams, metrics={'val_loss': checkpointer.best_model_score.item()})

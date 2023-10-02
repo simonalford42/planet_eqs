@@ -28,7 +28,8 @@ from custom_cmap import custom_cmap
 import sys
 import utils
 
-utils.print_and_return_command()
+command = utils.get_script_execution_command()
+print(command)
 
 # +
 # manual_argv = "--version 50 --total_steps 300000 --swa_steps 50000 --angles --no_mmr --no_nan --no_eplusminus --seed -1 --plot".split(' ')

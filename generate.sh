@@ -20,7 +20,8 @@ gen_scatterplot_figures=true
 # # 1409 doesnt work
 if [ "$gen_scatterplot_figures" = true ] ; then
     python main_figures.py --version 3948 --total_steps 300000 --swa_steps 50000 --angles --no_mmr --no_nan --no_eplusminus --seed 0 --plot "$@"
-    python main_figures.py --version 3948 --total_steps 300000 --swa_steps 50000 --angles --no_mmr --no_nan --no_eplusminus --seed 0 --plot --plot_random "$@"
+    # the test set... wait until the end to use
+    # python main_figures.py --version 3948 --total_steps 300000 --swa_steps 50000 --angles --no_mmr --no_nan --no_eplusminus --seed 0 --plot --plot_random "$@"
 fi
 
 if [ "$gen_5p_figures" = true ] ; then

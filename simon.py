@@ -22,52 +22,8 @@ def compute_features(inputs):
     assert inputs.shape[-1] == 31
 
 
-def import_inputs_and_nn_features():
-    args, checkpoint_filename = parse()
-    seed = args.seed
-
+def import_inputs_and_nn_features(args, checkpoint_filename):
     # Fixed hyperparams:
-    lr = 5e-4
-    TOTAL_STEPS = args.total_steps
-    TRAIN_LEN = 78660
-    batch_size = 2000 #ilog_rand(32, 3200)
-    steps_per_epoch = int(1+TRAIN_LEN/batch_size)
-    epochs = int(1+TOTAL_STEPS/steps_per_epoch)
-    epochs, epochs//10
-    args = {
-        'seed': seed,
-        'batch_size': batch_size,
-        'hidden': args.hidden,#ilog_rand(50, 1000),
-        'in': 1,
-        'latent': args.latent, #2,#ilog_rand(4, 500),
-        'lr': lr,
-        'swa_lr': lr/2,
-        'out': 1,
-        'samp': 5,
-        'swa_start': epochs//2,
-        'weight_decay': 1e-14,
-        'to_samp': 1,
-        'epochs': epochs,
-        'scheduler': True,
-        'scheduler_choice': 'swa',
-        'steps': TOTAL_STEPS,
-        'beta_in': 1e-5,
-        'beta_out': args.beta,#0.003,
-        'act': 'softplus',
-        'noisy_val': False,
-        'gradient_clip': 0.1,
-        # Much of these settings turn off other parameters tried:
-        'fix_megno': args.megno, #avg,std of megno
-        'fix_megno2': (not args.megno), #Throw out megno completely
-        'include_angles': args.angles,
-        'include_mmr': (not args.no_mmr),
-        'include_nan': (not args.no_nan),
-        'include_eplusminus': (not args.no_eplusminus),
-        'power_transform': args.power_transform,
-        'lower_std': args.lower_std,
-        'train_all': args.train_all,
-    }
-
     name = 'full_swag_pre_' + checkpoint_filename
     checkpoint_path = checkpoint_filename + '/version=0-v0.ckpt'
     model = spock_reg_model.VarModel.load_from_checkpoint(checkpoint_path)
@@ -104,9 +60,9 @@ def import_inputs_and_nn_features():
     return X, y
 
 
-def run_regression(X, y):
+def run_regression(X, y, args):
     model = pysr.PySRRegressor(
-        equation_file='results/hall_of_fame.csv',
+        equation_file=f'results/hall_of_fame_{args.version}_{args.seed}.pkl',
         niterations=5,  # < Increase me for better results
         binary_operators=["+", "*", '/', '-', '^'],
         unary_operators=[
@@ -126,5 +82,20 @@ def run_regression(X, y):
     torch_model = model.pytorch()
 
 if __name__ == '__main__':
-    X, y = import_inputs_and_nn_features()
-    run_regression(X, y)
+    args, checkpoint_filename = parse()
+    # X, y = import_inputs_and_nn_features(args, checkpoint_filename)
+    # run_regression(X, y, args)
+
+    feature_nn = pysr.PySRRegressor.from_file('results/hall_of_fame_7955_5.pkl').pytorch()
+    # .pytorch() returns a list of 20 nn's, one for each iter, I think
+    feature_nn = feature_nn[-1]
+
+    name = 'full_swag_pre_' + checkpoint_filename
+    checkpoint_path = checkpoint_filename + '/version=0-v0.ckpt'
+    model = spock_reg_model.VarModel.load_from_checkpoint(checkpoint_path)
+    model.make_dataloaders()
+    model.eval()
+
+    # just takes a random batch of inputs and passes them through the neural network
+    batch = next(iter(model.train_dataloader()))
+    feature_nn(batch)

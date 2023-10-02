@@ -15,7 +15,8 @@ import time
 from tqdm.notebook import tqdm
 import utils
 
-utils.print_args()
+command = utils.get_script_execution_command()
+print(command)
 
 rand = lambda lo, hi: np.random.rand()*(hi-lo) + lo
 irand = lambda lo, hi: int(np.random.rand()*(hi-lo) + lo)
@@ -32,10 +33,10 @@ TRAIN_LEN = 78660
 batch_size = 2000 #ilog_rand(32, 3200)
 steps_per_epoch = int(1+TRAIN_LEN/batch_size)
 epochs = int(1+TOTAL_STEPS/steps_per_epoch)
+print(f"epochs: {epochs}")
 
 swa_args = {
     'slurm_id': args.slurm_id,
-    'command': utils.print_and_return_command(),
     'version': args.version,
     'swa_lr' : 1e-4, #1e-4 is largest before NaN
     'swa_start' : int(0.5*TOTAL_STEPS), #step
@@ -43,6 +44,7 @@ swa_args = {
     'c': 5,
     'K': 30,
     'steps': TOTAL_STEPS,
+    'swag': True,
 }
 
 output_filename = checkpoint_filename + '_output'
@@ -63,6 +65,9 @@ except FileNotFoundError:
         checkpoint_filename + '/version=0.ckpt')
         .init_params(swa_args)
     )
+
+if args.pysr_model:
+    assert type(swag_model.feature_nn) == PySRFeatureNN
 
 max_l2_norm = 0.1*sum(p.numel() for p in swag_model.parameters() if p.requires_grad)
 
@@ -86,8 +91,9 @@ trainer = Trainer(
 
 try:
     trainer.fit(swag_model)
-except ValueError:
+except ValueError as e:
     print("Model", checkpoint_filename, 'exited early!', flush=True)
+    print(e)
     exit(1)
 
 # Save model:

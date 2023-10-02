@@ -15,13 +15,8 @@ DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 WARNINGS = set()
 
 
-def print_and_return_command(print_out=True):
-    c = 'python ' + ' '.join(sys.argv)
-    if print_out:
-        print(c)
-
-    return c
-
+def get_script_execution_command():
+    return 'python ' + ' '.join(sys.argv)
 
 def gpu_check():
     print_torch_device()

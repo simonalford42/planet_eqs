@@ -20,10 +20,9 @@ conda activate bnn_chaos_model
 
 # Enable errexit (exit on error)
 set -e
-# for seed in `seq 0 2`; do
-# Generate a random number between 1 and 9999
-random_number=$(shuf -i 1-9999 -n 1)
 
-python find_minima.py --total_steps 300000 --swa_steps 50000 --version $random_number --angles --no_mmr --no_nan --no_eplusminus --slurm_id $SLURM_JOB_ID "$@"
-python run_swag.py --total_steps 300000 --swa_steps 50000 --version $random_number --angles --no_mmr --no_nan --no_eplusminus --slurm_id $SLURM_JOB_ID "$@"
-# done
+version=$((1 + RANDOM % 9999))
+
+# python find_minima.py --total_steps 300000 --swa_steps 50000  --angles --no_mmr --no_nan --no_eplusminus --version $version --pysr_model 'results/hall_of_fame_7955_5.pkl' --slurm_id $SLURM_JOB_ID "$@"
+python run_swag.py --total_steps 300000 --swa_steps 50000 --angles --no_mmr --no_nan --no_eplusminus --version $version --slurm_id $SLURM_JOB_ID "$@"
+# python main_figures.py --version $version --total_steps 300000 --swa_steps 50000 --angles --no_mmr --no_nan --no_eplusminus --plot "$@"

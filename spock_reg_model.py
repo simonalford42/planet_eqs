@@ -1,3 +1,6 @@
+import pysr
+pysr.julia_helpers.init_julia()
+
 import pickle as pkl
 from copy import deepcopy as copy
 from sklearn.model_selection import train_test_split
@@ -22,6 +25,27 @@ from functools import wraps
 import warnings
 from torch.optim.optimizer import Optimizer
 from collections import OrderedDict
+import einops
+
+
+class PySRFeatureNN(torch.nn.Module):
+    def __init__(self, filepath):
+        super().__init__()
+        # something like 'results/hall_of_fame_7955_5.pkl'
+        self.filepath = filepath
+        self.module_list = nn.ModuleList(pysr.PySRRegressor.from_file(filepath).pytorch())
+
+
+    def forward(self, x):
+        B, T, d = x.shape
+        # input: [B, T, d]
+        # output: [B, n, d]
+        # the learned features expect a single batch axis as input
+        x = einops.rearrange(x, 'B T d -> (B T) d')
+        x = [module(x) for module in self.module_list]
+        x = einops.rearrange(x, 'n B -> B n')
+        x = einops.rearrange(x, '(B T) n -> B T n', B=B, T=T)
+        return x
 
 
 class CustomOneCycleLR(torch.optim.lr_scheduler._LRScheduler):
@@ -357,8 +381,9 @@ class VarModel(pl.LightningModule):
 
         self.n_features = hparams['time_series_features'] * (1 + int(hparams['include_derivatives']))
         if 'pysr_model' in hparams and hparams['pysr_model']:
-            self.feature_nn = PySRRegressor.from_file(hparams['pysr_model']).pytorch()
-            if hparams['freeze_pysr']:
+            self.feature_nn = PySRFeatureNN(hparams['pysr_model'])
+
+            if 'freeze_pysr' in hparams and hparams['freeze_pysr']:
                 self.feature_nn.requires_grad(False)
         else:
             self.feature_nn = mlp(self.n_features, hparams['latent'], hparams['hidden'], hparams['in'])
@@ -423,16 +448,17 @@ class VarModel(pl.LightningModule):
         sample_mu = torch.mean(x, dim=1)
         sample_var = torch.std(x, dim=1)**2
         n = x.shape[1]
-        
+
         std_in_mu = torch.sqrt(sample_var/n)
         std_in_var = torch.sqrt(2*sample_var**2/(n-1))
-        
+
         # Take a "sample" of the average/variance of the learned features
         mu_sample =  torch.randn_like(sample_mu) *std_in_mu  + sample_mu
         var_sample = torch.randn_like(sample_var)*std_in_var + sample_var
 
         # Get to same unit
         std_sample = torch.sqrt(torch.abs(var_sample) + EPSILON)
+
         #clatent = torch.cat((mu_sample, var_sample), dim=1)
         clatent = torch.cat((mu_sample, std_sample), dim=1)
         self.latents = x
@@ -783,7 +809,6 @@ class SWAGModel(VarModel):
             else:
                 p_vec = torch.cat((p_vec, p.reshape(-1)))
 
-        print(f"p_vec.shape={p_vec.shape}")
         return p_vec
 
     def load(self, p_vec):
@@ -795,7 +820,9 @@ class SWAGModel(VarModel):
             old_p = cur_state_dict[key]
             size = old_p.numel()
             shape = old_p.shape
-            new_p = p_vec[i:i+size].reshape(*shape)
+            new_p = p_vec[i:i+size]
+            if len(shape) > 0:
+                new_p = new_p.reshape(*shape)
             new_state_dict[key] = new_p
             i += size
 
@@ -847,8 +874,6 @@ class SWAGModel(VarModel):
         #fraction = self.global_step / self.hparams['steps']
         #if fraction > 0.5:
         if self.global_step > self.hparams['swa_start']:
-            print('aggregating model')
-            print('self.pre_D.shape: ', self.pre_D.shape)
             self.aggregate_model()
 
         # Record validation loss, and aggregated model loss
