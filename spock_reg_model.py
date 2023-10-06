@@ -26,6 +26,7 @@ import warnings
 from torch.optim.optimizer import Optimizer
 from collections import OrderedDict
 import einops
+from utils import assert_equal, assert_shape
 
 
 class PySRFeatureNN(torch.nn.Module):
@@ -34,7 +35,6 @@ class PySRFeatureNN(torch.nn.Module):
         # something like 'results/hall_of_fame_7955_5.pkl'
         self.filepath = filepath
         self.module_list = nn.ModuleList(pysr.PySRRegressor.from_file(filepath).pytorch())
-
 
     def forward(self, x):
         B, T, d = x.shape
@@ -46,6 +46,25 @@ class PySRFeatureNN(torch.nn.Module):
         x = einops.rearrange(x, 'n B -> B n')
         x = einops.rearrange(x, '(B T) n -> B T n', B=B, T=T)
         return x
+
+
+class RandomFeatureNN(torch.nn.Module):
+    def __init__(self, in_n, out_n):
+        super().__init__()
+        self.in_n = in_n
+        self.out_n = out_n
+        # not learnable!
+        self.random_projection = torch.rand(T, n) * 2 - 1
+
+    def forward(self, x):
+        # input: [B, T, d]
+        B, T, d = x.shape
+        assert_equal(T, self.in_n)
+        # output: [B, n, d]
+        # basically double batch matrix multiply
+        out = torch.einsum('ijk, kl', x, self.random_projection)
+        assert_shape(out, (B, self.out_n, d))
+        return out
 
 
 class CustomOneCycleLR(torch.optim.lr_scheduler._LRScheduler):
@@ -385,6 +404,8 @@ class VarModel(pl.LightningModule):
 
             if 'freeze_pysr' in hparams and hparams['freeze_pysr']:
                 self.feature_nn.requires_grad(False)
+        elif 'random_baseline' in hparams and hparams['random_baseline']:
+            self.feature_nn = RandomFeatureNN(in_n=self.n_features, out_n=hparams['latent'])
         else:
             self.feature_nn = mlp(self.n_features, hparams['latent'], hparams['hidden'], hparams['in'])
         self.regress_nn = mlp(hparams['latent']*2 + int(self.fix_megno)*2, 2, hparams['hidden'], hparams['out'])

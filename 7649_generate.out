@@ -1,0 +1,22 @@
+python main_figures.py --version 3948 --total_steps 300000 --swa_steps 50000 --angles --no_mmr --no_nan --no_eplusminus --seed 0 --plot --version 7649 --seed 0 --total_steps 200000
+  0%|          | 0/3 [00:00<?, ?it/s]
+low confidence gets RMSE of 1.21
+Weighted by SNR, this is: 1.03
+Between 4 and 4.99, the bias is 0.460 and the weighted bias is 0.290
+Between 5 and 5.99, the bias is 0.408 and the weighted bias is 0.270
+Between 6 and 6.99, the bias is 0.352 and the weighted bias is 0.330
+Between 7 and 7.99, the bias is 0.057 and the weighted bias is 0.164
+Between 8 and 8.99, the bias is -0.452 and the weighted bias is -0.299
+Model gets ROC of 0.924
+Model gets weighted ROC of 0.954
+python main_figures.py --version 3948 --total_steps 300000 --swa_steps 50000 --angles --no_mmr --no_nan --no_eplusminus --seed 0 --plot --plot_random --version 7649 --seed 0 --total_steps 200000
+  0%|          | 0/6 [00:00<?, ?it/s]
+low confidence gets RMSE of 1.32
+Weighted by SNR, this is: 1.20
+Between 4 and 4.99, the bias is 0.573 and the weighted bias is 0.361
+Between 5 and 5.99, the bias is 0.660 and the weighted bias is 0.538
+Between 6 and 6.99, the bias is 0.567 and the weighted bias is 0.555
+Between 7 and 7.99, the bias is 0.194 and the weighted bias is 0.231
+Between 8 and 8.99, the bias is -0.475 and the weighted bias is -0.435
+Model gets ROC of 0.927
+Model gets weighted ROC of 0.946

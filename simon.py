@@ -87,7 +87,7 @@ if __name__ == '__main__':
     # run_regression(X, y, args)
 
     feature_nn = pysr.PySRRegressor.from_file('results/hall_of_fame_7955_5.pkl').pytorch()
-    # .pytorch() returns a list of 20 nn's, one for each iter, I think
+    # .pytorch() returns a list of 20 nn's, one for each iter (?) or maybe feature?
     feature_nn = feature_nn[-1]
 
     name = 'full_swag_pre_' + checkpoint_filename
