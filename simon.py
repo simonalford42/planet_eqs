@@ -79,7 +79,7 @@ def run_regression(X, y, args):
         ],
         # prevent ^ from using complex exponents, nesting power laws is expressive but uninterpretable
         # base can have any complexity, exponent can have max 1 complexity
-        constraints={“^”: (-1, 1)}
+        constraints={'^': (-1, 1)},
     )
 
     model.fit(X, y)
