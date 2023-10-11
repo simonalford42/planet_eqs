@@ -66,16 +66,20 @@ def run_regression(X, y, args):
         niterations=5,  # < Increase me for better results
         binary_operators=["+", "*", '/', '-', '^'],
         unary_operators=[
-            "square",
-            "cube",
-            "exp",
+            # use fewer operators, nonredundant
+            # "square",
+            # "cube",
+            # "exp",
             "log",
-            'abs',
-            'sqrt',
+            # 'abs',
+            # 'sqrt',
             'sin',
-            'cos',
-            'tan',
+            # 'cos',
+            # 'tan',
         ],
+        # prevent ^ from using complex exponents, nesting power laws is expressive but uninterpretable
+        # base can have any complexity, exponent can have max 1 complexity
+        constraints={“^”: (-1, 1)}
     )
 
     model.fit(X, y)

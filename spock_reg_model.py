@@ -406,6 +406,8 @@ class VarModel(pl.LightningModule):
                 self.feature_nn.requires_grad(False)
         elif 'random_baseline' in hparams and hparams['random_baseline']:
             self.feature_nn = RandomFeatureNN(in_n=self.n_features, out_n=hparams['latent'])
+        elif 'identity' in hparams['special_args']:
+            self.feature_nn = torch.nn.Identity()
         else:
             self.feature_nn = mlp(self.n_features, hparams['latent'], hparams['hidden'], hparams['in'])
         self.regress_nn = mlp(hparams['latent']*2 + int(self.fix_megno)*2, 2, hparams['hidden'], hparams['out'])

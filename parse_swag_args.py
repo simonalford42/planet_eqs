@@ -27,6 +27,7 @@ def parse(glob=False):
     parser.add_argument('--slurm_id', type=int, default=-1, help='slurm job id')
     parser.add_argument('--pysr_model', type=str, default=None, help='PySR model to load and replace f1 with')
     parser.add_argument('--random-features', action='store_true', default=False, help='have f1 compute random features as a baseline')
+    parser.add_argument('--special-args', type=str, default='', help='special arguments')
     args = parser.parse_args()
     extra = ''
     if args.no_nan:
@@ -35,6 +36,10 @@ def parse(glob=False):
         extra += '_noeplusminus=1' 
     if args.train_all:
         extra += '_train_all=1' 
+
+    if 'identity' in args.special_args:
+        # just hard coding for the n features with the default arguments..
+        args.latent = 41
 
     checkpoint_filename = (
             "results/steps=%d_megno=%d_angles=%d_power=%d_hidden=%d_latent=%d_nommr=%d" %

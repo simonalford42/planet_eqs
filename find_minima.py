@@ -72,6 +72,7 @@ args = {
     'no_log': args.no_log,
     'pysr_model': args.pysr_model,
     'swag': False,
+    'special_args': args.special_args,
 }
 
 name = 'full_swag_pre_' + checkpoint_filename
