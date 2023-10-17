@@ -334,8 +334,8 @@ def get_data(
     dataset = torch.utils.data.TensorDataset(X[:train_len, :, idxes], y[:train_len])
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, pin_memory=True, num_workers=8)
 
-    # Cut up dataset into only the random or resonant parts. 
-    # Only needed if plotting OR 
+    # Cut up dataset into only the random or resonant parts.
+    # Only needed if plotting OR
     if (not plot) or (not train_all):
         test_dataset = torch.utils.data.TensorDataset(X[train_len:, :, idxes], y[train_len:])
     else:
@@ -345,7 +345,7 @@ def get_data(
         test_dataset = torch.utils.data.TensorDataset(X[train_len:][r[train_len:]][:, :, idxes], y[train_len:][r[train_len:]])
 
     test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=3000, shuffle=False, pin_memory=True, num_workers=8)
-        
+
     kwargs['model'].ssX = copy(ssX)
 
     return dataloader, test_dataloader
@@ -384,13 +384,13 @@ def safe_log_erf(x):
     value_giving_zero = torch.zeros_like(x, device=x.device)
     x_under = torch.where(base_mask, x, value_giving_zero)
     x_over = torch.where(~base_mask, x, value_giving_zero)
-    
+
     f_under = lambda x: (
-         0.485660082730562*x + 0.643278438654541*torch.exp(x) + 
+         0.485660082730562*x + 0.643278438654541*torch.exp(x) +
          0.00200084619923262*x**3 - 0.643250926022749 - 0.955350621183745*x**2
     )
     f_over = lambda x: torch.log(1.0+torch.erf(x))
-    
+
     return f_under(x_under) + f_over(x_over)
 
 EPSILON = 1e-5
@@ -431,6 +431,7 @@ class VarModel(pl.LightningModule):
         else:
             assert hparams['f1_variant'] == 'default'
             self.feature_nn = mlp(self.n_features, hparams['latent'], hparams['hidden'], hparams['in'])
+
         self.regress_nn = mlp(hparams['latent']*2 + int(self.fix_megno)*2, 2, hparams['hidden'], hparams['out'])
         self.input_noise_logvar = nn.Parameter(torch.zeros(self.n_features)-2)
         self.summary_noise_logvar = nn.Parameter(torch.zeros(hparams['latent'] * 2 + int(self.fix_megno)*2) - 2) # add to summaries, not direct latents
@@ -579,7 +580,7 @@ class VarModel(pl.LightningModule):
         #x is (batch, time, feature)
         if noisy_val:
             x = self.add_input_noise(x)
-        
+
         summary_stats = self.compute_summary_stats(x)
         if self.fix_megno:
             summary_stats = torch.cat([summary_stats, megno_avg_std], dim=1)
@@ -643,7 +644,7 @@ class VarModel(pl.LightningModule):
             )
         self.random_sample = init_settings[0]
         self.to(init_settings[1])
-        return np.average(all_samp, axis=0) 
+        return np.average(all_samp, axis=0)
 
     def _lossfnc(self, testy, y):
         mu = testy[:, [0]]
@@ -884,7 +885,7 @@ class SWAGModel(VarModel):
             else:
                 self.w_avg = (self.w_avg * self.n_models + cur_w) / (self.n_models + 1)
                 self.w2_avg = (self.w2_avg * self.n_models + cur_w2) / (self.n_models + 1)
-            
+
             if self.pre_D is None:
                 self.pre_D = cur_w.clone()[:, None]
             elif self.current_epoch % self.c == 0:
@@ -892,7 +893,7 @@ class SWAGModel(VarModel):
                 self.pre_D = torch.cat((self.pre_D, cur_w[:, None]), dim=1)
                 if self.pre_D.shape[1] > self.K:
                     self.pre_D = self.pre_D[:, 1:]
-                    
+
 
         self.n_models += 1
 
@@ -1029,7 +1030,7 @@ def save_swag(swag_model, path):
     }
 
     torch.save(save_items, path)
-    
+
 def load_swag(path):
     save_items = torch.load(path)
     swag_model = (
@@ -1074,5 +1075,5 @@ def load_swag(path):
         except FileNotFoundError:
             print(f"ssX file not found! {ssX_file}")
             ...
-    
+
     return swag_model
