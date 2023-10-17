@@ -54,16 +54,32 @@ class RandomFeatureNN(torch.nn.Module):
         self.in_n = in_n
         self.out_n = out_n
         # not learnable!
-        self.random_projection = torch.rand(T, n) * 2 - 1
+        self.random_projection = nn.Parameter(torch.rand(in_n, out_n) * 2 - 1, requires_grad=False)
 
     def forward(self, x):
-        # input: [B, T, d]
+        assert False, 'random nn'
         B, T, d = x.shape
-        assert_equal(T, self.in_n)
-        # output: [B, n, d]
+        assert_equal(d, self.in_n)
         # basically double batch matrix multiply
         out = torch.einsum('ijk, kl', x, self.random_projection)
-        assert_shape(out, (B, self.out_n, d))
+        assert_shape(out, (B, T, self.out_n))
+        return out
+
+
+class ZeroNN(torch.nn.Module):
+    def __init__(self, in_n, out_n):
+        super().__init__()
+        self.in_n = in_n
+        self.out_n = out_n
+        # not learnable!
+        self.zero_projection = nn.Parameter(torch.zeros(in_n, out_n), requires_grad=False)
+
+    def forward(self, x):
+        B, T, d = x.shape
+        assert_equal(d, self.in_n)
+        # basically double batch matrix multiply
+        out = torch.einsum('ijk, kl', x, self.zero_projection)
+        assert_shape(out, (B, T, self.out_n))
         return out
 
 
@@ -399,16 +415,21 @@ class VarModel(pl.LightningModule):
         self.include_angles = False if 'include_angles' not in hparams else hparams['include_angles']
 
         self.n_features = hparams['time_series_features'] * (1 + int(hparams['include_derivatives']))
-        if 'pysr_model' in hparams and hparams['pysr_model']:
+        if hparams['pysr_model']:
+            # constants can still be optimized with SGD
             self.feature_nn = PySRFeatureNN(hparams['pysr_model'])
-
-            if 'freeze_pysr' in hparams and hparams['freeze_pysr']:
+            if hparams['f1_variant'] == 'pysr_frozen':
                 self.feature_nn.requires_grad(False)
-        elif 'random_baseline' in hparams and hparams['random_baseline']:
+            else:
+                assert hparams['f1_variant'] == 'pysr'
+        elif hparams['f1_variant'] == 'random_features':
             self.feature_nn = RandomFeatureNN(in_n=self.n_features, out_n=hparams['latent'])
-        elif 'identity' in hparams['special_args']:
+        elif hparams['f1_variant'] == 'identity':
             self.feature_nn = torch.nn.Identity()
+        elif hparams['f1_variant'] == 'zero':
+            self.feature_nn = ZeroNN(in_n=self.n_features, out_n=hparams['latent'])
         else:
+            assert hparams['f1_variant'] == 'default'
             self.feature_nn = mlp(self.n_features, hparams['latent'], hparams['hidden'], hparams['in'])
         self.regress_nn = mlp(hparams['latent']*2 + int(self.fix_megno)*2, 2, hparams['hidden'], hparams['out'])
         self.input_noise_logvar = nn.Parameter(torch.zeros(self.n_features)-2)

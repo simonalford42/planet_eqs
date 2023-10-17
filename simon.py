@@ -16,6 +16,7 @@ from scipy.stats import truncnorm
 import sys
 from parse_swag_args import parse
 from einops import rearrange
+from sklearn.decomposition import PCA
 
 def compute_features(inputs):
     model = PySRRegressor.from_file('results/hall_of_fame.pkl')
@@ -26,7 +27,12 @@ def import_inputs_and_nn_features(args, checkpoint_filename):
     # Fixed hyperparams:
     name = 'full_swag_pre_' + checkpoint_filename
     checkpoint_path = checkpoint_filename + '/version=0-v0.ckpt'
-    model = spock_reg_model.VarModel.load_from_checkpoint(checkpoint_path)
+    try:
+        model = spock_reg_model.VarModel.load_from_checkpoint(checkpoint_path)
+    except FileNotFoundError:
+        checkpoint_path = checkpoint_filename + '/version=0.ckpt'
+        model = spock_reg_model.VarModel.load_from_checkpoint(checkpoint_path)
+
     model.make_dataloaders()
     model.eval()
 
@@ -61,8 +67,12 @@ def import_inputs_and_nn_features(args, checkpoint_filename):
 
 
 def run_regression(X, y, args):
+    # go down to 6 features to make SR easier
+    # X = PCA(n_components=6).fit_transform(X)
+
     model = pysr.PySRRegressor(
-        equation_file=f'results/hall_of_fame_{args.version}_{args.seed}.pkl',
+        # equation_file=f'results/hall_of_fame_{args.version}_{args.seed}.pkl',
+        equation_file=f'results/hall_of_fame_{args.version}_{args.seed}.csv',
         niterations=5,  # < Increase me for better results
         binary_operators=["+", "*", '/', '-', '^'],
         unary_operators=[
@@ -87,19 +97,19 @@ def run_regression(X, y, args):
 
 if __name__ == '__main__':
     args, checkpoint_filename = parse()
-    # X, y = import_inputs_and_nn_features(args, checkpoint_filename)
-    # run_regression(X, y, args)
+    X, y = import_inputs_and_nn_features(args, checkpoint_filename)
+    run_regression(X, y, args)
 
-    feature_nn = pysr.PySRRegressor.from_file('results/hall_of_fame_7955_5.pkl').pytorch()
-    # .pytorch() returns a list of 20 nn's, one for each iter (?) or maybe feature?
-    feature_nn = feature_nn[-1]
+    # feature_nn = pysr.PySRRegressor.from_file('results/hall_of_fame_7955_5.pkl').pytorch()
+    # # .pytorch() returns a list of 20 nn's, one for each iter (?) or maybe feature?
+    # feature_nn = feature_nn[-1]
 
-    name = 'full_swag_pre_' + checkpoint_filename
-    checkpoint_path = checkpoint_filename + '/version=0-v0.ckpt'
-    model = spock_reg_model.VarModel.load_from_checkpoint(checkpoint_path)
-    model.make_dataloaders()
-    model.eval()
+    # name = 'full_swag_pre_' + checkpoint_filename
+    # checkpoint_path = checkpoint_filename + '/version=0-v0.ckpt'
+    # model = spock_reg_model.VarModel.load_from_checkpoint(checkpoint_path)
+    # model.make_dataloaders()
+    # model.eval()
 
-    # just takes a random batch of inputs and passes them through the neural network
-    batch = next(iter(model.train_dataloader()))
-    feature_nn(batch)
+    # # just takes a random batch of inputs and passes them through the neural network
+    # batch = next(iter(model.train_dataloader()))
+    # feature_nn(batch)
