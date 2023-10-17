@@ -57,7 +57,6 @@ class RandomFeatureNN(torch.nn.Module):
         self.random_projection = nn.Parameter(torch.rand(in_n, out_n) * 2 - 1, requires_grad=False)
 
     def forward(self, x):
-        assert False, 'random nn'
         B, T, d = x.shape
         assert_equal(d, self.in_n)
         # basically double batch matrix multiply

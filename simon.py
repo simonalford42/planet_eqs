@@ -79,8 +79,8 @@ def run_regression(X, y):
 
     model = pysr.PySRRegressor(
         # equation_file=f'results/hall_of_fame_{args.version}_{args.seed}.pkl',
-        equation_file=f'results/hall_of_fame_{ARGS.version}_{ARGS.seed}.csv',
-        niterations=5,  # < Increase me for better results
+        equation_file=f'sr_results/hall_of_fame_{ARGS.version}_{ARGS.seed}.csv',
+        niterations=50,  # < Increase me for better results
         binary_operators=["+", "*", '/', '-', '^'],
         unary_operators=[
             # use fewer operators, nonredundant
@@ -102,15 +102,10 @@ def run_regression(X, y):
     model.fit(X, y)
     torch_model = model.pytorch()
 
-def test_zero_net():
-    inputs, targets = get_f1_inputs_and_targets()
-    print(torch.all(targets == 0))
-
 
 if __name__ == '__main__':
-    test_zero_net()
-    # X, y = import_inputs_and_nn_features()
-    # run_regression(X, y)
+    X, y = import_inputs_and_nn_features()
+    run_regression(X, y)
 
     # feature_nn = pysr.PySRRegressor.from_file('results/hall_of_fame_7955_5.pkl').pytorch()
     # # .pytorch() returns a list of 20 nn's, one for each iter (?) or maybe feature?
