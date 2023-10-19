@@ -25,7 +25,8 @@ def parse(glob=False):
     parser.add_argument('--lower_std', action='store_true', default=False, help='default=False')
     parser.add_argument('--no_log', action='store_true', default=False, help='disable logging')
     parser.add_argument('--slurm_id', type=int, default=-1, help='slurm job id')
-    parser.add_argument('--pysr_model', type=str, default=None, help='PySR model to load and replace f1 with')
+    parser.add_argument('--pysr_model', type=str, default=None, help='PySR model to load and replace f1 with, e.g. sr_results/hall_of_fame_9723_0.pkl')
+    parser.add_argument('--sr_f1', action='store_true', default=False, help='do misc. stuff with f1 and SR')
     parser.add_argument('--f1_variant', type=str, default='default',
                         choices=['zero', 'identity', 'pysr', 'pysr_frozen', 'random_features'])
     args = parser.parse_args()

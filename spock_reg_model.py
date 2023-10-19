@@ -418,7 +418,8 @@ class VarModel(pl.LightningModule):
             # constants can still be optimized with SGD
             self.feature_nn = PySRFeatureNN(hparams['pysr_model'])
             if hparams['f1_variant'] == 'pysr_frozen':
-                self.feature_nn.requires_grad(False)
+                for param in self.feature_nn.parameters():
+                    param.requires_grad = False
             else:
                 assert hparams['f1_variant'] == 'pysr'
         elif hparams['f1_variant'] == 'random_features':

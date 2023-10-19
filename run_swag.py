@@ -110,3 +110,9 @@ pkl.dump(swag_model.ssX, open(output_filename + '_ssX.pkl', 'wb'))
 print('saved model to ' + output_filename + '.pkl ...')
 
 print('Finished running')
+import main_figures2
+rmse, snr_rmse, roc, weighted_roc = main_figures2.calc_scores()
+logger.log_metrics(metrics={'rmse': rmse,
+                            'snr_rmse': snr_rmse,
+                            'roc': roc,
+                            'weighted_roc': weighted_roc,})
