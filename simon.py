@@ -14,25 +14,38 @@ import torch
 import numpy as np
 from scipy.stats import truncnorm
 import sys
-from parse_swag_args import parse
+import parse_swag_args
 from einops import rearrange
+from sklearn.decomposition import PCA
+
+ARGS, CHECKPOINT_FILENAME = parse_swag_args.parse()
 
 def compute_features(inputs):
     model = PySRRegressor.from_file('results/hall_of_fame.pkl')
     assert inputs.shape[-1] == 31
 
 
-def import_inputs_and_nn_features(args, checkpoint_filename):
+def get_f1_inputs_and_targets():
     # Fixed hyperparams:
-    name = 'full_swag_pre_' + checkpoint_filename
-    checkpoint_path = checkpoint_filename + '/version=0-v0.ckpt'
-    model = spock_reg_model.VarModel.load_from_checkpoint(checkpoint_path)
+    name = 'full_swag_pre_' + CHECKPOINT_FILENAME
+    checkpoint_path = CHECKPOINT_FILENAME + '/version=0-v0.ckpt'
+    try:
+        model = spock_reg_model.VarModel.load_from_checkpoint(checkpoint_path)
+    except FileNotFoundError:
+        checkpoint_path = CHECKPOINT_FILENAME + '/version=0.ckpt'
+        model = spock_reg_model.VarModel.load_from_checkpoint(checkpoint_path)
+
     model.make_dataloaders()
     model.eval()
 
     # just takes a random batch of inputs and passes them through the neural network
     batch = next(iter(model.train_dataloader()))
     inputs, targets = model.generate_f1_inputs_and_targets(batch, batch_idx=0)
+    return inputs, targets
+
+
+def import_inputs_and_nn_features():
+    inputs, targets =  get_f1_inputs_and_targets()
     print('inputs shape: ', inputs.shape)
     print('targets shape: ', targets.shape)
 
@@ -60,9 +73,13 @@ def import_inputs_and_nn_features(args, checkpoint_filename):
     return X, y
 
 
-def run_regression(X, y, args):
+def run_regression(X, y):
+    # go down to 6 features to make SR easier
+    X = PCA(n_components=6).fit_transform(X)
+
     model = pysr.PySRRegressor(
-        equation_file=f'results/hall_of_fame_{args.version}_{args.seed}.pkl',
+        # equation_file=f'results/hall_of_fame_{args.version}_{args.seed}.pkl',
+        equation_file=f'results/hall_of_fame_{ARGS.version}_{ARGS.seed}.csv',
         niterations=5,  # < Increase me for better results
         binary_operators=["+", "*", '/', '-', '^'],
         unary_operators=[
@@ -85,21 +102,26 @@ def run_regression(X, y, args):
     model.fit(X, y)
     torch_model = model.pytorch()
 
+def test_zero_net():
+    inputs, targets = get_f1_inputs_and_targets()
+    print(torch.all(targets == 0))
+
+
 if __name__ == '__main__':
-    args, checkpoint_filename = parse()
-    # X, y = import_inputs_and_nn_features(args, checkpoint_filename)
-    # run_regression(X, y, args)
+    test_zero_net()
+    # X, y = import_inputs_and_nn_features()
+    # run_regression(X, y)
 
-    feature_nn = pysr.PySRRegressor.from_file('results/hall_of_fame_7955_5.pkl').pytorch()
-    # .pytorch() returns a list of 20 nn's, one for each iter (?) or maybe feature?
-    feature_nn = feature_nn[-1]
+    # feature_nn = pysr.PySRRegressor.from_file('results/hall_of_fame_7955_5.pkl').pytorch()
+    # # .pytorch() returns a list of 20 nn's, one for each iter (?) or maybe feature?
+    # feature_nn = feature_nn[-1]
 
-    name = 'full_swag_pre_' + checkpoint_filename
-    checkpoint_path = checkpoint_filename + '/version=0-v0.ckpt'
-    model = spock_reg_model.VarModel.load_from_checkpoint(checkpoint_path)
-    model.make_dataloaders()
-    model.eval()
+    # name = 'full_swag_pre_' + checkpoint_filename
+    # checkpoint_path = checkpoint_filename + '/version=0-v0.ckpt'
+    # model = spock_reg_model.VarModel.load_from_checkpoint(checkpoint_path)
+    # model.make_dataloaders()
+    # model.eval()
 
-    # just takes a random batch of inputs and passes them through the neural network
-    batch = next(iter(model.train_dataloader()))
-    feature_nn(batch)
+    # # just takes a random batch of inputs and passes them through the neural network
+    # batch = next(iter(model.train_dataloader()))
+    # feature_nn(batch)

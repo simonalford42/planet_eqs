@@ -11,7 +11,7 @@
 #SBATCH --requeue
  # total limit (hh:mm:ss)
 #SBATCH -t 24:00:00
-#SBATCH --mem=100G
+#SBATCH --mem=50G
 #SBATCH --gres=gpu:1
 #SBATCH --partition=ellis
 
@@ -23,6 +23,6 @@ set -e
 
 version=$((1 + RANDOM % 9999))
 
-python find_minima.py --total_steps 300000 --swa_steps 50000  --angles --no_mmr --no_nan --no_eplusminus --version $version --slurm_id $SLURM_JOB_ID "$@"
-python run_swag.py --total_steps 300000 --swa_steps 50000 --angles --no_mmr --no_nan --no_eplusminus --version $version --slurm_id $SLURM_JOB_ID "$@"
-python main_figures.py --version $version --total_steps 300000 --swa_steps 50000 --angles --no_mmr --no_nan --no_eplusminus --plot "$@"
+python -u find_minima.py --total_steps 300000 --swa_steps 50000  --angles --no_mmr --no_nan --no_eplusminus --version $version --slurm_id $SLURM_JOB_ID "$@"
+python -u run_swag.py --total_steps 300000 --swa_steps 50000 --angles --no_mmr --no_nan --no_eplusminus --version $version --slurm_id $SLURM_JOB_ID "$@"
+python -u main_figures.py --version $version --total_steps 300000 --swa_steps 50000 --angles --no_mmr --no_nan --no_eplusminus --plot "$@"

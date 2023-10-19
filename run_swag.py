@@ -67,7 +67,7 @@ except FileNotFoundError:
     )
 
 if args.pysr_model:
-    assert type(swag_model.feature_nn) == PySRFeatureNN
+    assert type(swag_model.feature_nn) == spock_reg_model.PySRFeatureNN
 
 max_l2_norm = 0.1*sum(p.numel() for p in swag_model.parameters() if p.requires_grad)
 
@@ -76,7 +76,7 @@ swag_model.hparams.epochs = epochs
 
 lr_logger = LearningRateMonitor()
 name = 'full_swag_post_' + checkpoint_filename
-logger = WandbLogger(project='bnn chaos model SR', name=name)
+logger = WandbLogger(project='bnn-chaos-model', entity='bnn-chaos-model', name=name)
 checkpointer = ModelCheckpoint(
     filepath=checkpoint_filename + '.ckpt',
     monitor='swa_loss_no_reg'

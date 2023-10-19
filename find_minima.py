@@ -72,12 +72,12 @@ args = {
     'no_log': args.no_log,
     'pysr_model': args.pysr_model,
     'swag': False,
-    'special_args': args.special_args,
+    'f1_variant': args.f1_variant,
 }
 
 name = 'full_swag_pre_' + checkpoint_filename
 # logger = TensorBoardLogger("tb_logs", name=name)
-logger = WandbLogger(project='bnn chaos model SR', name=name)
+logger = WandbLogger(project='bnn-chaos-model', entity='bnn-chaos-model', name=name)
 checkpointer = ModelCheckpoint(filepath=checkpoint_filename + '/{version}')
 model = spock_reg_model.VarModel(args)
 model.make_dataloaders()
