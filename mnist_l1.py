@@ -8,6 +8,7 @@ import numpy as np
 from PIL import Image
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
+import plotext as plot
 
 torch.manual_seed(2)
 
@@ -21,6 +22,8 @@ def im_convert(tensor):
 class Net(nn.Module):
   def __init__(self):
     super(Net,self).__init__()
+    self.feature_mask2 = nn.Parameter(torch.ones((28, 28)), requires_grad=False)
+    self.feature_mask = nn.Parameter(torch.ones(28, 28))
     # a convolutional layer with 1 input channel (grayscale), 10 output channels, a kernel size of 5, and a stride of 1
     self.conv1 = nn.Conv2d(1,10,kernel_size=5,stride=1)
     self.conv2 = nn.Conv2d(10,10,kernel_size=5,stride=1)
@@ -32,6 +35,10 @@ class Net(nn.Module):
     self.fc2 = nn.Linear(100,10)
 
   def forward(self,x):
+    # mask input features
+    x = x * self.feature_mask[None, None, :, :]
+    x = x * self.feature_mask2[None, None, :, :]
+
     x = F.relu(self.conv1(x)) #24x24x10
     x = self.pool(x) #12x12x10
     x = F.relu(self.conv2(x)) #8x8x10
@@ -48,6 +55,20 @@ batch_size = 100
 validation_split = .1
 shuffle_dataset = True
 random_seed= 2
+l1_lambda = 0.01
+l1_lambda_end = 0.01
+iterations = 10
+max_pruned = 0.8
+
+# fn from https://arxiv.org/pdf/1710.01878.pdf
+# https://www.wolframalpha.com/input?i=plot+y+%3D+10+-+10+*+%281+-+x%29%5E3+from+x+%3D+0+to+1
+def prune_percent(f):
+    # f is fraction of run completed between 0 and 1
+    if f < 0.5:
+        return 0
+    else:
+        f2 = (f - 0.5)/0.5
+        return max_pruned - max_pruned * (1 - f2) ** 3
 
 # Creating data indices for training and validation splits:
 dataset_size = len(train_ds)
@@ -72,6 +93,7 @@ test_loader = torch.utils.data.DataLoader(
     datasets.MNIST('../data',train=False,download=True,
       transform=transforms.Compose([transforms.ToTensor()])),batch_size=batch_size,shuffle=True)
 
+l1_batch_delta = (l1_lambda_end - l1_lambda) / (iterations * len(train_loader))
 # fig, ax = plt.subplots(nrows=2,ncols=3)
 
 # i=0
@@ -84,8 +106,8 @@ test_loader = torch.utils.data.DataLoader(
 
 # plt.show()
 
-model = Net()
-optimizer = optim.SGD(model.parameters(),lr=0.0001)
+model = Net().cuda()
+optimizer = optim.SGD(model.parameters(),lr=0.01)
 criterion = nn.CrossEntropyLoss()
 
 train_errors = []
@@ -95,20 +117,34 @@ val_acc = []
 n_train = len(train_loader)*batch_size
 n_val = len(validation_loader)*batch_size
 
-for i in range(10):
-  print('iteration ',i)
+print('training..')
+percent_through = 0
+for i in range(iterations):
   total_loss = 0
   total_acc = 0
   c = 0
   for (images,labels) in train_loader:
-    images = images
-    labels = labels
+    l1_lambda += l1_batch_delta
+    images = images.cuda()
+    labels = labels.cuda()
 
     optimizer.zero_grad()
     output = model(images)
     loss = criterion(output,labels)
+    l1_reg = torch.abs(model.feature_mask).sum()
+    loss = loss + l1_lambda * l1_reg
     loss.backward()
     optimizer.step()
+
+    percent_through += 1/(iterations*len(train_loader))
+    p = prune_percent(percent_through)
+    if p > 0:
+        # set the lowest p fraction to zero
+        k = int(p * model.feature_mask.numel())
+        if k > 0:
+            kth_smallest_value = model.feature_mask.flatten().kthvalue(k)[0]
+            # prune the smallest weights
+            model.feature_mask2[model.feature_mask < kth_smallest_value] = 0
 
     total_loss+=loss.item()
     total_acc+=torch.sum(torch.max(output,dim=1)[1]==labels).item()*1.0
@@ -119,8 +155,8 @@ for i in range(10):
   total_acc_val = 0
   c = 0
   for images,labels in validation_loader:
-    images = images
-    labels = labels
+    images = images.cuda()
+    labels = labels.cuda()
     output = model(images)
     loss = criterion(output,labels)
 
@@ -128,7 +164,23 @@ for i in range(10):
     total_acc_val +=torch.sum(torch.max(output,dim=1)[1]==labels).item()*1.0
     c+=1
 
-  print('iteration ',i,' train loss: ',total_loss/n_train,' train acc: ',total_acc/n_train, ' val loss: ',total_loss_val/n_val,' val acc: ',total_acc_val/n_val)
+  num_masked = (model.feature_mask2 == 0).sum().item() / model.feature_mask2.numel()
+  print('iteration ',i,'train loss: ',total_loss/n_train,'train acc: ',total_acc/n_train, 'val loss: ',total_loss_val/n_val,'val acc: ',total_acc_val/n_val, 'masked: ', num_masked, 'l1_lambda: ', l1_lambda, 'p: ', p)
+  # plot.hist(list(model.feature_mask.flatten()) + [0,1], bins=10)
+  # plot.plot_size(100, 10)
+  # plot.show()
+  # plot.clear_figure()
+  if num_masked > 0:
+      plt.imshow(model.feature_mask2.cpu().detach().numpy(), cmap='Greys')
+      plt.axis('off')
+      plt.show()
+      plt.savefig(f'/home/sca63/temp/iter{i}_mask.png', bbox_inches='tight', pad_inches=0, dpi=100)
+      # show the image in the command line
+      plot.image_plot(f'/home/sca63/temp/iter{i}_mask.png')
+      plot.plot_size(60, 20)
+      plot.show()
+      plot.clear_figure()
+
 
   train_errors.append(total_loss/n_train)
   train_acc.append(total_acc/n_train)
@@ -137,8 +189,8 @@ for i in range(10):
 
 # total_acc = 0
 # for images,labels in test_loader:
-  # images = images
-  # labels = labels
+  # images = images.cuda()
+  # labels = labels.cuda()
   # output = model(images)
   # total_acc+=torch.sum(torch.max(output,dim=1)[1]==labels).item()*1.0
 

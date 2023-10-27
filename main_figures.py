@@ -132,6 +132,7 @@ if args.plot_random:
 
 val_dataloader = swag_ensemble[0]._val_dataloader
 
+
 def sample_full_swag(X_sample):
     """Pick a random model from the ensemble and sample from it
     within each model, it samples from its weights."""
@@ -149,6 +150,10 @@ def sample_full_swag(X_sample):
 truths = []
 preds = []
 raw_preds = []
+
+# print('warning: using train dataloader')
+# dataloader = swag_ensemble[0]._dataloader
+# for X_sample, y_sample in tqdm(dataloader):
 
 nc = 0
 losses = 0.0
@@ -456,6 +461,10 @@ for confidence in confidences_to_plot:
 
     print(f'{confidence} confidence gets RMSE of {np.average(np.square(ppx[ppx < 8.99] - ppy[ppx < 8.99]))**0.5:.2f}')
     print(f'Weighted by SNR, this is: {np.average(np.square(ppx[ppx < 8.99] - ppy[ppx < 8.99]), weights=snr[ppx<8.99])**0.5:.2f}')
+    np.save(checkpoint_filename + '_ppx.npy', ppx)
+    np.save(checkpoint_filename + '_ppy.npy', ppy)
+    np.save(checkpoint_filename + '_snr.npy', snr)
+    assert False
 
     ######################################################
     # Bias scores:

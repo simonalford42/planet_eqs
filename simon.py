@@ -95,57 +95,43 @@ def import_Xy():
     return X, y
 
 
-def run_regression(X, y):
+def run_regression(X, y, args):
     # go down to 6 features to make SR easier
     # X = PCA(n_components=6).fit_transform(X)
 
-    path = utils.next_unused_path('sr_results/hall_of_fame_{ARGS.version}_{ARGS.seed}.pkl', lambda i: f'_{i}')
+    path = utils.next_unused_path(f'sr_results/hall_of_fame_{ARGS.version}_{ARGS.seed}.pkl', lambda i: f'_{i}')
     # replace '.pkl' with '.csv'
     path = path[:-3] + 'csv'
 
     model = pysr.PySRRegressor(
         equation_file=path,
-        niterations=500000,  # < Increase me for better results
+        niterations=500000,
         binary_operators=["+", "*", '/', '-', '^'],
         unary_operators=[
-            # use fewer operators, nonredundant
-            # "square",
-            # "cube",
-            # "exp",
-            "log",
-            # 'abs',
-            # 'sqrt',
-            'sin',
-            # 'cos',
-            # 'tan',
+           # use fewer operators, nonredundant
+           # "square",
+           # "cube",
+           # "exp",
+           "log",
+           # 'abs',
+           # 'sqrt',
+           'sin',
+           # 'cos',
+           # 'tan',
         ],
-        timeout_in_seconds=60 * 60 * 40,
+        maxsize=60,
+        timeout_in_seconds=int(60*60*args.time_in_hours),
         # prevent ^ from using complex exponents, nesting power laws is expressive but uninterpretable
         # base can have any complexity, exponent can have max 1 complexity
         constraints={'^': (-1, 1)},
         nested_constraints={"sin": {"sin": 0}},
-        # cluster_manager="slurm",
     )
-
     model.fit(X, y)
-    # torch_model = model.pytorch()
 
 
 if __name__ == '__main__':
-    # update_args(version=9723)
+    # update_args(version=1278)
     X, y = import_Xy()
-    run_regression(X, y)
+    run_regression(X, y, ARGS)
 
-    # feature_nn = pysr.PySRRegressor.from_file('results/hall_of_fame_7955_5.pkl').pytorch()
-    # # .pytorch() returns a list of 20 nn's, one for each iter (?) or maybe feature?
-    # feature_nn = feature_nn[-1]
 
-    # name = 'full_swag_pre_' + CHECKPOINT_FILENAME
-    # checkpoint_path = CHECKPOINT_FILENAME + '/version=0-v0.ckpt'
-    # model = spock_reg_model.VarModel.load_from_checkpoint(checkpoint_path)
-    # model.make_dataloaders()
-    # model.eval()
-
-    # # just takes a random batch of inputs and passes them through the neural network
-    # batch = next(iter(model.train_dataloader()))
-    # feature_nn(batch)

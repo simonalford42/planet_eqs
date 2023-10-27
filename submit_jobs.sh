@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 
-sbatch --partition gpu train.sh --seed 0 --latent 1
-# sbatch --partition gpu train.sh --f1_variant random_features --seed 1
-# sbatch --partition gpu train.sh --f1_variant identity --seed 1
-# sbatch --partition gpu train.sh --f1_variant zero --seed 1
-# sbatch --partition ellis train.sh --seed 1 --f1_variant pysr_frozen --pysr_model sr_results/hall_of_fame_9723_0.pkl
-# sbatch --partition ellis train.sh --seed 1 --f1_variant pysr --pysr_model sr_results/hall_of_fame_9723_0.pkl
-# sbatch sr_slurm.sh
+# sbatch --partition ellis --time=02:00:00 sr_slurm.sh --time_in_hours 1
+# sbatch --partition ellis --time=08:00:00 sr_slurm.sh --time_in_hours 7
+# sbatch --time=01:00:00 sr_slurm.sh --time_in_hours 0.5
+
+# sbatch --partition gpu train.sh --l1_reg
+sbatch --partition gpu train.sh --f1_variant pysr --pysr_model sr_results/hall_of_fame_1278_1_0.pkl

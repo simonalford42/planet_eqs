@@ -1,4 +1,4 @@
-name: bnn_chaos_model
+name: bnn3
 channels:
   - conda-forge
   - pytorch

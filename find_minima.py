@@ -73,6 +73,7 @@ args = {
     'pysr_model': args.pysr_model,
     'swag': False,
     'f1_variant': args.f1_variant,
+    'l1_reg': args.l1_reg,
 }
 
 name = 'full_swag_pre_' + checkpoint_filename

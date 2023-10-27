@@ -435,6 +435,8 @@ def calc_scores():
         snr_rmse = np.average(np.square(ppx[ppx < 8.99] - ppy[ppx < 8.99]), weights=snr[ppx<8.99])**0.5
         print(f'{confidence} confidence gets RMSE of {rmse:.2f}')
         print(f'Weighted by SNR, this is: {snr_rmse:.2f}')
+        np.save(ppx, f'ppx_{ARGS.version}.npy')
+        np.save(ppx, f'ppy_{ARGS.version}.npy')
 
         ######################################################
         # Bias scores:

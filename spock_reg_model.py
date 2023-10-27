@@ -29,6 +29,19 @@ import einops
 from utils import assert_equal, assert_shape
 
 
+class MaskLayer(nn.Module):
+    def __init__(self, n_features):
+        super().__init__()
+        self.mask = nn.Parameter(torch.ones(n_features))
+
+    def forward(self, x):
+        return x * self.mask
+
+    def l1_cost(self):
+        return torch.sum(torch.abs(self.mask.data))
+
+
+
 class PySRFeatureNN(torch.nn.Module):
     def __init__(self, filepath):
         super().__init__()
@@ -432,6 +445,12 @@ class VarModel(pl.LightningModule):
             assert hparams['f1_variant'] == 'default'
             self.feature_nn = mlp(self.n_features, hparams['latent'], hparams['hidden'], hparams['in'])
 
+        self.l1_reg = hparams['l1_reg']
+        if self.l1_reg:
+            self.inputs_mask = MaskLayer(self.n_features)
+            self.features_mask = MaskLayer(hparams['latent'])
+            self.feature_nn = torch.nn.Sequential(self.inputs_mask, self.feature_nn, self.features_mask)
+
         self.regress_nn = mlp(hparams['latent']*2 + int(self.fix_megno)*2, 2, hparams['hidden'], hparams['out'])
         self.input_noise_logvar = nn.Parameter(torch.zeros(self.n_features)-2)
         self.summary_noise_logvar = nn.Parameter(torch.zeros(hparams['latent'] * 2 + int(self.fix_megno)*2) - 2) # add to summaries, not direct latents
@@ -682,6 +701,10 @@ class VarModel(pl.LightningModule):
         testy = self(x, noisy_val=noisy_val)
         n_samp = y.shape[0]
         loss = self._lossfnc(testy, y).sum()
+        if self.l1_reg:
+            # default l1 coeff of 0.01
+            # regularize both the inputs used and the output features
+            loss = loss + 0.01 * (self.inputs_mask.l1_cost() + self.features_mask.l1_cost())
         return loss
 
     def input_kl(self):
