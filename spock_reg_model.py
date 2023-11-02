@@ -27,6 +27,8 @@ from torch.optim.optimizer import Optimizer
 from collections import OrderedDict
 import einops
 from utils import assert_equal, assert_shape
+import wandb
+import json
 
 
 class MaskLayer(nn.Module):
@@ -45,19 +47,23 @@ class MaskLayer(nn.Module):
 class PySRFeatureNN(torch.nn.Module):
     def __init__(self, filepath):
         super().__init__()
-        # something like 'results/hall_of_fame_7955_5.pkl'
+        # something like 'sr_results/hall_of_fame_7955_5.pkl'
         self.filepath = filepath
+        indices_path = filepath[:-4] + '_indices.json'
         self.module_list = nn.ModuleList(pysr.PySRRegressor.from_file(filepath).pytorch())
+        with open(indices_path, 'r') as f:
+            self.included_indices = json.load(f)
 
     def forward(self, x):
         B, T, d = x.shape
+        x = x[..., self.included_indices]
         # input: [B, T, d]
         # output: [B, n, d]
         # the learned features expect a single batch axis as input
         x = einops.rearrange(x, 'B T d -> (B T) d')
+        # list of length n_features
         x = [module(x) for module in self.module_list]
-        x = einops.rearrange(x, 'n B -> B n')
-        x = einops.rearrange(x, '(B T) n -> B T n', B=B, T=T)
+        x = einops.rearrange(x, 'n (B T) -> B T n', B=B, T=T)
         return x
 
 
@@ -445,11 +451,14 @@ class VarModel(pl.LightningModule):
             assert hparams['f1_variant'] == 'default'
             self.feature_nn = mlp(self.n_features, hparams['latent'], hparams['hidden'], hparams['in'])
 
-        self.l1_reg = hparams['l1_reg']
+        self.l1_reg = hparams['l1_reg'] if 'l1_reg' in hparams else False
         if self.l1_reg:
+            self.l1_coeff = hparams['l1_coeff']
             self.inputs_mask = MaskLayer(self.n_features)
             self.features_mask = MaskLayer(hparams['latent'])
-            self.feature_nn = torch.nn.Sequential(self.inputs_mask, self.feature_nn, self.features_mask)
+            self.feature_nn = torch.nn.Sequential(self.inputs_mask,
+                                                  self.feature_nn,
+                                                  self.features_mask)
 
         self.regress_nn = mlp(hparams['latent']*2 + int(self.fix_megno)*2, 2, hparams['hidden'], hparams['out'])
         self.input_noise_logvar = nn.Parameter(torch.zeros(self.n_features)-2)
@@ -702,9 +711,8 @@ class VarModel(pl.LightningModule):
         n_samp = y.shape[0]
         loss = self._lossfnc(testy, y).sum()
         if self.l1_reg:
-            # default l1 coeff of 0.01
             # regularize both the inputs used and the output features
-            loss = loss + 0.01 * (self.inputs_mask.l1_cost() + self.features_mask.l1_cost())
+            loss = loss + self.l1_coeff * (self.inputs_mask.l1_cost() + self.features_mask.l1_cost())
         return loss
 
     def input_kl(self):
@@ -743,7 +751,12 @@ class VarModel(pl.LightningModule):
 
         total_loss = loss + prior
 
-        tensorboard_logs = {'train_loss_no_reg': loss/len(X_sample), 'train_loss_with_reg': total_loss/len(X_sample), 'input_kl': input_kl/len(X_sample), 'summary_kl': summary_kl/len(X_sample)}
+        tensorboard_logs = {'train_loss_no_reg': loss/len(X_sample),
+                            'train_loss_with_reg': total_loss/len(X_sample),
+                            'input_kl': input_kl/len(X_sample),
+                            'summary_kl': summary_kl/len(X_sample),
+                            'inputs_mask': wandb.Histogram(self.inputs_mask.mask.data.cpu().numpy()),
+                            'features_mask': wandb.Histogram(self.features_mask.mask.data.cpu().numpy())}
 
         return {'loss': total_loss, 'log': tensorboard_logs}
 

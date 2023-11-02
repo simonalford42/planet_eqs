@@ -21,12 +21,7 @@ conda activate bnn_chaos_model
 # Enable errexit (exit on error)
 set -e
 
-version=$((1 + RANDOM % 9999))
+version=$((1 + RANDOM % 999999))
 
 python -u find_minima.py --total_steps 300000 --swa_steps 50000  --angles --no_mmr --no_nan --no_eplusminus --version $version --slurm_id $SLURM_JOB_ID "$@"
 python -u run_swag.py --total_steps 300000 --swa_steps 50000 --angles --no_mmr --no_nan --no_eplusminus --version $version --slurm_id $SLURM_JOB_ID "$@"
-python -u main_figures.py --total_steps 300000 --swa_steps 50000  --angles --no_mmr --no_nan --no_eplusminus --version $version --slurm_id $SLURM_JOB_ID "$@"
-
-# python -u main_figures.py --total_steps 300000 --swa_steps 50000  --angles --no_mmr --no_nan --no_eplusminus --version 3045 --seed 1
-# python -u main_figures.py --total_steps 300000 --swa_steps 50000  --angles --no_mmr --no_nan --no_eplusminus --version 1278 --seed 1
-# python -u main_figures.py --total_steps 300000 --swa_steps 50000  --angles --no_mmr --no_nan --no_eplusminus --version 1083 --seed 1

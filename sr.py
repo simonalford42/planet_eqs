@@ -6,7 +6,6 @@ import seaborn as sns
 sns.set_style('darkgrid')
 from matplotlib import pyplot as plt
 import spock_reg_model
-spock_reg_model.HACK_MODEL = True
 from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
@@ -18,6 +17,7 @@ import parse_swag_args
 from einops import rearrange
 from sklearn.decomposition import PCA
 import utils
+import json
 
 ARGS, CHECKPOINT_FILENAME = parse_swag_args.parse()
 
@@ -38,6 +38,8 @@ def get_f1_inputs_and_targets():
 
     model.make_dataloaders()
     model.eval()
+    # print(model.inputs_mask.mask.data)
+    # print(model.features_mask.mask.data)
 
     # just takes a random batch of inputs and passes them through the neural network
     batch = next(iter(model.train_dataloader()))
@@ -67,8 +69,9 @@ def update_args(version=4995, seed=0, total_steps=300000, megno=False, angles=Tr
     CHECKPOINT_FILENAME = checkpoint_filename
 
 
-def import_Xy():
+def import_Xy(included_indices):
     inputs, targets =  get_f1_inputs_and_targets()
+    print(f'inputs: {inputs.shape}')
 
     N = 500
     X = rearrange(inputs, 'B T F -> (B T) F')
@@ -77,16 +80,7 @@ def import_Xy():
     X, y = X[indices], y[indices]
     X, y = X.detach().numpy(), y.detach().numpy()
 
-
-    all_labels = ['time', 'e+_near', 'e-_near', 'max_strength_mmr_near', 'e+_far', 'e-_far', 'max_strength_mmr_far', 'megno', 'a1', 'e1', 'i1', 'cos_Omega1', 'sin_Omega1', 'cos_pomega1', 'sin_pomega1', 'cos_theta1', 'sin_theta1', 'a2', 'e2', 'i2', 'cos_Omega2', 'sin_Omega2', 'cos_pomega2', 'sin_pomega2', 'cos_theta2', 'sin_theta2', 'a3', 'e3', 'i3', 'cos_Omega3', 'sin_Omega3', 'cos_pomega3', 'sin_pomega3', 'cos_theta3', 'sin_theta3', 'm1', 'm2', 'm3', 'nan_mmr_near', 'nan_mmr_far', 'nan_megno']
-
-    # hard coded based off the default CL args passed
-    skipped = ['nan_mmr_near', 'nan_mmr_far', 'nan_megno', 'e+_near', 'e-_near', 'max_strength_mmr_near', 'e+_far', 'e-_far', 'max_strength_mmr_far', 'megno']
-    assert len(skipped) == 10
-
-    included_ixs = [i for i in range(len(all_labels)) if all_labels[i] not in skipped]
-    labels = [all_labels[i] for i in included_ixs]
-
+    # all of the skipped ones are just set to zero.
     assert np.all(X[..., [i for i in range(len(all_labels)) if i not in included_ixs]] == 0)
 
     X = X[..., included_ixs]
@@ -95,13 +89,32 @@ def import_Xy():
     return X, y
 
 
+def get_sr_included_ixs():
+    all_labels = ['time', 'e+_near', 'e-_near', 'max_strength_mmr_near', 'e+_far', 'e-_far', 'max_strength_mmr_far', 'megno', 'a1', 'e1', 'i1', 'cos_Omega1', 'sin_Omega1', 'cos_pomega1', 'sin_pomega1', 'cos_theta1', 'sin_theta1', 'a2', 'e2', 'i2', 'cos_Omega2', 'sin_Omega2', 'cos_pomega2', 'sin_pomega2', 'cos_theta2', 'sin_theta2', 'a3', 'e3', 'i3', 'cos_Omega3', 'sin_Omega3', 'cos_pomega3', 'sin_pomega3', 'cos_theta3', 'sin_theta3', 'm1', 'm2', 'm3', 'nan_mmr_near', 'nan_mmr_far', 'nan_megno']
+
+    # hard coded based off the default CL args passed
+    skipped = ['nan_mmr_near', 'nan_mmr_far', 'nan_megno', 'e+_near', 'e-_near', 'max_strength_mmr_near', 'e+_far', 'e-_far', 'max_strength_mmr_far', 'megno']
+    assert len(skipped) == 10
+
+    included_ixs = [i for i in range(len(all_labels)) if all_labels[i] not in skipped]
+    labels = [all_labels[i] for i in included_ixs]
+    return included_ixs
+
+
 def run_regression(X, y, args):
-    # go down to 6 features to make SR easier
+    included_indices = get_sr_included_ixs()
+    X, y = import_Xy(included_indices)
+
+    # go down to 6 features to make SR easier?
     # X = PCA(n_components=6).fit_transform(X)
 
     path = utils.next_unused_path(f'sr_results/hall_of_fame_{ARGS.version}_{ARGS.seed}.pkl', lambda i: f'_{i}')
     # replace '.pkl' with '.csv'
     path = path[:-3] + 'csv'
+    # save the included ixs
+    indices_path = path[:-4] + '_indices.json'
+    with open(indices_path, 'w') as f:
+        json.dump(included_indices)
 
     model = pysr.PySRRegressor(
         equation_file=path,
@@ -130,8 +143,14 @@ def run_regression(X, y, args):
 
 
 if __name__ == '__main__':
-    # update_args(version=1278)
-    X, y = import_Xy()
-    run_regression(X, y, ARGS)
+    update_args(version=1278, seed=1)
+    import spock_reg_model
+    pysr_model = spock_reg_model.PySRFeatureNN(filepath='sr_results/hall_of_fame_1278_1.pkl')
+    X,y = get_f1_inputs_and_targets()
+    print(pysr_model(X).shape)
+
+    # useful if running from inside a shell
+
+    # run_regression(X, y, ARGS)
 
 
