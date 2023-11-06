@@ -26,7 +26,7 @@ import warnings
 from torch.optim.optimizer import Optimizer
 from collections import OrderedDict
 import einops
-from utils import assert_equal, assert_shape
+from utils import assert_equal
 import wandb
 import json
 
@@ -45,9 +45,9 @@ class MaskLayer(nn.Module):
 
 
 class PySRFeatureNN(torch.nn.Module):
-    def __init__(self, filepath):
+    def __init__(self, filepath='sr_results/hall_of_fame_1278_1_0.pkl'):
         super().__init__()
-        # something like 'sr_results/hall_of_fame_7955_5.pkl'
+        # something like 'sr_results/hall_of_fame_7955_1.pkl'
         self.filepath = filepath
         indices_path = filepath[:-4] + '_indices.json'
         self.module_list = nn.ModuleList(pysr.PySRRegressor.from_file(filepath).pytorch())
@@ -80,7 +80,7 @@ class RandomFeatureNN(torch.nn.Module):
         assert_equal(d, self.in_n)
         # basically double batch matrix multiply
         out = torch.einsum('ijk, kl', x, self.random_projection)
-        assert_shape(out, (B, T, self.out_n))
+        assert_equal(out.shape, (B, T, self.out_n))
         return out
 
 
@@ -97,7 +97,7 @@ class ZeroNN(torch.nn.Module):
         assert_equal(d, self.in_n)
         # basically double batch matrix multiply
         out = torch.einsum('ijk, kl', x, self.zero_projection)
-        assert_shape(out, (B, T, self.out_n))
+        assert_equal(out.shape, (B, T, self.out_n))
         return out
 
 
@@ -754,9 +754,11 @@ class VarModel(pl.LightningModule):
         tensorboard_logs = {'train_loss_no_reg': loss/len(X_sample),
                             'train_loss_with_reg': total_loss/len(X_sample),
                             'input_kl': input_kl/len(X_sample),
-                            'summary_kl': summary_kl/len(X_sample),
-                            'inputs_mask': wandb.Histogram(self.inputs_mask.mask.data.cpu().numpy()),
-                            'features_mask': wandb.Histogram(self.features_mask.mask.data.cpu().numpy())}
+                            'summary_kl': summary_kl/len(X_sample)}
+
+        if self.l1_reg:
+            tensorboard_logs['inputs_mask'] = wandb.Histogram(self.inputs_mask.mask.data.cpu().numpy())
+            tensorboard_logs['features_mask'] = wandb.Histogram(self.features_mask.mask.data.cpu().numpy())
 
         return {'loss': total_loss, 'log': tensorboard_logs}
 

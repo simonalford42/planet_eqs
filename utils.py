@@ -59,16 +59,6 @@ def assert_equal(a, b):
         assert a == b, f'a != b: a:{a}, b:{b}'
 
 
-def assert_shape(a: torch.Tensor, shape: tuple):
-    ''' wherever a has -1 value, shape can be anything '''
-    if -1 in shape:
-        for i in range(len(shape)):
-            if shape[i] == -1:
-                shape[i] = a.shape[i]
-
-    assert_equal(a.shape, shape)
-
-
 def num_params(model):
     return sum([torch.prod(torch.tensor(p.shape))
                 for p in list(model.parameters())])
