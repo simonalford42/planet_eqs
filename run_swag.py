@@ -77,6 +77,7 @@ swag_model.hparams.epochs = epochs
 lr_logger = LearningRateMonitor()
 name = 'full_swag_post_' + checkpoint_filename
 logger = WandbLogger(project='bnn-chaos-model', entity='bnn-chaos-model', name=name)
+
 checkpointer = ModelCheckpoint(
     filepath=checkpoint_filename + '.ckpt',
     monitor='swa_loss_no_reg'

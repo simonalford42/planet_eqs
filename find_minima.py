@@ -74,6 +74,7 @@ args = {
     'swag': False,
     'f1_variant': args.f1_variant,
     'l1_reg': args.l1_reg,
+    'l1_coeff': args.l1_coeff,
 }
 
 name = 'full_swag_pre_' + checkpoint_filename
