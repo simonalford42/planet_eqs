@@ -749,6 +749,7 @@ class VarModel(pl.LightningModule):
                                                   self.features_mask)
 
         self.regress_nn = mlp(hparams['latent']*2 + int(self.fix_megno)*2, 2, hparams['hidden'], hparams['out'])
+        # self.regress_nn = BioMLP(in_dim=hparams['latent']*2 + int(self.fix_megno)*2, depth=2, w=hparams['hidden'], out_dim=hparams['out'])
         self.input_noise_logvar = nn.Parameter(torch.zeros(self.n_features)-2)
         self.summary_noise_logvar = nn.Parameter(torch.zeros(hparams['latent'] * 2 + int(self.fix_megno)*2) - 2) # add to summaries, not direct latents
         self.lowest = 0.5

@@ -27,7 +27,7 @@ def parse(glob=False):
     parser.add_argument('--pysr_model', type=str, default=None, help='PySR model to load and replace f1 with, e.g. sr_results/hall_of_fame_9723_0.pkl')
     parser.add_argument('--sr_f1', action='store_true', default=False, help='do misc. stuff with f1 and SR')
     parser.add_argument('--f1_variant', type=str, default='default',
-                        choices=['zero', 'identity', 'pysr', 'pysr_frozen', 'random_features', 'bimt'])
+                        choices=['default', 'zero', 'identity', 'pysr', 'pysr_frozen', 'random_features', 'bimt'])
     parser.add_argument('--l1_reg', action='store_true', default=False)
     parser.add_argument('--l1_coeff', type=float, default=0.01)
     args = parser.parse_args()
@@ -83,7 +83,7 @@ def parse_sr(glob=False):
     parser.add_argument('--pysr_model', type=str, default=None, help='PySR model to load and replace f1 with, e.g. sr_results/hall_of_fame_9723_0.pkl')
     parser.add_argument('--sr_f1', action='store_true', default=False, help='do misc. stuff with f1 and SR')
     parser.add_argument('--f1_variant', type=str, default='default',
-                        choices=['zero', 'identity', 'pysr', 'pysr_frozen', 'random_features', 'bimt'])
+                        choices=['default', 'zero', 'identity', 'pysr', 'pysr_frozen', 'random_features', 'bimt'])
 
     # for pysr only
     parser.add_argument('-t', '--time_in_hours', type=float, default=1)

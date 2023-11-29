@@ -174,6 +174,7 @@ def spock_features(X):
 def test_pysr():
     included_indices = get_sr_included_ixs()
     X, _ = import_Xy(included_indices)
+    # X = torch.ones((500, 31))
     y = spock_features(X)
 
     path = utils.next_unused_path(f'sr_results/sr_test_hof.pkl', lambda i: f'_{i}')

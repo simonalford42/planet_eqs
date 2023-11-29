@@ -22,16 +22,18 @@
 set -e
 
 version=$((1 + RANDOM % 999999))
+version2=$((1 + RANDOM % 999999))
 
-python -u find_minima.py --total_steps 300 --swa_steps 50  --angles --no_mmr --no_nan --no_eplusminus --version $version --slurm_id $SLURM_JOB_ID "$@" --f1_variant bimt
-python -u run_swag.py --total_steps 300000 --swa_steps 50000 --angles --no_mmr --no_nan --no_eplusminus --version $version --slurm_id $SLURM_JOB_ID "$@" --f1_variant bimt
+# python -u find_minima.py --total_steps 3000 --swa_steps 500  --angles --no_mmr --no_nan --no_eplusminus --version $version --slurm_id $SLURM_JOB_ID "$@" --f1_variant bimt
+# python -u run_swag.py --total_steps 3000 --swa_steps 500 --angles --no_mmr --no_nan --no_eplusminus --version $version --slurm_id $SLURM_JOB_ID "$@" --f1_variant bimt
+python -u sr.py --version 11339 --seed 0 #--time_in_hours 0.1 --max_size 60
+python -u find_minima.py --total_steps 300 --swa_steps 50  --angles --no_mmr --no_nan --no_eplusminus --version $version2 --slurm_id $SLURM_JOB_ID "$@" --f1_variant pysr --pysr_model sr_results/hall_of_fame_11339.pkl 
+python -u run_swag.py --total_steps 300 --swa_steps 50 --angles --no_mmr --no_nan --no_eplusminus --version $version2 --slurm_id $SLURM_JOB_ID "$@" --f1_variant pysr --pysr_model sr_results/hall_of_fame_11339.pkl 
 
-#python -u main_figures.py --total_steps 300000 --swa_steps 50000  --angles --no_mmr --no_nan --no_eplusminus --version $version --slurm_id $SLURM_JOB_ID "$@"
 
 # python -u main_figures.py --total_steps 300000 --swa_steps 50000  --angles --no_mmr --no_nan --no_eplusminus --version 3045 --seed 1
 # python -u main_figures.py --total_steps 300000 --swa_steps 50000  --angles --no_mmr --no_nan --no_eplusminus --version 1278 --seed 1
 # python -u main_figures.py --total_steps 300000 --swa_steps 50000  --angles --no_mmr --no_nan --no_eplusminus --version 1083 --seed 1
 
-python -u find_minima.py --total_steps 300000 --swa_steps 50000  --angles --no_mmr --no_nan --no_eplusminus --version $version --slurm_id $SLURM_JOB_ID "$@"
-python -u run_swag.py --total_steps 300000 --swa_steps 50000 --angles --no_mmr --no_nan --no_eplusminus --version $version --slurm_id $SLURM_JOB_ID "$@"
+
 
