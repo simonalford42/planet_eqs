@@ -17,7 +17,4 @@
 source /home/sca63/mambaforge/etc/profile.d/conda.sh
 conda activate bnn_chaos_model
 
-# Enable errexit (exit on error)
-set -e
-
-python -u simon.py --total_steps 300000 --swa_steps 50000 --version 1278 --seed 1 --angles --no_mmr --no_nan --no_eplusminus "$@"
+python -u sr.py "$@"

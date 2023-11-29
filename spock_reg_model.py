@@ -29,76 +29,7 @@ import einops
 from utils import assert_equal
 import wandb
 import json
-
-
-class MaskLayer(nn.Module):
-    def __init__(self, n_features):
-        super().__init__()
-        self.mask = nn.Parameter(torch.ones(n_features))
-
-    def forward(self, x):
-        return x * self.mask
-
-    def l1_cost(self):
-        return torch.sum(torch.abs(self.mask.data))
-
-
-
-class PySRFeatureNN(torch.nn.Module):
-    def __init__(self, filepath='sr_results/hall_of_fame_1278_1_0.pkl'):
-        super().__init__()
-        # something like 'sr_results/hall_of_fame_7955_1.pkl'
-        self.filepath = filepath
-        indices_path = filepath[:-4] + '_indices.json'
-        self.module_list = nn.ModuleList(pysr.PySRRegressor.from_file(filepath).pytorch())
-        with open(indices_path, 'r') as f:
-            self.included_indices = json.load(f)
-
-    def forward(self, x):
-        B, T, d = x.shape
-        x = x[..., self.included_indices]
-        # input: [B, T, d]
-        # output: [B, n, d]
-        # the learned features expect a single batch axis as input
-        x = einops.rearrange(x, 'B T d -> (B T) d')
-        # list of length n_features
-        x = [module(x) for module in self.module_list]
-        x = einops.rearrange(x, 'n (B T) -> B T n', B=B, T=T)
-        return x
-
-
-class RandomFeatureNN(torch.nn.Module):
-    def __init__(self, in_n, out_n):
-        super().__init__()
-        self.in_n = in_n
-        self.out_n = out_n
-        # not learnable!
-        self.random_projection = nn.Parameter(torch.rand(in_n, out_n) * 2 - 1, requires_grad=False)
-
-    def forward(self, x):
-        B, T, d = x.shape
-        assert_equal(d, self.in_n)
-        # basically double batch matrix multiply
-        out = torch.einsum('ijk, kl', x, self.random_projection)
-        assert_equal(out.shape, (B, T, self.out_n))
-        return out
-
-
-class ZeroNN(torch.nn.Module):
-    def __init__(self, in_n, out_n):
-        super().__init__()
-        self.in_n = in_n
-        self.out_n = out_n
-        # not learnable!
-        self.zero_projection = nn.Parameter(torch.zeros(in_n, out_n), requires_grad=False)
-
-    def forward(self, x):
-        B, T, d = x.shape
-        assert_equal(d, self.in_n)
-        # basically double batch matrix multiply
-        out = torch.einsum('ijk, kl', x, self.zero_projection)
-        assert_equal(out.shape, (B, T, self.out_n))
-        return out
+from modules import *
 
 
 class CustomOneCycleLR(torch.optim.lr_scheduler._LRScheduler):
@@ -433,36 +364,53 @@ class VarModel(pl.LightningModule):
         self.include_angles = False if 'include_angles' not in hparams else hparams['include_angles']
 
         self.n_features = hparams['time_series_features'] * (1 + int(hparams['include_derivatives']))
+        self.mean_cov = hparams['f1_variant'] == 'mean_cov'
+
         if hparams['pysr_model']:
             # constants can still be optimized with SGD
-            self.feature_nn = PySRFeatureNN(hparams['pysr_model'])
+            self.feature_nn = PySRFeatureNN(hparams['pysr_model'], model_selection=hparams['pysr_model_selection'])
             if hparams['f1_variant'] == 'pysr_frozen':
                 for param in self.feature_nn.parameters():
                     param.requires_grad = False
             else:
                 assert hparams['f1_variant'] == 'pysr'
+            if hparams['cyborg_max_pysr_ix'] is not None:
+                default_nn = mlp(self.n_features, hparams['latent'], hparams['hidden'], hparams['in'])
+                self.feature_nn = Cyborg(default_nn, self.feature_nn, out_n=hparams['latent'], nn2_ixs=list(range(hparams['cyborg_max_pysr_ix'])))
+
         elif hparams['f1_variant'] == 'random_features':
             self.feature_nn = RandomFeatureNN(in_n=self.n_features, out_n=hparams['latent'])
         elif hparams['f1_variant'] == 'identity':
             self.feature_nn = torch.nn.Identity()
         elif hparams['f1_variant'] == 'zero':
             self.feature_nn = ZeroNN(in_n=self.n_features, out_n=hparams['latent'])
+        elif hparams['f1_variant'] == 'linear':
+            self.feature_nn = nn.Linear(self.n_features, hparams['latent'])
+        elif hparams['f1_variant'] == 'mean_cov':
+            pass
         else:
             assert hparams['f1_variant'] == 'default'
             self.feature_nn = mlp(self.n_features, hparams['latent'], hparams['hidden'], hparams['in'])
+
 
         self.l1_reg = hparams['l1_reg'] if 'l1_reg' in hparams else False
         if self.l1_reg:
             self.l1_coeff = hparams['l1_coeff']
             self.inputs_mask = MaskLayer(self.n_features)
-            self.features_mask = MaskLayer(hparams['latent'])
+            # self.features_mask = MaskLayer(hparams['latent'])
             self.feature_nn = torch.nn.Sequential(self.inputs_mask,
-                                                  self.feature_nn,
-                                                  self.features_mask)
+                                                  self.feature_nn)
+                                                  # self.features_mask)
 
-        self.regress_nn = mlp(hparams['latent']*2 + int(self.fix_megno)*2, 2, hparams['hidden'], hparams['out'])
+        if hparams['f1_variant'] == 'mean_cov':
+            i = self.n_features
+            summary_dim = i + i*i
+        else:
+            summary_dim = hparams['latent']*2 + int(self.fix_megno)*2
+
+        self.regress_nn = mlp(summary_dim, 2, hparams['hidden'], hparams['out'])
         self.input_noise_logvar = nn.Parameter(torch.zeros(self.n_features)-2)
-        self.summary_noise_logvar = nn.Parameter(torch.zeros(hparams['latent'] * 2 + int(self.fix_megno)*2) - 2) # add to summaries, not direct latents
+        self.summary_noise_logvar = nn.Parameter(torch.zeros(summary_dim) - 2) # add to summaries, not direct latents
         self.lowest = 0.5
         if 'lower_std' in hparams and hparams['lower_std']:
             self.lowest = 0.1
@@ -516,7 +464,47 @@ class VarModel(pl.LightningModule):
             if hasattr(m, 'set_flag'):
                 m.set_flag(flag_name, value)
 
+    def compute_summary_stats2(self, x):
+        x = self.feature_nn(x)
+        sample_mu = torch.mean(x, dim=1)
+        sample_var = torch.std(x, dim=1)**2
+        sample_std = torch.sqrt(torch.abs(sample_var) + EPSILON)
+
+        clatent = torch.cat((sample_mu, sample_std), dim=1)
+        self.latents = x
+        return clatent
+
+    def compute_mean_cov_stats(self, x):
+        # instead of passing x through feature nn, directly calculate the mean and covariance of x
+        # for now, ignore the sampling aspect - talk to miles about it
+        # x: [B, T, d]
+        # mean: [B, d]
+        # covariance: [B, d, d]
+        B, T, d = x.shape
+
+        # batched covariance calculation:
+        # https://stackoverflow.com/a/71357620/4383594
+        def batch_cov(points):
+            B, N, D = points.size()
+            mean = points.mean(dim=1).unsqueeze(1)
+            diffs = (points - mean).reshape(B * N, D)
+            prods = torch.bmm(diffs.unsqueeze(2), diffs.unsqueeze(1)).reshape(B, N, D, D)
+            bcov = prods.sum(dim=1) / (N - 1)  # Unbiased estimate
+            return bcov  # (B, D, D)
+
+        means = x.mean(dim=1)
+        covs = batch_cov(x)
+        covs = einops.rearrange(covs, 'B D1 D2 -> B (D1 D2)')  # flatten
+        self.latents = x
+        return torch.cat((means, covs), dim=1)
+
     def compute_summary_stats(self, x):
+        if 'no_summary_sample' in self.hparams and self.hparams['no_summary_sample']:
+            return self.compute_summary_stats2(x)
+        if self.hparams['f1_variant'] == 'mean_cov':
+            # no f1 needed, take the inputs straight
+            return self.compute_mean_cov_stats(x)
+
         x = self.feature_nn(x)
         sample_mu = torch.mean(x, dim=1)
         sample_var = torch.std(x, dim=1)**2
@@ -558,6 +546,17 @@ class VarModel(pl.LightningModule):
             mask = torch.zeros_like(x)
             mask[..., self.megno_location] = x[..., self.megno_location].clone()
             x = x - mask
+        return x
+
+    def zero_theta(self, x):
+        theta_locations = [15, 16, 24, 25, 33, 34]
+        for ix in self.hparams['zero_theta']:
+            assert 1 <= ix <= 6
+            loc = theta_locations[ix-1]
+            with torch.no_grad():
+                mask = torch.zeros_like(x)
+                mask[..., loc] = x[..., loc].clone()
+                x = x - mask
         return x
 
     def zero_mmr(self, x):
@@ -602,6 +601,9 @@ class VarModel(pl.LightningModule):
 
         if not self.include_eplusminus:
             x = self.zero_eplusminus(x)
+
+        if 'zero_theta' in self.hparams and self.hparams['zero_theta'] != 0:
+            x = self.zero_theta(x)
 
         if self.random_sample:
             x = self.augment(x)
@@ -683,9 +685,13 @@ class VarModel(pl.LightningModule):
 
         regression_loss = -(y - mu)**2/(2*var)
         regression_loss += -torch.log(std)
-        regression_loss += -safe_log_erf(
-                    (mu - 4)/(torch.sqrt(2*var))
-                )
+
+        if 'loss_ablate' not in self.hparams or 'no_normalize' not in self.hparams['loss_ablate']:
+        # add this unless loss_ablate is set to no_normalize
+            regression_loss += -safe_log_erf(
+                        (mu - 4)/(torch.sqrt(2*var))
+                    )
+
         classifier_loss = safe_log_erf(
                     (mu - 9)/(torch.sqrt(2*var))
             )
@@ -704,6 +710,9 @@ class VarModel(pl.LightningModule):
             safe_classifier_loss * ( t_greater_9)
         )
 
+        if 'loss_ablate' in self.hparams and 'no_classification' in self.hparams['loss_ablate']:
+            total_loss = safe_regression_loss * (~t_greater_9)
+
         return -total_loss.sum(1)
 
     def lossfnc(self, x, y, samples=1, noisy_val=True):
@@ -711,8 +720,7 @@ class VarModel(pl.LightningModule):
         n_samp = y.shape[0]
         loss = self._lossfnc(testy, y).sum()
         if self.l1_reg:
-            # regularize both the inputs used and the output features
-            loss = loss + self.l1_coeff * (self.inputs_mask.l1_cost() + self.features_mask.l1_cost())
+            loss = loss + self.l1_coeff * self.inputs_mask.l1_cost()
         return loss
 
     def input_kl(self):
@@ -726,10 +734,6 @@ class VarModel(pl.LightningModule):
         return self._summary_kl.sum()
 
     def generate_f1_inputs_and_targets(self, batch, batch_idx):
-        fraction = self.global_step / self.hparams['steps']
-        beta_in = min([1, fraction/0.3]) * self.beta_in
-        beta_out = min([1, fraction/0.3]) * self.beta_out
-
         X_sample, y_sample = batch
         inputs, summary_stats = self.forward_to_summary_only(X_sample, noisy_val=False)
         return inputs, summary_stats
@@ -749,7 +753,8 @@ class VarModel(pl.LightningModule):
 
         prior = input_kl + summary_kl
 
-        total_loss = loss + prior
+        # total_loss = loss + prior
+        total_loss = loss
 
         tensorboard_logs = {'train_loss_no_reg': loss/len(X_sample),
                             'train_loss_with_reg': total_loss/len(X_sample),
@@ -757,8 +762,22 @@ class VarModel(pl.LightningModule):
                             'summary_kl': summary_kl/len(X_sample)}
 
         if self.l1_reg:
+
+            # if batch_idx == 0:
+                # mask = self.inputs_mask.mask.data
+                # where_constant = torch.tensor([False,  True,  True,  True,  True,  True,  True,  True, False, False,
+                                    # False, False, False, False, False, False, False, False, False, False,
+                                    # False, False, False, False, False, False, False, False, False, False,
+                                    # False, False, False, False, False, False, False, False, True,  True,
+                                    # True])
+                # print(mask)
+                # print('constant avg:', mask[where_constant].mean())
+                # print('nonconst avg:', mask[~where_constant].mean())
+
             tensorboard_logs['inputs_mask'] = wandb.Histogram(self.inputs_mask.mask.data.cpu().numpy())
-            tensorboard_logs['features_mask'] = wandb.Histogram(self.features_mask.mask.data.cpu().numpy())
+            # tensorboard_logs['features_mask'] = wandb.Histogram(self.features_mask.mask.data.cpu().numpy())
+            tensorboard_logs['inputs_mask_min'] = self.inputs_mask.mask.data.cpu().numpy().min()
+            tensorboard_logs['inputs_mask_max'] = self.inputs_mask.mask.data.cpu().numpy().max()
 
         return {'loss': total_loss, 'log': tensorboard_logs}
 
