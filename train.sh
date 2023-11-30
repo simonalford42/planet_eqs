@@ -39,8 +39,5 @@ python -u run_swag.py --total_steps 300 --swa_steps 50 --angles --no_mmr --no_na
 
 
 
-<<<<<<< HEAD
-=======
-python -u find_minima.py --total_steps 300000 --swa_steps 50000  --angles --no_mmr --no_nan --no_eplusminus --version $version --slurm_id $SLURM_JOB_ID "$@" --f1_variant default
-python -u run_swag.py --total_steps 300000 --swa_steps 50000 --angles --no_mmr --no_nan --no_eplusminus --version $version --slurm_id $SLURM_JOB_ID "$@" --f1_variant default
->>>>>>> fb3a18083c6c2caf5d1d4caff4d3b19f776297b7
+#python -u find_minima.py --total_steps 300000 --swa_steps 50000  --angles --no_mmr --no_nan --no_eplusminus --version $version --slurm_id $SLURM_JOB_ID "$@" --f1_variant default
+#python -u run_swag.py --total_steps 300000 --swa_steps 50000 --angles --no_mmr --no_nan --no_eplusminus --version $version --slurm_id $SLURM_JOB_ID "$@" --f1_variant default
