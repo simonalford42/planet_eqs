@@ -6,6 +6,45 @@ import pysr
 import json
 import einops
 
+
+class SpecialLinear(nn.Module):
+    def __init__(self, n_inputs, n_features):
+        super().__init__()
+        self.n_inputs = n_inputs
+        # number of features we're emulating
+        self.n_features = n_features
+        self.linear = nn.Linear(n_inputs + n_inputs * n_inputs, 2*n_features)
+
+    def forward(self, x):
+        return self.linear(x)
+
+    def from_linear(linear: nn.Linear):
+        layer = SpecialLinear(n_inputs=linear.weight.shape[1], n_features=linear.weight.shape[0])
+        layer.init_layer(linear)
+        return layer
+
+
+    def init_layer(self, layer: nn.Linear):
+        # layer to emulate is a [n_inputs, n_features] linear layer.
+        # originally we take the mean and variance of the features.
+        # now we are trying to recreate those features by running a linear transformation the means and variances of the inputs
+        w, b = layer.weight.data, layer.bias.data
+        assert_equal(w.shape, (self.n_features, self.n_inputs))
+        assert_equal(b.shape, (self.n_features,))
+
+        with torch.no_grad():
+            # values outside the mean/var-covar block diagonal are zero
+            self.linear.weight.data[...] = 0
+            # calculating the means from the means.
+            self.linear.weight.data[:self.n_features, :self.n_inputs] = w
+            # calculating the variances from the covariances
+            w2 = torch.einsum('ij, ik -> ijk', w, w)
+            w2 = einops.rearrange(w2, 'i j k -> i (j k)')
+            self.linear.weight[self.n_features:, self.n_inputs:] = w2
+            self.linear.bias.data[:self.n_features] = b
+            self.linear.bias.data[self.n_features:] = 0
+
+
 class MaskLayer(nn.Module):
     def __init__(self, n_features):
         super().__init__()
