@@ -733,6 +733,8 @@ class VarModel(pl.LightningModule):
             self.feature_nn = torch.nn.Identity()
         elif hparams['f1_variant'] == 'zero':
             self.feature_nn = ZeroNN(in_n=self.n_features, out_n=hparams['latent'])
+        elif hparams['f1_variant'] == 'linear':
+            self.feature_nn = nn.Linear(self.n_features, hparams['latent'])
         elif hparams['f1_variant'] == 'bimt':
             self.feature_nn = BioMLP(in_dim=self.n_features, out_dim=hparams['latent'])
         else:
@@ -749,7 +751,7 @@ class VarModel(pl.LightningModule):
                                                   self.features_mask)
 
         self.regress_nn = mlp(hparams['latent']*2 + int(self.fix_megno)*2, 2, hparams['hidden'], hparams['out'])
-        # self.regress_nn = BioMLP(in_dim=hparams['latent']*2 + int(self.fix_megno)*2, depth=2, w=hparams['hidden'], out_dim=hparams['out'])
+        #self.regress_nn = BioMLP(in_dim=hparams['latent']*2 + int(self.fix_megno)*2, depth=2, w=hparams['hidden'], out_dim=hparams['out'])
         self.input_noise_logvar = nn.Parameter(torch.zeros(self.n_features)-2)
         self.summary_noise_logvar = nn.Parameter(torch.zeros(hparams['latent'] * 2 + int(self.fix_megno)*2) - 2) # add to summaries, not direct latents
         self.lowest = 0.5
