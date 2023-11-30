@@ -1,6 +1,3 @@
-import pysr
-pysr.julia_helpers.init_julia()
-
 import pickle as pkl
 from copy import deepcopy as copy
 from sklearn.model_selection import train_test_split
@@ -470,7 +467,8 @@ class VarModel(pl.LightningModule):
         sample_var = torch.std(x, dim=1)**2
         sample_std = torch.sqrt(torch.abs(sample_var) + EPSILON)
 
-        clatent = torch.cat((sample_mu, sample_std), dim=1)
+        clatent = torch.cat((sample_mu, sample_var), dim=1)
+        # clatent = torch.cat((sample_mu, sample_std), dim=1)
         self.latents = x
         return clatent
 
