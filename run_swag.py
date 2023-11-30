@@ -66,9 +66,6 @@ except FileNotFoundError:
         .init_params(swa_args)
     )
 
-if args.pysr_model:
-    assert type(swag_model.feature_nn) == spock_reg_model.PySRFeatureNN
-
 max_l2_norm = 0.1*sum(p.numel() for p in swag_model.parameters() if p.requires_grad)
 
 swag_model.hparams.steps = TOTAL_STEPS

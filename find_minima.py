@@ -19,12 +19,12 @@ irand = lambda lo, hi: int(np.random.rand()*(hi-lo) + lo)
 log_rand = lambda lo, hi: 10**rand(np.log10(lo), np.log10(hi))
 ilog_rand = lambda lo, hi: int(10**rand(np.log10(lo), np.log10(hi)))
 
-args, checkpoint_filename = parse()
-seed = args.seed
+parse_args, checkpoint_filename = parse()
+seed = parse_args.seed
 
 # Fixed hyperparams:
 lr = 5e-4
-TOTAL_STEPS = args.total_steps
+TOTAL_STEPS = parse_args.total_steps
 TRAIN_LEN = 78660
 batch_size = 2000 #ilog_rand(32, 3200)
 steps_per_epoch = int(1+TRAIN_LEN/batch_size)
@@ -36,16 +36,17 @@ command = utils.get_script_execution_command()
 print(command)
 
 args = {
-    'slurm_id': args.slurm_id,
-    'version': args.version,
+    'slurm_id': parse_args.slurm_id,
+    'version': parse_args.version,
     'seed': seed,
     'batch_size': batch_size,
-    'hidden': args.hidden,#ilog_rand(50, 1000),
+    'hidden': parse_args.hidden,#ilog_rand(50, 1000),
     'in': 1,
-    'latent': args.latent, #2,#ilog_rand(4, 500),
+    'latent': parse_args.latent, #2,#ilog_rand(4, 500),
     'lr': lr,
     'swa_lr': lr/2,
-    'out': 1,
+    # 'out': 1,
+    'out': parse_args.f2_depth,
     'samp': 5,
     'swa_start': epochs//2,
     'weight_decay': 1e-14,
@@ -55,31 +56,41 @@ args = {
     'scheduler_choice': 'swa',
     'steps': TOTAL_STEPS,
     'beta_in': 1e-5,
-    'beta_out': args.beta,#0.003,
+    'beta_out': parse_args.beta,#0.003,
     'act': 'softplus',
     'noisy_val': False,
     'gradient_clip': 0.1,
     # Much of these settings turn off other parameters tried:
-    'fix_megno': args.megno, #avg,std of megno
-    'fix_megno2': (not args.megno), #Throw out megno completely
-    'include_angles': args.angles,
-    'include_mmr': (not args.no_mmr),
-    'include_nan': (not args.no_nan),
-    'include_eplusminus': (not args.no_eplusminus),
-    'power_transform': args.power_transform,
-    'lower_std': args.lower_std,
-    'train_all': args.train_all,
-    'no_log': args.no_log,
-    'pysr_model': args.pysr_model,
-    'swag': False,
-    'f1_variant': args.f1_variant,
-    'l1_reg': args.l1_reg,
-    'l1_coeff': args.l1_coeff,
+    'fix_megno': parse_args.megno, #avg,std of megno
+    'fix_megno2': (not parse_args.megno), #Throw out megno completely
+    'include_angles': parse_args.angles,
+    'include_mmr': (not parse_args.no_mmr),
+    'include_nan': (not parse_args.no_nan),
+    'include_eplusminus': (not parse_args.no_eplusminus),
+    'power_transform': parse_args.power_transform,
 }
+
+# by default, parsed args get sent as hparams
+for k, v in vars(parse_args).items():
+    if k not in ['beta', 'megno', 'angles', 'no_mmr', 'no_nan', 'no_eplusminus']:
+        args[k] = v
+
+    # 'lower_std': args.lower_std,
+    # 'train_all': args.train_all,
+    # 'no_log': args.no_log,
+    # 'pysr_model': args.pysr_model,
+    # 'swag': False,
+    # 'f1_variant': args.f1_variant,
+    # 'l1_reg': args.l1_reg,
+    # 'l1_reg_grad': args.l1_reg_grad,
+    # 'l1_coeff': args.l1_coeff,
+    # 'pysr_model_selection': args.pysr_model_selection,
+    # 'cyborg_max_pysr_ix': args.cyborg_max_pysr_ix,
+    # 'loss_ablate': args.loss_ablate,
 
 name = 'full_swag_pre_' + checkpoint_filename
 # logger = TensorBoardLogger("tb_logs", name=name)
-logger = WandbLogger(project='bnn-chaos-model', entity='bnn-chaos-model', name=name)
+logger = WandbLogger(project='bnn-chaos-model', entity='bnn-chaos-model', name=name, mode='disabled' if args['no_log'] else 'online')
 checkpointer = ModelCheckpoint(filepath=checkpoint_filename + '/{version}')
 model = spock_reg_model.VarModel(args)
 model.make_dataloaders()
@@ -91,8 +102,10 @@ trainer = Trainer(
     gpus=1, num_nodes=1, max_epochs=args['epochs'],
     logger=logger if not args['no_log'] else False,
     checkpoint_callback=checkpointer, benchmark=True,
-    terminate_on_nan=True, gradient_clip_val=max_l2_norm
+    terminate_on_nan=True, gradient_clip_val=max_l2_norm,
 )
+
+torch.autograd.set_detect_anomaly(True)
 
 try:
     trainer.fit(model)
