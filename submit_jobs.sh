@@ -7,7 +7,8 @@
 # sbatch -J mc80_2 --partition gpu train.sh --f1_variant mean_cov --hidden 80 --f2_depth 2
 # sbatch -J mc160_3 --partition gpu train.sh --f1_variant mean_cov --hidden 160 --f2_depth 3
 
-sbatch -J nosum --partition gpu train.sh --no_summary_sample --seed 1
+# sbatch -J nosum --partition gpu train.sh --no_summary_sample --seed 1 --no_log
+
 # sbatch -J zt1 --partition gpu train.sh --zero_theta 1
 # sbatch -J zt2 --partition gpu train.sh --zero_theta 2
 # sbatch -J zt3 --partition gpu train.sh --zero_theta 3
