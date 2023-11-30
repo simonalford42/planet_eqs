@@ -15,6 +15,18 @@ DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 WARNINGS = set()
 
 
+
+# batched covariance calculation:
+# https://stackoverflow.com/a/71357620/4383594
+def batch_cov(points):
+    B, N, D = points.size()
+    mean = points.mean(dim=1).unsqueeze(1)
+    diffs = (points - mean).reshape(B * N, D)
+    prods = torch.bmm(diffs.unsqueeze(2), diffs.unsqueeze(1)).reshape(B, N, D, D)
+    bcov = prods.sum(dim=1) / (N - 1)  # Unbiased estimate
+    return bcov  # (B, D, D)
+
+
 def get_script_execution_command():
     return 'python ' + ' '.join(sys.argv)
 

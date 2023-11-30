@@ -775,18 +775,8 @@ class VarModel(pl.LightningModule):
         # covariance: [B, d, d]
         B, T, d = x.shape
 
-        # batched covariance calculation:
-        # https://stackoverflow.com/a/71357620/4383594
-        def batch_cov(points):
-            B, N, D = points.size()
-            mean = points.mean(dim=1).unsqueeze(1)
-            diffs = (points - mean).reshape(B * N, D)
-            prods = torch.bmm(diffs.unsqueeze(2), diffs.unsqueeze(1)).reshape(B, N, D, D)
-            bcov = prods.sum(dim=1) / (N - 1)  # Unbiased estimate
-            return bcov  # (B, D, D)
-
         means = x.mean(dim=1)
-        covs = batch_cov(x)
+        covs = utils.batch_cov(x)
         covs = einops.rearrange(covs, 'B D1 D2 -> B (D1 D2)')  # flatten
         self.latents = x
         return torch.cat((means, covs), dim=1)
