@@ -15,13 +15,29 @@
 #SBATCH --gres=gpu:1
 #SBATCH --partition=ellis
 
-source /home/sca63/mambaforge/etc/profile.d/conda.sh
-conda activate bnn_chaos_model
+# source /home/sca63/mambaforge/etc/profile.d/conda.sh
+# conda activate bnn_chaos_model
 
 # Enable errexit (exit on error)
 set -e
 
 version=$((1 + RANDOM % 999999))
+version2=$((1 + RANDOM % 999999))
 
-python -u find_minima.py --total_steps 300000 --swa_steps 50000  --angles --no_mmr --no_nan --no_eplusminus --version $version --slurm_id $SLURM_JOB_ID "$@" --f1_variant default
-python -u run_swag.py --total_steps 300000 --swa_steps 50000 --angles --no_mmr --no_nan --no_eplusminus --version $version --slurm_id $SLURM_JOB_ID "$@" --f1_variant default
+python -u find_minima.py --total_steps 300 --swa_steps 50  --angles --no_mmr --no_nan --no_eplusminus --version $version --slurm_id $SLURM_JOB_ID "$@" --f1_variant bimt
+python -u run_swag.py --total_steps 300 --swa_steps 50 --angles --no_mmr --no_nan --no_eplusminus --version $version --slurm_id $SLURM_JOB_ID "$@" --f1_variant bimt
+# python -u sr.py --version 11339 --seed 0 #--time_in_hours 0.1 --max_size 60
+# python -u find_minima.py --total_steps 300 --swa_steps 50  --angles --no_mmr --no_nan --no_eplusminus --version $version2 --slurm_id $SLURM_JOB_ID "$@" --f1_variant pysr --pysr_model sr_results/hall_of_fame_11339.pkl 
+# python -u run_swag.py --total_steps 300 --swa_steps 50 --angles --no_mmr --no_nan --no_eplusminus --version $version2 --slurm_id $SLURM_JOB_ID "$@" --f1_variant pysr --pysr_model sr_results/hall_of_fame_11339.pkl 
+
+# python -u find_minima.py --total_steps 300 --swa_steps 500  --angles --no_mmr --no_nan --no_eplusminus --version $version --slurm_id $SLURM_JOB_ID "$@" --f1_variant linear
+# python -u run_swag.py --total_steps 300 --swa_steps 500 --angles --no_mmr --no_nan --no_eplusminus --version $version --slurm_id $SLURM_JOB_ID "$@" --f1_variant linear
+
+# python -u main_figures.py --total_steps 300000 --swa_steps 50000  --angles --no_mmr --no_nan --no_eplusminus --version 3045 --seed 1
+# python -u main_figures.py --total_steps 300000 --swa_steps 50000  --angles --no_mmr --no_nan --no_eplusminus --version 1278 --seed 1
+# python -u main_figures.py --total_steps 300000 --swa_steps 50000  --angles --no_mmr --no_nan --no_eplusminus --version 1083 --seed 1
+
+
+
+#python -u find_minima.py --total_steps 300000 --swa_steps 50000  --angles --no_mmr --no_nan --no_eplusminus --version $version --slurm_id $SLURM_JOB_ID "$@" --f1_variant default
+#python -u run_swag.py --total_steps 300000 --swa_steps 50000 --angles --no_mmr --no_nan --no_eplusminus --version $version --slurm_id $SLURM_JOB_ID "$@" --f1_variant default

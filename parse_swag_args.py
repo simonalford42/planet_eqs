@@ -29,7 +29,7 @@ def default_parser():
     parser.add_argument('--pysr_model_selection', type=str, default='best', choices=['best', 'accuracy', 'score'], help='')
     parser.add_argument('--sr_f1', action='store_true', default=False, help='do misc. stuff with f1 and SR')
     parser.add_argument('--f1_variant', type=str, default='default',
-                        choices=['zero', 'identity', 'pysr', 'pysr_frozen', 'random_features', 'linear', 'mean_cov', 'default'])
+                        choices=['zero', 'identity', 'pysr', 'pysr_frozen', 'random_features', 'linear', 'mean_cov', 'default', 'bimt'])
     parser.add_argument('--l1_reg', action='store_true', default=False)
     parser.add_argument('--l1_coeff', type=float, default=0.01)
     parser.add_argument('--cyborg_max_pysr_ix', default=None, type=int, help='indices up to and including the max index will be replaced with the pysr features')

@@ -201,6 +201,49 @@ def spock_features(X):
 
 
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+def test_pysr():
+    included_indices = get_sr_included_ixs()
+    X, _ = import_Xy(included_indices)
+    # X = torch.ones((500, 31))
+    y = spock_features(X)
+
+    path = utils.next_unused_path(f'sr_results/sr_test_hof.pkl', lambda i: f'_{i}')
+    # replace '.pkl' with '.csv'
+    path = path[:-3] + 'csv'
+
+    model = pysr.PySRRegressor(
+        equation_file=path,
+        niterations=500,
+        binary_operators=["+", "*", '/', '-', '^'],
+        unary_operators=[
+           # use fewer operators, nonredundant
+           # "square",
+           # "cube",
+           # "exp",
+           "log",
+           # 'abs',
+           # 'sqrt',
+           'sin',
+           # 'cos',
+           # 'tan',
+        ],
+        maxsize=60,
+        timeout_in_seconds=60*60*24*6,
+        # prevent ^ from using complex exponents, nesting power laws is expressive but uninterpretable
+        # base can have any complexity, exponent can have max 1 complexity
+        constraints={'^': (-1, 1)},
+        nested_constraints={"sin": {"sin": 0}},
+    )
+    model.fit(X, y)
+
+
+
+=======
+>>>>>>> fb3a18083c6c2caf5d1d4caff4d3b19f776297b7
+>>>>>>> master
 if __name__ == '__main__':
     # test_pysr()
     # useful if running from inside a shell
