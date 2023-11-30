@@ -32,9 +32,6 @@ import json
 from modules import *
 
 
-<<<<<<< HEAD
-=======
-
 class BioLinear(nn.Module):
     # BioLinear is just Linear, but each neuron comes with coordinates.
     def __init__(self, in_dim, out_dim, in_fold=1, out_fold=1):
@@ -100,7 +97,6 @@ class BioMLP(nn.Module):
         self.original_params = None
 
     def forward(self, x):
-        
         B, T, d = x.shape
         x = einops.rearrange(x, 'B T d -> (B T) d')
 
@@ -319,8 +315,6 @@ class BioMLP(nn.Module):
 
 
 
-
->>>>>>> master
 class CustomOneCycleLR(torch.optim.lr_scheduler._LRScheduler):
     """Custom version of one-cycle learning rate to stop early"""
     def __init__(self,
@@ -699,9 +693,9 @@ class VarModel(pl.LightningModule):
         else:
             summary_dim = hparams['latent']*2 + int(self.fix_megno)*2
 
-        #self.regress_nn = mlp(hparams['latent']*2 + int(self.fix_megno)*2, 2, hparams['hidden'], hparams['out'])
-        #self.regress_nn = BioMLP(in_dim=hparams['latent']*2 + int(self.fix_megno)*2, depth=2, w=hparams['hidden'], out_dim=hparams['out'])
-        self.regress_nn = mlp(summary_dim, 2, hparams['hidden'], hparams['out'])
+        self.regress_nn = mlp(hparams['latent']*2 + int(self.fix_megno)*2, 2, hparams['hidden'], hparams['out'])
+        # self.regress_nn = BioMLP(in_dim=hparams['latent']*2 + int(self.fix_megno)*2, depth=2, w=hparams['hidden'], out_dim=hparams['out'])
+        # self.regress_nn = mlp(summary_dim, 2, hparams['hidden'], hparams['out'])
         self.input_noise_logvar = nn.Parameter(torch.zeros(self.n_features)-2)
         self.summary_noise_logvar = nn.Parameter(torch.zeros(summary_dim) - 2) # add to summaries, not direct latents
         self.lowest = 0.5
@@ -759,11 +753,11 @@ class VarModel(pl.LightningModule):
 
     def compute_summary_stats2(self, x):
         x = self.feature_nn(x)
-        sample_mu = torch.mean(x, dim=1)
-        sample_var = torch.std(x, dim=1)**2
+        sample_mu = torch.mean(x, dim=1, keepdim=True)
+        sample_var = torch.std(x, dim=1, keepdim=True)**2
         sample_std = torch.sqrt(torch.abs(sample_var) + EPSILON)
 
-        clatent = torch.cat((sample_mu, sample_std), dim=1)
+        clatent = torch.cat((sample_mu, sample_std), dim=-1)
         self.latents = x
         return clatent
 
@@ -810,7 +804,12 @@ class VarModel(pl.LightningModule):
         return clatent
 
     def predict_instability(self, summary_stats):
-        testy = self.regress_nn(summary_stats)
+        with torch.no_grad():
+            z = torch.zeros_like(summary_stats)
+            print(z.shape)
+            print(self.hparams['latent']*2 + int(self.fix_megno)*2, self.hparams['hidden'], self.hparams['out'])
+            testy = self.regress_nn(z)
+        # testy = self.regress_nn(summary_stats)
         # Outputs mu, std
         mu = soft_clamp(testy[:, [0]], 4.0, 12.0)
         std = soft_clamp(testy[:, [1]], self.lowest, 6.0)
