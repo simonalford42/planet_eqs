@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 
 
+# sbatch -J mc_init --partition ellis train.sh --f1_variant mean_cov --init_special --total_steps 100000
+# sbatch -J mc_no_init --partition ellis train.sh --f1_variant mean_cov --total_steps 100000
+sbatch -J mc_init --partition ellis train.sh --f1_variant mean_cov --init_special --total_steps 300000 --seed 2
+sbatch -J mc_no_init --partition ellis train.sh --f1_variant mean_cov --total_steps 300000 --seed 2
+
 # sbatch -J mc80 --partition ellis train.sh --f1_variant mean_cov --hidden 80
 # sbatch -J mc160 --partition ellis train.sh --f1_variant mean_cov --hidden 160
 # sbatch -J mc80_2 --partition gpu train.sh --f1_variant mean_cov --hidden 80 --f2_depth 2
-sbatch -J mc160_3 --partition gpu train.sh --f1_variant mean_cov --hidden 160 --f2_depth 3
+# sbatch -J mc160_3 --partition gpu train.sh --f1_variant mean_cov --hidden 160 --f2_depth 3
 
 # sbatch -J zt1 --partition gpu train.sh --f1_variant linear --zero_theta 1
 # sbatch -J zt2 --partition gpu train.sh --f1_variant linear --zero_theta 2

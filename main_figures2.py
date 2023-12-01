@@ -36,7 +36,7 @@ import utils
 ARGS, CHECKPOINT_FILENAME = parse(glob=True)
 
 
-def calc_scores():
+def calc_scores(logger=None):
     global ARGS, CHECKPOINT_FILENAME
     s = CHECKPOINT_FILENAME + "*output.pkl"
     swag_ensemble = [
@@ -485,6 +485,8 @@ def calc_scores():
             plt.savefig(CHECKPOINT_FILENAME + 'comparison.png', dpi=300)
         else:
             plt.savefig(CHECKPOINT_FILENAME + f'_{confidence}_confidence_' + 'comparison.png', dpi=300)
+            if logger:
+                logger.log({"comparison": plt})
 
     # +
 
@@ -582,8 +584,12 @@ def calc_scores():
     plt.xlim(0, 1)
     plt.ylim(0, 1)
     fig.savefig(CHECKPOINT_FILENAME + 'classification.pdf')
-    plt.style.use('seaborn')
 
-    return rmse, snr_rmse, roc, weight_roc
+    if logger:
+        logger.log_metrics(metrics={'rmse': rmse,
+                                    'snr_rmse': snr_rmse,
+                                    'roc': roc,
+                                    'weighted_roc': weighted_roc,})
+        logger.log({"classification": fig})
 
 

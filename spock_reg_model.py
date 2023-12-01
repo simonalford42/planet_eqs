@@ -24,6 +24,7 @@ from torch.optim.optimizer import Optimizer
 from collections import OrderedDict
 import einops
 from utils import assert_equal
+import utils
 import wandb
 import json
 from modules import *
@@ -402,10 +403,13 @@ class VarModel(pl.LightningModule):
         if hparams['f1_variant'] == 'mean_cov':
             i = self.n_features
             summary_dim = i + i*i
+            self.regress_nn = nn.Sequential(
+                    SpecialLinear(self.n_features, hparams['latent'], init=hparams['init_special']),
+                    mlp(2 * hparams['latent'], 2, hparams['hidden'], hparams['out']))
         else:
             summary_dim = hparams['latent']*2 + int(self.fix_megno)*2
+            self.regress_nn = mlp(summary_dim, 2, hparams['hidden'], hparams['out'])
 
-        self.regress_nn = mlp(summary_dim, 2, hparams['hidden'], hparams['out'])
         self.input_noise_logvar = nn.Parameter(torch.zeros(self.n_features)-2)
         self.summary_noise_logvar = nn.Parameter(torch.zeros(summary_dim) - 2) # add to summaries, not direct latents
         self.lowest = 0.5

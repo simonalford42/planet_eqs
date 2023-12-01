@@ -4,6 +4,7 @@ import torch.nn as nn
 from load_model import load
 from utils import assert_equal
 import utils
+from spock_reg_model import VarModel
 
 model = load(version= 21101)
 
@@ -94,16 +95,19 @@ for k, v in vars(parse_args).items():
 args['f1_variant'] = 'identity'
 args['no_summary_sample'] = True
 model2 = VarModel(args)
-# [B, 40] statistics of the inputs
-input_stats = model2.compute_summary_stats2(batch)
+
+x, y = batch
+
+# [B, 41 + 41*41] statistics of the inputs
+input_stats = model2.compute_mean_cov_stats(x)
 print(f'input_stats: {input_stats.shape}')
 
-# [B, 40] statistics of the linear network
-linear_stats = model.compute_summary_stats2(batch)
+# [B, 82] statistics of the linear network
+linear_stats = model.compute_summary_stats2(x)
 print(f'linear_stats: {linear_stats.shape}')
 
 linear_approx_stats = nn(input_stats)
 print(f'linear_approx_stats: {linear_approx_stats.shape}')
 
-
-
+misses = [i for i in range(linear_stats.shape[1]) if not torch.allclose(linear_stats[i], linear_approx_stats[i])]
+print(misses)

@@ -5,15 +5,20 @@ import os
 import pysr
 import json
 import einops
+import load_model
 
 
 class SpecialLinear(nn.Module):
-    def __init__(self, n_inputs, n_features):
+    def __init__(self, n_inputs, n_features, init=False):
         super().__init__()
         self.n_inputs = n_inputs
         # number of features we're emulating
         self.n_features = n_features
         self.linear = nn.Linear(n_inputs + n_inputs * n_inputs, 2*n_features)
+        if init:
+            linear = load_model.load(version=21101).feature_nn
+            assert_equal(type(linear), nn.Linear)
+            self.init_layer(linear)
 
     def forward(self, x):
         return self.linear(x)

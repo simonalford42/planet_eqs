@@ -37,6 +37,7 @@ def default_parser():
     parser.add_argument('--no_summary_sample', action='store_true', default=False, help='dont sample the summary stats')
     parser.add_argument('--f2_depth', type=int,  default=1, help='regress nn number of hidden layers')
     parser.add_argument('--zero_theta', type=int,  nargs='+', default=0, help='ix or ixs of sin/cos theta1-3 to zero, doing at 1-6')
+    parser.add_argument('--init_special', action='store_true', default=False, help='init special linear layer')
     return parser
 
 def parse(glob=False):
