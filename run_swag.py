@@ -23,9 +23,11 @@ irand = lambda lo, hi: int(np.random.rand()*(hi-lo) + lo)
 log_rand = lambda lo, hi: 10**rand(np.log10(lo), np.log10(hi))
 ilog_rand = lambda lo, hi: int(10**rand(np.log10(lo), np.log10(hi)))
 
-
 from parse_swag_args import parse
-args, checkpoint_filename = parse()
+args = parse()
+checkpoint_filename = utils.ckpt_path(args.version, args.seed)
+
+
 seed = args.seed
 
 if args.no_swag:

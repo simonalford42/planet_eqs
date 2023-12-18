@@ -3,11 +3,18 @@
 
 # -------------------- Monday jobs -------------------
 
-# sbatch -J lw015 --partition gpu train.sh --f1_variant linear --l1_reg weights --l1_coeff 0.15
-# sbatch -J lw005 --partition gpu train.sh --f1_variant linear --l1_reg weights --l1_coeff 0.005
-# sbatch -J lw02 --partition gpu train.sh --f1_variant linear --l1_reg weights --l1_coeff 0.2
-# sbatch -J lw05 --partition gpu train.sh --f1_variant linear --l1_reg weights --l1_coeff 0.5
-# sbatch -J lw07 --partition gpu train.sh --f1_variant linear --l1_reg weights --l1_coeff 0.7
+sbatch -J lw015 --partition gpu train.sh --f1_variant linear --l1_reg weights --l1_coeff 0.15
+sbatch -J lw005 --partition gpu train.sh --f1_variant linear --l1_reg weights --l1_coeff 0.005
+sbatch -J lw02 --partition gpu train.sh --f1_variant linear --l1_reg weights --l1_coeff 0.2
+sbatch -J lw05 --partition gpu train.sh --f1_variant linear --l1_reg weights --l1_coeff 0.5
+sbatch -J lw07 --partition gpu train.sh --f1_variant linear --l1_reg weights --l1_coeff 0.7
+
+sbatch -J l15 --partition gpu train.sh --f1_variant linear --f2_reg 15
+sbatch -J l20 --partition gpu train.sh --f1_variant linear --f2_reg 20
+sbatch -J l40 --partition gpu train.sh --f1_variant linear --f2_reg 40
+sbatch -J l100 --partition gpu train.sh --f1_variant linear --f2_reg 100
+sbatch -J l1k --partition gpu train.sh --f1_variant linear --f2_reg 1000
+sbatch -J l10k --partition gpu train.sh --f1_variant linear --f2_reg 10000
 
 # -------------------- Friday jobs -------------------
 

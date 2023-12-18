@@ -1,23 +1,34 @@
 import glob
 
 def is_valid(version, seed=None):
-    files = glob.glob('results/steps=*/')
-    # go from 'steps=500_megno=0_angles=1_power=0_hidden=40_latent=20_nommr=1_nonan=1_noeplusminus=1_v26498_0'/ to 26498
-    versions_present = [int(f.split('_')[-2][1:]) for f in files]
+    versions, seeds = get_versions_and_seeds()
     if seed is None:
-        return version not in versions_present
+        return version not in versions
     else:
-        seeds = [int(f.split('_')[-1][:-1]) for f in files]
-        return (version, seed) not in zip(versions_present, seeds)
+        return (version, seed) not in zip(versions, seeds)
+
+
+def get_versions_and_seeds():
+    files = glob.glob('results/*/')
+    versions = []
+    seeds = []
+    for f in files:
+        f2 = f[len('results/'):-1] # go from 'results/*/' to '*'
+        # go from 1278_0 to 1278, 0
+        v, s = f2.split('_')
+        versions.append(int(v))
+        seeds.append(int(s))
+
+    return versions, seeds
+
 
 def next_version():
-    files = glob.glob('results/steps=*/')
-    # go from 'steps=500_megno=0_angles=1_power=0_hidden=40_latent=20_nommr=1_nonan=1_noeplusminus=1_v26498_0'/ to 26498
-    versions_present = [int(f.split('_')[-2][1:]) for f in files]
-    for i in range(100000):
-        if i not in versions_present:
+    versions, seeds = get_versions_and_seeds()
+    for i in range(100000000):
+        if i not in versions:
             return i
 
     raise Exception("No valid version found")
 
-    print(next_version())
+# this way, we can call it as a bash script, and it will "return" this value
+print(next_version())

@@ -16,8 +16,8 @@ WARNINGS = set()
 
 
 def ckpt_path(version, seed=0):
-    # return "results/" + str(version) + '_' + str(seed)
-    return "results_backup/steps=300000_megno=0_angles=1_power=0_hidden=40_latent=20_nommr=1_nonan=1_noeplusminus=1_v" + str(version) + '_' + str(seed)
+    return "results/" + str(version) + '_' + str(seed)
+
 
 # batched covariance calculation:
 # https://stackoverflow.com/a/71357620/4383594
