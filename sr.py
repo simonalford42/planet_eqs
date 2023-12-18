@@ -2,19 +2,16 @@
 import subprocess
 import wandb
 import pysr
+from pysr import PySRRegressor
 pysr.julia_helpers.init_julia()
 
 import seaborn as sns
 sns.set_style('darkgrid')
-from matplotlib import pyplot as plt
 import spock_reg_model
 from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
-import torch
 import numpy as np
-from scipy.stats import truncnorm
-import sys
 import parse_swag_args
 from einops import rearrange
 from sklearn.decomposition import PCA
@@ -30,26 +27,10 @@ def compute_features(inputs):
     assert inputs.shape[-1] == 31
 
 
-def load_model(**kwargs):
-    # update_args(**kwargs)
-    # Fixed hyperparams:
-    name = 'full_swag_pre_' + CHECKPOINT_FILENAME
-    checkpoint_path = CHECKPOINT_FILENAME + '/version=0-v0.ckpt'
-    try:
-        model = spock_reg_model.VarModel.load_from_checkpoint(checkpoint_path)
-    except FileNotFoundError:
-        checkpoint_path = CHECKPOINT_FILENAME + '/version=0.ckpt'
-        model = spock_reg_model.VarModel.load_from_checkpoint(checkpoint_path)
-
-    return model
-
-def get_f1_inputs_and_targets(model=None):
-    if model is None:
-        model = load_model()
+def get_f1_inputs_and_targets(args):
+    model = spock_reg_model.load_model(version=args.version, seed=args.seed)
     model.make_dataloaders()
     model.eval()
-    # print(model.inputs_mask.mask.data)
-    # print(model.features_mask.mask.data)
 
     # just takes a random batch of inputs and passes them through the neural network
     batch = next(iter(model.train_dataloader()))
@@ -57,33 +38,11 @@ def get_f1_inputs_and_targets(model=None):
     return inputs, targets
 
 
-def update_args(version=1278, seed=0, total_steps=300000, megno=False, angles=True, power_transform=False,
-        hidden=40, latent=20, no_mmr=True, no_nan=True, no_eplusminus=True, train_all=False):
-    extra = ''
-    if no_nan:
-        extra += '_nonan=1' 
-    if no_eplusminus:
-        extra += '_noeplusminus=1' 
-    if train_all:
-        extra += '_train_all=1' 
-    checkpoint_filename = (
-            "results/steps=%d_megno=%d_angles=%d_power=%d_hidden=%d_latent=%d_nommr=%d" %
-            (total_steps, megno, angles, power_transform, hidden, latent, no_mmr)
-        + extra + '_v' + str(version)
-    )
-    checkpoint_filename += '_%d' %(seed,)
-
-    global ARGS, CHECKPOINT_FILENAME
-    ARGS.version = version
-    ARGS.seed = seed
-    CHECKPOINT_FILENAME = checkpoint_filename
-
-
-def import_Xy(included_ixs=None):
+def import_Xy(args, included_ixs=None):
     if not included_ixs:
         included_ixs = INCLUDED_IXS
 
-    inputs, targets =  get_f1_inputs_and_targets()
+    inputs, targets =  get_f1_inputs_and_targets(args)
     print(f'inputs: {inputs.shape}')
 
     N = 500
@@ -116,6 +75,7 @@ def get_sr_included_ixs():
     included_ixs = [i for i in range(len(LABELS)) if LABELS[i] not in skipped]
     included_labels = [LABELS[i] for i in included_ixs]
     return included_ixs
+
 
 INCLUDED_IXS = get_sr_included_ixs()
 
@@ -161,7 +121,7 @@ def run_regression(args):
     command = utils.get_script_execution_command()
     print(command)
 
-    X, y = import_Xy(included_ixs)
+    X, y = import_Xy(args, included_ixs)
 
     model = pysr.PySRRegressor(**pysr_config)
     model.fit(X, y, variable_names=variable_names(included_ixs))
@@ -199,11 +159,6 @@ def spock_features(X):
     y = einops.rearrange(y, 'n B -> B n')
     return y
 
-
-
 if __name__ == '__main__':
     # test_pysr()
-    # useful if running from inside a shell
     run_regression(ARGS)
-
-

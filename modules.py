@@ -5,8 +5,17 @@ import os
 import pysr
 import json
 import einops
-import load_model
+import spock_reg_model
 
+
+class ZeroFeatureAtIx(nn.Module):
+    def __init__(self, n_features, ix):
+        super().__init__()
+        self.n_features = n_features
+        self.ix = ix
+
+    def forward(self, x):
+        return torch.cat([x[..., :self.ix], torch.zeros_like(x[..., self.ix:self.ix+1]), x[..., self.ix+1:]], dim=-1)
 
 class SpecialLinear(nn.Module):
     def __init__(self, n_inputs, n_features, init=False):
@@ -16,7 +25,7 @@ class SpecialLinear(nn.Module):
         self.n_features = n_features
         self.linear = nn.Linear(n_inputs + n_inputs * n_inputs, 2*n_features)
         if init:
-            linear = load_model.load(version=21101).feature_nn
+            linear = spock_reg_model.load(total_steps=300000, seed=0, version=21101).feature_nn
             assert_equal(type(linear), nn.Linear)
             self.init_layer(linear)
 
@@ -27,7 +36,6 @@ class SpecialLinear(nn.Module):
         layer = SpecialLinear(n_inputs=linear.weight.shape[1], n_features=linear.weight.shape[0])
         layer.init_layer(linear)
         return layer
-
 
     def init_layer(self, layer: nn.Linear):
         # layer to emulate is a [n_inputs, n_features] linear layer.

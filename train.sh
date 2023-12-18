@@ -21,7 +21,8 @@ conda activate bnn_chaos_model
 # Enable errexit (exit on error)
 set -e
 
-version=$((1 + RANDOM % 999999))
+# gets the next available version number
+version=$(python versions.py)
 
-# python -u find_minima.py --version $version --slurm_id $SLURM_JOB_ID "$@"
-python -u run_swag.py --version $version --slurm_id $SLURM_JOB_ID "$@"
+python -u find_minima.py --version $version --slurm_id $SLURM_JOB_ID --slurm_name $SLURM_JOB_NAME "$@"
+python -u run_swag.py --version $version --slurm_id $SLURM_JOB_ID --slurm_name $SLURM_JOB_NAME "$@"

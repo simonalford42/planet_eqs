@@ -31,6 +31,7 @@ import torch
 import time
 from tqdm.notebook import tqdm
 import utils
+import wandb
 
 
 ARGS, CHECKPOINT_FILENAME = parse(glob=True)
@@ -485,8 +486,9 @@ def calc_scores(logger=None):
             plt.savefig(CHECKPOINT_FILENAME + 'comparison.png', dpi=300)
         else:
             plt.savefig(CHECKPOINT_FILENAME + f'_{confidence}_confidence_' + 'comparison.png', dpi=300)
-            if logger:
-                logger.log({"comparison": plt})
+
+        if logger:
+            logger.log_metrics({"comparison": wandb.Image(plt)})
 
     # +
 
@@ -589,7 +591,7 @@ def calc_scores(logger=None):
         logger.log_metrics(metrics={'rmse': rmse,
                                     'snr_rmse': snr_rmse,
                                     'roc': roc,
-                                    'weighted_roc': weighted_roc,})
-        logger.log({"classification": fig})
+                                    'weighted_roc': weight_roc,})
+        logger.log_metrics({"classification": wandb.Image(fig)})
 
 

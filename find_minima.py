@@ -1,7 +1,6 @@
 """This file trains a model to minima, then saves it for run_swag.py"""
 import seaborn as sns
 sns.set_style('darkgrid')
-from matplotlib import pyplot as plt
 import spock_reg_model
 spock_reg_model.HACK_MODEL = True
 from pytorch_lightning import Trainer
@@ -19,33 +18,25 @@ irand = lambda lo, hi: int(np.random.rand()*(hi-lo) + lo)
 log_rand = lambda lo, hi: 10**rand(np.log10(lo), np.log10(hi))
 ilog_rand = lambda lo, hi: int(10**rand(np.log10(lo), np.log10(hi)))
 
-parse_args, checkpoint_filename = parse()
-seed = parse_args.seed
+parse_args = parse()
+checkpoint_filepath = utils.ckpt_path(parse_args.version, parse_args.seed)
 
 # Fixed hyperparams:
-lr = 5e-4
 TOTAL_STEPS = parse_args.total_steps
 TRAIN_LEN = 78660
 batch_size = 2000 #ilog_rand(32, 3200)
 steps_per_epoch = int(1+TRAIN_LEN/batch_size)
 epochs = int(1+TOTAL_STEPS/steps_per_epoch)
 print(f"epochs: {epochs}")
-# epochs = 200
 
 command = utils.get_script_execution_command()
 print(command)
 
 args = {
-    'slurm_id': parse_args.slurm_id,
-    'version': parse_args.version,
-    'seed': seed,
+    'seed': parse_args.seed,
     'batch_size': batch_size,
-    'hidden': parse_args.hidden,#ilog_rand(50, 1000),
     'in': 1,
-    'latent': parse_args.latent, #2,#ilog_rand(4, 500),
-    'lr': lr,
-    'swa_lr': lr/2,
-    # 'out': 1,
+    'swa_lr': parse_args.lr/2,
     'out': parse_args.f2_depth,
     'samp': 5,
     'swa_start': epochs//2,
@@ -56,37 +47,28 @@ args = {
     'scheduler_choice': 'swa',
     'steps': TOTAL_STEPS,
     'beta_in': 1e-5,
-    'beta_out': parse_args.beta,#0.003,
+    'beta_out': 0.001,
     'act': 'softplus',
     'noisy_val': False,
     'gradient_clip': 0.1,
     # Much of these settings turn off other parameters tried:
-    'fix_megno': parse_args.megno, #avg,std of megno
-    'fix_megno2': (not parse_args.megno), #Throw out megno completely
-    'include_angles': parse_args.angles,
-    'include_mmr': (not parse_args.no_mmr),
-    'include_nan': (not parse_args.no_nan),
-    'include_eplusminus': (not parse_args.no_eplusminus),
-    'power_transform': parse_args.power_transform,
+    'fix_megno': False, #avg,std of megno
+    'fix_megno2': True, #Throw out megno completely
+    'include_angles': True,
+    'include_mmr': False,
+    'include_nan': False,
+    'include_eplusminus': False,
+    'power_transform': False,
+    # moving some parse args to here to clean up
+    'plot': False,
+    'plot_random': False,
+    'train_all': False,
+    'lower_std': False,
 }
 
 # by default, parsed args get sent as hparams
 for k, v in vars(parse_args).items():
-    if k not in ['beta', 'megno', 'angles', 'no_mmr', 'no_nan', 'no_eplusminus']:
-        args[k] = v
-
-    # 'lower_std': args.lower_std,
-    # 'train_all': args.train_all,
-    # 'no_log': args.no_log,
-    # 'pysr_model': args.pysr_model,
-    # 'swag': False,
-    # 'f1_variant': args.f1_variant,
-    # 'l1_reg': args.l1_reg,
-    # 'l1_reg_grad': args.l1_reg_grad,
-    # 'l1_coeff': args.l1_coeff,
-    # 'pysr_model_selection': args.pysr_model_selection,
-    # 'cyborg_max_pysr_ix': args.cyborg_max_pysr_ix,
-    # 'loss_ablate': args.loss_ablate,
+    args[k] = v
 
 name = 'full_swag_pre_' + checkpoint_filename
 # logger = TensorBoardLogger("tb_logs", name=name)
@@ -105,7 +87,7 @@ trainer = Trainer(
     terminate_on_nan=True, gradient_clip_val=max_l2_norm,
 )
 
-torch.autograd.set_detect_anomaly(True)
+# torch.autograd.set_detect_anomaly(True)
 
 try:
     trainer.fit(model)

@@ -28,9 +28,13 @@ from parse_swag_args import parse
 args, checkpoint_filename = parse()
 seed = args.seed
 
+if args.no_swag:
+    print('no swag, exiting')
+    exit(0)
+
 TOTAL_STEPS = args.swa_steps
 TRAIN_LEN = 78660
-batch_size = 2000 #ilog_rand(32, 3200)
+batch_size = args.batch_size  # 2000 #ilog_rand(32, 3200)
 steps_per_epoch = int(1+TRAIN_LEN/batch_size)
 epochs = int(1+TOTAL_STEPS/steps_per_epoch)
 print(f"epochs: {epochs}")

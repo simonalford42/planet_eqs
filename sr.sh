@@ -1,3 +1,20 @@
 #!/usr/bin/env bash
 
-python sr.py
+ # job name
+#SBATCH -J planet_sr
+ # output file (%j expands to jobID)
+#SBATCH -o out/sr_%A.out
+ # total nodes
+#SBATCH -N 1
+ # total cores
+#SBATCH -n 32
+#SBATCH --requeue
+ # total limit (hh:mm:ss)
+#SBATCH -t 02:00:00
+#SBATCH --mem=50G
+#SBATCH --partition=default_partition
+
+source /home/sca63/mambaforge/etc/profile.d/conda.sh
+conda activate bnn_chaos_model
+
+python -u sr.py "$@"
