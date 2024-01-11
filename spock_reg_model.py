@@ -820,6 +820,57 @@ class VarModel(pl.LightningModule):
         inputs, summary_stats = self.forward_to_summary_only(X_sample, noisy_val=False)
         return inputs, summary_stats
 
+    def generate_f2_inputs_and_targets(self, batch, batch_idx):
+        x, _ = batch
+        noisy_val = False
+
+        if self.fix_megno or self.fix_megno2:
+            if self.fix_megno:
+                megno_avg_std = self.summarize_megno(x)
+            #(batch, 2)
+            x = self.zero_megno(x)
+
+        if not self.include_mmr:
+            x = self.zero_mmr(x)
+
+        if not self.include_nan:
+            x = self.zero_nan(x)
+
+        if not self.include_eplusminus:
+            x = self.zero_eplusminus(x)
+
+        if 'zero_theta' in self.hparams and self.hparams['zero_theta'] != 0:
+            x = self.zero_theta(x)
+
+        if self.random_sample:
+            x = self.augment(x)
+        #x is (batch, time, feature)
+        if noisy_val:
+            x = self.add_input_noise(x)
+
+        summary_stats = self.compute_summary_stats(x)
+
+        if self.fix_megno:
+            summary_stats = torch.cat([summary_stats, megno_avg_std], dim=1)
+
+        self._cur_summary = summary_stats
+
+        #summary is (batch, feature)
+        self._summary_kl = (1/2) * (
+                summary_stats**2
+                + torch.exp(self.summary_noise_logvar)[None, :]
+                - self.summary_noise_logvar[None, :]
+                - 1
+            )
+
+        if noisy_val:
+            summary_stats = self.add_summary_noise(summary_stats)
+
+        mu, std = self.predict_instability(summary_stats)
+        #Each is (batch,)
+
+        return summary_stats, torch.cat((mu, std), dim=1), std
+
     def training_step(self, batch, batch_idx):
         fraction = self.global_step / self.hparams['steps']
         beta_in = min([1, fraction/0.3]) * self.beta_in
