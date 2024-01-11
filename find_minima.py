@@ -70,22 +70,18 @@ args = {
 for k, v in vars(parse_args).items():
     args[k] = v
 
-print('name = full swag pre')
-
 name = 'full_swag_pre_' + checkpoint_filename
 # logger = TensorBoardLogger("tb_logs", name=name)
 logger = WandbLogger(project='bnn-chaos-model', entity='bnn-chaos-model', name=name, mode='disabled' if args['no_log'] else 'online')
-print('logger')
 checkpointer = ModelCheckpoint(filepath=checkpoint_filename + '/{version}')
-print('checkpt')
-model = spock_reg_model.VarModel(args)
-print('spock reg')
-model.make_dataloaders()
-print('data made')
+if args['load']:
+    model = spock_reg_model.load(args['load'])
+    spock_reg_model.update_l1_model(model)
+else:
+    model = spock_reg_model.VarModel(args)
+    model.make_dataloaders()
 
 labels = ['time', 'e+_near', 'e-_near', 'max_strength_mmr_near', 'e+_far', 'e-_far', 'max_strength_mmr_far', 'megno', 'a1', 'e1', 'i1', 'cos_Omega1', 'sin_Omega1', 'cos_pomega1', 'sin_pomega1', 'cos_theta1', 'sin_theta1', 'a2', 'e2', 'i2', 'cos_Omega2', 'sin_Omega2', 'cos_pomega2', 'sin_pomega2', 'cos_theta2', 'sin_theta2', 'a3', 'e3', 'i3', 'cos_Omega3', 'sin_Omega3', 'cos_pomega3', 'sin_pomega3', 'cos_theta3', 'sin_theta3', 'm1', 'm2', 'm3', 'nan_mmr_near', 'nan_mmr_far', 'nan_megno']
-
-print('max l2 norm')
 
 max_l2_norm = args['gradient_clip']*sum(p.numel() for p in model.parameters() if p.requires_grad)
 trainer = Trainer(
@@ -97,7 +93,6 @@ trainer = Trainer(
 
 # torch.autograd.set_detect_anomaly(True)
 
-print('starting to train')
 try:
     trainer.fit(model)
 except ValueError as e:

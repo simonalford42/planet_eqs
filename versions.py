@@ -1,4 +1,5 @@
 import glob
+import random
 
 def is_valid(version, seed=None):
     versions, seeds = get_versions_and_seeds()
@@ -24,11 +25,10 @@ def get_versions_and_seeds():
 
 def next_version():
     versions, seeds = get_versions_and_seeds()
-    for i in range(100000000):
+    while True:
+        i = random.randint(0, 100000)
         if i not in versions:
             return i
-
-    raise Exception("No valid version found")
 
 # this way, we can call it as a bash script, and it will "return" this value
 print(next_version())

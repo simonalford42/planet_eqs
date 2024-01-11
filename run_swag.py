@@ -27,7 +27,6 @@ from parse_swag_args import parse
 args = parse()
 checkpoint_filename = utils.ckpt_path(args.version, args.seed)
 
-
 seed = args.seed
 
 if args.no_swag:
@@ -115,4 +114,4 @@ print('saved model to ' + output_filename + '.pkl ...')
 
 print('Finished running')
 import main_figures2
-main_figures2.calc_scores(logger=logger)
+main_figures2.calc_scores(args, checkpoint_filename, logger=logger)

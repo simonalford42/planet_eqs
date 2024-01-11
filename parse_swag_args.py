@@ -1,7 +1,18 @@
 import argparse
-import random
 
-def default_parser():
+def get_checkpoint_filename_old(args, glob=False):
+    checkpoint_filename = (
+            "results/steps=%d_megno=%d_angles=%d_power=%d_hidden=%d_latent=%d_nommr=%d" %
+            (args.total_steps, args.megno, args.angles, args.power_transform, args.hidden, args.latent, args.no_mmr)
+        + '_nonan=1_noeplusminus=1_v' + str(args.version) + '_'
+    )
+    if not glob:
+        checkpoint_filename += '%d' %(args.seed,)
+
+    return checkpoint_filename
+
+
+def parse():
     # Instantiate the parser
     parser = argparse.ArgumentParser(description='Optional app description')
     # when importing from jupyter nb, it passes an arg to --f which we should just ignore
@@ -15,7 +26,7 @@ def default_parser():
     parser.add_argument('--seed', type=int, default=0, help='default=0')
 
     parser.add_argument('--total_steps', type=int, default=300000, help='default=300000')
-    parser.add_argument('--hidden', type=int, default=40, help='default=40')
+    parser.add_argument('--hidden', type=int, default=40, help='regress nn hidden dim')
     parser.add_argument('--latent', type=int, default=20, help='number of features f1 outputs')
 
     parser.add_argument('--swa_steps', type=int, default=50000, help='default=50000')
@@ -45,24 +56,9 @@ def default_parser():
     parser.add_argument('--f2_dropout', type=float, default=None) # dropout p for f2 input
     parser.add_argument('--lr', type=float, default=5e-4)
     parser.add_argument('--mean_var', action='store_true')
+    parser.add_argument('--f2_linear', action='store_true')
+    parser.add_argument('--load', type=str, default=None, help='ckpt path to load, e.g. model.ckpt')
 
-    return parser
-
-
-def get_checkpoint_filename_old(args, glob=False):
-    checkpoint_filename = (
-            "results/steps=%d_megno=%d_angles=%d_power=%d_hidden=%d_latent=%d_nommr=%d" %
-            (args.total_steps, args.megno, args.angles, args.power_transform, args.hidden, args.latent, args.no_mmr)
-        + '_nonan=1_noeplusminus=1_v' + str(args.version) + '_'
-    )
-    if not glob:
-        checkpoint_filename += '%d' %(args.seed,)
-
-    return checkpoint_filename
-
-
-def parse():
-    parser = default_parser()
     args = parser.parse_args()
 
     if args.f1_variant == 'identity':
@@ -71,21 +67,5 @@ def parse():
 
     if args.pysr_model is not None and args.f1_variant == 'default':
         args.f1_variant = 'pysr'
-
-    return args
-
-def parse_sr():
-    parser = default_parser()
-    # for pysr only
-    parser.add_argument('-t', '--time_in_hours', type=float, default=1)
-    parser.add_argument('-m', '--max_size', type=int, default=60)
-
-    args = parser.parse_args()
-
-    if args.f1_variant == 'identity':
-        # just hard coding for the n features with the default arguments..
-        args.latent = 41
-
-    assert (args.f1_variant in ['pysr', 'pysr_frozen']) == (args.pysr_model is not None)
 
     return args

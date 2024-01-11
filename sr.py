@@ -12,7 +12,7 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
 import numpy as np
-import parse_swag_args
+import argparse
 from einops import rearrange
 from sklearn.decomposition import PCA
 import utils
@@ -20,15 +20,13 @@ from utils import assert_equal
 import json
 import einops
 
-ARGS, CHECKPOINT_FILENAME = parse_swag_args.parse_sr()
-
 def compute_features(inputs):
     model = PySRRegressor.from_file('results/hall_of_fame.pkl')
     assert inputs.shape[-1] == 31
 
 
 def get_f1_inputs_and_targets(args):
-    model = spock_reg_model.load_model(version=args.version, seed=args.seed)
+    model = spock_reg_model.load(version=args.version, seed=args.seed)
     model.make_dataloaders()
     model.eval()
 
@@ -38,12 +36,22 @@ def get_f1_inputs_and_targets(args):
     return inputs, targets
 
 
+def get_f2_inputs_and_targets(args):
+    model = spock_reg_model.load(version=args.version, seed=args.seed)
+    model.make_dataloaders()
+    model.eval()
+
+    # just takes a random batch of inputs and passes them through the neural network
+    batch = next(iter(model.train_dataloader()))
+    inputs, targets, stds = model.generate_f2_inputs_and_targets(batch, batch_idx=0)
+    return inputs, targets, stds
+
+
 def import_Xy(args, included_ixs=None):
     if not included_ixs:
         included_ixs = INCLUDED_IXS
 
     inputs, targets =  get_f1_inputs_and_targets(args)
-    print(f'inputs: {inputs.shape}')
 
     N = 500
     X = rearrange(inputs, 'B T F -> (B T) F')
@@ -63,6 +71,20 @@ def import_Xy(args, included_ixs=None):
     return X, y
 
 
+def import_Xy_f2(args):
+    # [B, 40] and [B, 2] and [B, ]
+    X, y, stds =  get_f2_inputs_and_targets(args)
+
+    good_stds = stds < args.max_std
+
+    N = 500
+    ixs = np.random.choice(X.shape[0], size=N, replace=False)
+    X, y = X[ixs], y[ixs]
+    X, y = X.detach().numpy(), y.detach().numpy()
+
+    return X, y
+
+
 LABELS = ['time', 'e+_near', 'e-_near', 'max_strength_mmr_near', 'e+_far', 'e-_far', 'max_strength_mmr_far', 'megno', 'a1', 'e1', 'i1', 'cos_Omega1', 'sin_Omega1', 'cos_pomega1', 'sin_pomega1', 'cos_theta1', 'sin_theta1', 'a2', 'e2', 'i2', 'cos_Omega2', 'sin_Omega2', 'cos_pomega2', 'sin_pomega2', 'cos_theta2', 'sin_theta2', 'a3', 'e3', 'i3', 'cos_Omega3', 'sin_Omega3', 'cos_pomega3', 'sin_pomega3', 'cos_theta3', 'sin_theta3', 'm1', 'm2', 'm3', 'nan_mmr_near', 'nan_mmr_far', 'nan_megno']
 
 LABEL_TO_IX = {label: i for i, label in enumerate(LABELS)}
@@ -77,14 +99,11 @@ def get_sr_included_ixs():
     return included_ixs
 
 
-INCLUDED_IXS = get_sr_included_ixs()
+def run_pysr(args):
 
+    included_ixs = get_sr_included_ixs()
 
-def run_regression(args):
-
-    included_ixs = INCLUDED_IXS
-
-    path = utils.next_unused_path(f'sr_results/hall_of_fame_{ARGS.version}_{ARGS.seed}.pkl', lambda i: f'_{i}')
+    path = utils.next_unused_path(f'sr_results/hall_of_fame_{args.target}_{args.version}_{args.seed}.pkl', lambda i: f'_{i}')
     # replace '.pkl' with '.csv'
     path = path[:-3] + 'csv'
     # save the included ixs
@@ -93,6 +112,8 @@ def run_regression(args):
         json.dump(included_ixs, f)
 
     pysr_config = dict(
+        procs=10,
+        cluster_manager='slurm',
         equation_file=path,
         niterations=500000,
         binary_operators=["+", "*", '/', '-', '^'],
@@ -106,8 +127,8 @@ def run_regression(args):
     )
 
     config = {
-        'version': ARGS.version,
-        'seed': ARGS.seed,
+        'version': args.version,
+        'seed': args.seed,
         **pysr_config,
         'results_cmd': f'vim $(ls {path[:-4]}.csv*)',
     }
@@ -121,10 +142,16 @@ def run_regression(args):
     command = utils.get_script_execution_command()
     print(command)
 
-    X, y = import_Xy(args, included_ixs)
+    if args.target == 'f1':
+        X, y = import_Xy(args, included_ixs)
+        variables = variable_names(included_ixs)
+    elif args.target == 'f2':
+        X, y = import_Xy_f2(args)
+        n = X.shape[1] // 2
+        variables = [f'm{i}' for i in range(n)] + [f's{i}' for i in range(n)]
 
     model = pysr.PySRRegressor(**pysr_config)
-    model.fit(X, y, variable_names=variable_names(included_ixs))
+    model.fit(X, y, variable_names=variables)
 
     losses = [min(eqs['loss']) for eqs in model.equation_file_contents_]
     wandb.log({'avg_loss': sum(losses)/len(losses),
@@ -159,6 +186,29 @@ def spock_features(X):
     y = einops.rearrange(y, 'n B -> B n')
     return y
 
+
+def parse_args():
+    # Instantiate the parser
+    parser = argparse.ArgumentParser(description='Optional app description')
+    # when importing from jupyter nb, it passes an arg to --f which we should just ignore
+    parser.add_argument('--no_log', action='store_true', default=False, help='disable wandb logging')
+    parser.add_argument('--slurm_id', type=int, default=-1, help='slurm job id')
+    parser.add_argument('--slurm_name', type=str, default='', help='slurm job name')
+    parser.add_argument('--version', type=int, help='', default=1278)
+    parser.add_argument('--seed', type=int, default=0, help='default=0')
+
+    parser.add_argument('--time_in_hours', type=float, default=1)
+    parser.add_argument('--max_size', type=int, default=60)
+    parser.add_argument('--target', type=str, default='f1', choices=['f1', 'f2'])
+    parser.add_argument('--target', type=str, default='f1', choices=['f1', 'f2'])
+    parser.add_argument('--max_std', type=float, default=-1)
+
+    args = parser.parse_args()
+
+    return args
+
+
 if __name__ == '__main__':
     # test_pysr()
-    run_regression(ARGS)
+    args = parse_args()
+    run_pysr(args)

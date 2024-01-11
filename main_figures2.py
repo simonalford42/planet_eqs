@@ -34,12 +34,8 @@ import utils
 import wandb
 
 
-ARGS, CHECKPOINT_FILENAME = parse(glob=True)
-
-
-def calc_scores(logger=None):
-    global ARGS, CHECKPOINT_FILENAME
-    s = CHECKPOINT_FILENAME + "*output.pkl"
+def calc_scores(args, checkpoint_filename, logger=None, plot_random=False):
+    s = checkpoint_filename + "*output.pkl"
     swag_ensemble = [
         spock_reg_model.load_swag(fname).cuda()
         for fname in glob.glob(s) #
@@ -49,8 +45,8 @@ def calc_scores(logger=None):
         raise ValueError(s + " not found!")
 
 
-    if ARGS.plot_random:
-        CHECKPOINT_FILENAME += '_random'
+    if plot_random:
+        checkpoint_filename += '_random'
 
 
     plt.switch_backend('agg')
@@ -106,11 +102,11 @@ def calc_scores(logger=None):
     colors = np.array(colors)/255.0
 
     swag_ensemble[0].make_dataloaders()
-    if ARGS.plot_random:
+    if plot_random:
         assert swag_ensemble[0].ssX is not None
         tmp_ssX = copy(swag_ensemble[0].ssX)
         # print(tmp_ssX.mean_)
-        if ARGS.train_all:
+        if args.train_all:
             swag_ensemble[0].make_dataloaders(
                 ssX=swag_ensemble[0].ssX,
                 train=True,
@@ -292,7 +288,7 @@ def calc_scores(logger=None):
     gaussian_stds = stds#np.std(sample_preds, 0)
     sigma = (truths[tmp_mask] - np.tile(averages, (2, 1)).T[tmp_mask])/np.tile(gaussian_stds, (2, 1)).T[tmp_mask]
 
-    np.save(CHECKPOINT_FILENAME + 'model_error_distribution.npy', sigma)
+    np.save(checkpoint_filename + 'model_error_distribution.npy', sigma)
 
     bins = 30
     fig = plt.figure(figsize=(4, 4))
@@ -308,14 +304,14 @@ def calc_scores(logger=None):
     plt.xlabel('Error over sigma', fontsize=14)
     # plt.xlabel('$|\mu_θ - y|/\sigma_θ$', fontsize=14)
     plt.legend()
-    fig.savefig(CHECKPOINT_FILENAME + 'error_dist.pdf')
+    fig.savefig(checkpoint_filename + 'error_dist.pdf')
 
 
     # Looks great! We didn't even need to tune it. Just use the same scale as the paper (0.5). Perhaps, however, with epistemic uncertainty, we will need to tune.
 
 
     def density_scatter(x, y, xlabel='', ylabel='', clabel='Sample Density', log=False,
-        width_mult=1, bins=30, p_cut=None, update_rc=True, ax=None, fig=None, cmap='viridis', **kwARGS):
+        width_mult=1, bins=30, p_cut=None, update_rc=True, ax=None, fig=None, cmap='viridis', **kwargs):
         if fig is None or ax is None:
             fig, ax = plt.subplots(1, 1, figsize=(4, 3))
         xy = np.array([x, y]).T
@@ -336,7 +332,7 @@ def calc_scores(logger=None):
 
         h, xedge, yedge, im = ax.hist2d(
             px, py, density=True, norm=norm,
-            bins=[int(width_mult*bins), bins], cmap=cmap, **kwARGS)
+            bins=[int(width_mult*bins), bins], cmap=cmap, **kwargs)
         ax.set_ylabel(ylabel)
         ax.set_xlabel(xlabel)
         fig.colorbar(im, ax=ax).set_label(clabel)
@@ -403,7 +399,7 @@ def calc_scores(logger=None):
         fig = plt.figure(figsize=(4, 4),
                          dpi=300,
                          constrained_layout=True)
-        # if ARGS.plot_random:
+        # if plot_random:
             # ic('random')
             # ic(len(ppx))
             # alpha = min([0.05 * 72471 / len(ppx), 1.0])
@@ -412,7 +408,7 @@ def calc_scores(logger=None):
             # ic(len(ppx))
 
     #     alpha = min([0.05 * 8740 / len(ppx), 1.0])
-    #     ic(alpha, ARGS.plot_random, len(ppx))
+    #     ic(alpha, plot_random, len(ppx))
         alpha = 1.0
 
         #colors[2, 3]
@@ -436,8 +432,11 @@ def calc_scores(logger=None):
         snr_rmse = np.average(np.square(ppx[ppx < 8.99] - ppy[ppx < 8.99]), weights=snr[ppx<8.99])**0.5
         print(f'{confidence} confidence gets RMSE of {rmse:.2f}')
         print(f'Weighted by SNR, this is: {snr_rmse:.2f}')
-        # np.save(ppx, f'ppx_{ARGS.version}.npy')
-        # np.save(ppx, f'ppy_{ARGS.version}.npy')
+
+        # np.save(f'ppx_{args.version}.npy', ppx)
+        # np.save(f'ppy_{args.version}.npy', ppy)
+        # np.save(f'p_std_{args.version}.npy', p_std)
+        # assert False
 
         ######################################################
         # Bias scores:
@@ -451,7 +450,7 @@ def calc_scores(logger=None):
 
         #Transparency:
         if show_transparency:
-            if ARGS.plot_random:
+            if plot_random:
                 transparency_adjuster = 1.0 #0.5 * 0.2
             else:
                 transparency_adjuster = 1.0
@@ -483,9 +482,9 @@ def calc_scores(logger=None):
         plt.tight_layout()
 
         if confidence == 'low':
-            plt.savefig(CHECKPOINT_FILENAME + 'comparison.png', dpi=300)
+            plt.savefig(checkpoint_filename + 'comparison.png', dpi=300)
         else:
-            plt.savefig(CHECKPOINT_FILENAME + f'_{confidence}_confidence_' + 'comparison.png', dpi=300)
+            plt.savefig(checkpoint_filename + f'_{confidence}_confidence_' + 'comparison.png', dpi=300)
 
         if logger:
             logger.log_metrics({"comparison": wandb.Image(plt)})
@@ -510,7 +509,7 @@ def calc_scores(logger=None):
                                     orientation='horizontal')
     cb1.set_label('SNR')
     fig.show()
-    plt.savefig(CHECKPOINT_FILENAME + 'colorbar.png', dpi=300)
+    plt.savefig(checkpoint_filename + 'colorbar.png', dpi=300)
 
     plt.style.use('default')
     # plt.style.use('science')
@@ -532,7 +531,7 @@ def calc_scores(logger=None):
     plt.ylim(0, 0.7)
 
 
-    fig.savefig(CHECKPOINT_FILENAME + 'residual.pdf')
+    fig.savefig(checkpoint_filename + 'residual.pdf')
 
     labels = ['time', 'e+_near', 'e-_near', 'max_strength_mmr_near', 'e+_far', 'e-_far', 'max_strength_mmr_far', 'megno', 'a1', 'e1', 'i1', 'cos_Omega1', 'sin_Omega1', 'cos_pomega1', 'sin_pomega1', 'cos_theta1', 'sin_theta1', 'a2', 'e2', 'i2', 'cos_Omega2', 'sin_Omega2', 'cos_pomega2', 'sin_pomega2', 'cos_theta2', 'sin_theta2', 'a3', 'e3', 'i3', 'cos_Omega3', 'sin_Omega3', 'cos_pomega3', 'sin_pomega3', 'cos_theta3', 'sin_theta3', 'm1', 'm2', 'm3', 'nan_mmr_near', 'nan_mmr_far', 'nan_megno']
 
@@ -566,7 +565,6 @@ def calc_scores(logger=None):
     # snr =  np.average(sample_preds, axis=0)**2/np.std(sample_preds, axis=0)**2
     y_weight = einops.repeat(snr, 'sample -> (sample run)', run=2)
 
-
     roc = roc_auc_score(
         y_true=y_roc,
         y_score=y_score,
@@ -585,7 +583,7 @@ def calc_scores(logger=None):
     #     fig)
     plt.xlim(0, 1)
     plt.ylim(0, 1)
-    fig.savefig(CHECKPOINT_FILENAME + 'classification.pdf')
+    fig.savefig(checkpoint_filename + 'classification.pdf')
 
     if logger:
         logger.log_metrics(metrics={'rmse': rmse,
@@ -593,5 +591,11 @@ def calc_scores(logger=None):
                                     'roc': roc,
                                     'weighted_roc': weight_roc,})
         logger.log_metrics({"classification": wandb.Image(fig)})
+
+
+if __name__ == '__main__':
+    args = parse()
+    checkpoint_filename = utils.ckpt_path(args.version, args.seed)
+    calc_scores(args, checkpoint_filename)
 
 

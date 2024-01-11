@@ -1,98 +1,90 @@
 #!/usr/bin/env bash
 
+# -------------------- Wed 1/11/24 jobs ------------------
 
-# -------------------- Monday jobs -------------------
+# sbatch -J f2_sr3 --partition ellis --time 02:00:00 sr.sh --version 21101 --target f2 --time_in_hours 1
+# sbatch -J f2_sr2 --partition ellis --time 08:00:00 sr.sh --version 21101 --target f2 --time_in_hours 7
+# sbatch -J f2_sr4 --partition ellis --time 24:00:00 sr.sh --version 21101 --target f2 --time_in_hours 23
 
-sbatch -J lw015 --partition gpu train.sh --f1_variant linear --l1_reg weights --l1_coeff 0.15
-sbatch -J lw005 --partition gpu train.sh --f1_variant linear --l1_reg weights --l1_coeff 0.005
-sbatch -J lw02 --partition gpu train.sh --f1_variant linear --l1_reg weights --l1_coeff 0.2
-sbatch -J lw05 --partition gpu train.sh --f1_variant linear --l1_reg weights --l1_coeff 0.5
-sbatch -J lw07 --partition gpu train.sh --f1_variant linear --l1_reg weights --l1_coeff 0.7
+# -------------------- Tue 1/10/24 jobs ------------------
 
-sbatch -J l15 --partition gpu train.sh --f1_variant linear --f2_reg 15
-sbatch -J l20 --partition gpu train.sh --f1_variant linear --f2_reg 20
-sbatch -J l40 --partition gpu train.sh --f1_variant linear --f2_reg 40
-sbatch -J l100 --partition gpu train.sh --f1_variant linear --f2_reg 100
-sbatch -J l1k --partition gpu train.sh --f1_variant linear --f2_reg 1000
-sbatch -J l10k --partition gpu train.sh --f1_variant linear --f2_reg 10000
+# sbatch -J lf2_5_-1 --partition gpu train.sh --f2_depth -1 --hidden 5 --f1_variant linear
+# sbatch -J lf2_10_-1 --partition gpu train.sh --f2_depth -1 --hidden 10 --f1_variant linear
+# sbatch -J lf2_20_-1 --partition gpu train.sh --f2_depth -1 --hidden 20 --f1_variant linear
+# sbatch -J lf2_40_-1 --partition gpu train.sh --f2_depth -1 --hidden 40 --f1_variant linear
+# sbatch -J lf2_80_-1 --partition gpu train.sh --f2_depth -1 --hidden 80 --f1_variant linear
 
-# -------------------- Friday jobs -------------------
+# sbatch -J lf2_5_0 --partition gpu train.sh --f2_depth 0 --hidden 5 --f1_variant linear
+# sbatch -J lf2_10_0 --partition gpu train.sh --f2_depth 0 --hidden 10 --f1_variant linear
+# sbatch -J lf2_20_0 --partition gpu train.sh --f2_depth 0 --hidden 20 --f1_variant linear
+# sbatch -J lf2_40_0 --partition gpu train.sh --f2_depth 0 --hidden 40 --f1_variant linear
+# sbatch -J lf2_80_0 --partition gpu train.sh --f2_depth 0 --hidden 80 --f1_variant linear
 
-# sbatch -J sr --partition gpu sr.sh --version 21101
-# sbatch -J f2_d2_h40 --partition gpu train.sh --f1_variant linear # default: depth 2, hidden 40
-# sbatch -J f2_d2_h20 --partition gpu train.sh --f1_variant linear --f2_depth 2 --hidden 20
-# sbatch -J f2_d1_h40 --partition gpu train.sh --f1_variant linear --f2_depth 1
-# sbatch -J f2_d1_h80 --partition gpu train.sh --f1_variant linear --f2_depth 1 --hidden 80
-# sbatch -J f2_d1_h20 --partition gpu train.sh --f1_variant linear --f2_depth 1 --hidden 20
+# sbatch -J lf2_5_1 --partition gpu train.sh --f2_depth 1 --hidden 5 --f1_variant linear
+# sbatch -J lf2_10_1 --partition gpu train.sh --f2_depth 1 --hidden 10 --f1_variant linear
+# sbatch -J lf2_20_1 --partition gpu train.sh --f2_depth 1 --hidden 20 --f1_variant linear
+# sbatch -J lf2_40_1 --partition gpu train.sh --f2_depth 1 --hidden 40 --f1_variant linear
+# sbatch -J lf2_80_1 --partition gpu train.sh --f2_depth 1 --hidden 80 --f1_variant linear
 
-# sbatch -J lw01 --partition gpu train.sh --f1_variant linear --l1_reg weights --l1_coeff 0.1
-# sbatch -J lw1 --partition gpu train.sh --f1_variant linear --l1_reg weights --l1_coeff 1.0
-# sbatch -J lw5 --partition gpu train.sh --f1_variant linear --l1_reg weights --l1_coeff 5.0
-# sbatch -J lw10 --partition gpu train.sh --f1_variant linear --l1_reg weights --l1_coeff 10
-# sbatch -J lw100 --partition gpu train.sh --f1_variant linear --l1_reg weights --l1_coeff 100
+# -------------------- Mon 1/9/24 jobs -------------------
 
-# sbatch -J l25 --partition gpu train.sh --f1_variant linear --f2_reg 2.5
-# sbatch -J l30 --partition gpu train.sh --f1_variant linear --f2_reg 3.0
-# sbatch -J l35 --partition gpu train.sh --f1_variant linear --f2_reg 3.5
-# sbatch -J l40 --partition gpu train.sh --f1_variant linear --f2_reg 4.0
-# sbatch -J l50 --partition gpu train.sh --f1_variant linear --f2_reg 5.0
-# sbatch -J l60 --partition gpu train.sh --f1_variant linear --f2_reg 6.0
-# sbatch -J l100 --partition gpu train.sh --f1_variant linear --f2_reg 10.0
+# sbatch -J z5 -t 48:00:00 --partition ellis train.sh --load 10367 --total_steps 1000000 # f2_reg = 5
+# sbatch -J z10 -t 48:00:00 --partition ellis train.sh --load 14695  --total_steps 1000000 # f2_reg = 10
+# sbatch -J z20 -t 48:00:00 --partition ellis train.sh --load 4  --total_steps 1000000 # f2_reg = 20
+# sbatch -J z100 -t 48:00:00 --partition ellis train.sh --load 5  --total_steps 1000000 # f2_reg = 100
 
-# sbatch -J mean_var --partition ellis train.sh --f1_variant identity --no_summary_sample --seed 5
-# sbatch -J mean_var --partition ellis train.sh --f1_variant identity --no_summary_sample --seed 6
-# sbatch -J mean_var --partition ellis train.sh --f1_variant mean_cov --seed 5 --mean_var
-# sbatch -J mean_var --partition ellis train.sh --f1_variant mean_cov --seed 6 --mean_var
+# sbatch -J f2_5_-1 --partition gpu train.sh --f2_depth -1 --hidden 5
+# sbatch -J f2_10_-1 --partition gpu train.sh --f2_depth -1 --hidden 10
+# sbatch -J f2_20_-1 --partition gpu train.sh --f2_depth -1 --hidden 20
+# sbatch -J f2_40_-1 --partition gpu train.sh --f2_depth -1 --hidden 40
+# sbatch -J f2_80_-1 --partition gpu train.sh --f2_depth -1 --hidden 80
 
-# ------------ Wednesday jobs ----------------
+# -------------------- Thu 1/4/24 jobs -------------------
 
-# sbatch -J fr_mean_cov --partition ellis train.sh --f1_variant mean_cov --no_summary_sample --no_swag --total_steps 50000 --init_special
+# sbatch -J z5 --partition ellis train.sh --load 10367  # f2_reg = 5
+# sbatch -J z10 --partition ellis train.sh --load 14695  # f2_reg = 10
+# sbatch -J z20 --partition ellis train.sh --load 4  # f2_reg = 20
+# sbatch -J z100 --partition ellis train.sh --load 5  # f2_reg = 100
 
-# sbatch -J l15 --partition ellis train.sh --f1_variant linear --f2_reg 1.5
-# sbatch -J l19 --partition ellis train.sh --f1_variant linear --f2_reg 1.9
-# sbatch -J l23 --partition ellis train.sh --f1_variant linear --f2_reg 2.3
+# sbatch -J f2_10_0 --partition gpu train.sh --f2_depth 0 --hidden 10
+# sbatch -J f2_10_1 --partition gpu train.sh --f2_depth 1 --hidden 10
+# sbatch -J f2_5_1 --partition gpu train.sh --f2_depth 1 --hidden 5
+# sbatch -J f2_5_2 --partition gpu train.sh --f2_depth 2 --hidden 5
 
-# --------------------- Tuesday jobs --------------------
+# sbatch -J f2_sr2 --partition gpu --time 08:00:00 sr.sh --version 21101 --target f2 --time_in_hours 8
 
-# sbatch -J fr_lin --partition gpu train.sh --f1_variant linear --no_summary_sample --no_swag --total_steps 50000 --load_f1 'version=21101'
-# sbatch -J fr_mean_cov --partition gpu train.sh --f1_variant mean_cov --no_summary_sample --no_swag --total_steps 50000 --init_special
+# -------------------- Wed 1/3/24 jobs -------------------
 
-# sbatch -J mean_var --partition gpu train.sh --f1_variant mean_cov --seed 0
-# sbatch -J mean_var --partition gpu train.sh --f1_variant mean_cov --seed 1
+# sbatch -J f2_linear --partition ellis train.sh --f2_linear
 
-# sbatch -J e1 --partition gpu train.sh --version 1 --seed 0
-# sbatch -J e2 --partition gpu train.sh --version 1 --seed 1
-# sbatch -J e3 --partition gpu train.sh --version 1 --seed 2
-# sbatch -J e4 --partition gpu train.sh --version 1 --seed 3
-# sbatch -J e5 --partition gpu train.sh --version 1 --seed 4
-# sbatch -J e6 --partition gpu train.sh --version 1 --seed 5
-# sbatch -J e7 --partition gpu train.sh --version 1 --seed 6
-# sbatch -J e8 --partition gpu train.sh --version 1 --seed 7
-# sbatch -J e9 --partition gpu train.sh --version 1 --seed 8
-# sbatch -J e10 --partition gpu train.sh --version 1 --seed 9
-# sbatch -J e11 --partition gpu train.sh --version 1 --seed 10
-# sbatch -J e12 --partition gpu train.sh --version 1 --seed 11
-# sbatch -J e13 --partition gpu train.sh --version 1 --seed 12
-# sbatch -J e14 --partition gpu train.sh --version 1 --seed 13
-# sbatch -J e15 --partition gpu train.sh --version 1 --seed 14
-# sbatch -J e16 --partition gpu train.sh --version 1 --seed 15
-# sbatch -J e17 --partition gpu train.sh --version 1 --seed 16
-# sbatch -J e18 --partition gpu train.sh --version 1 --seed 17
-# sbatch -J e19 --partition gpu train.sh --version 1 --seed 18
-# sbatch -J e20 --partition gpu train.sh --version 1 --seed 19
-# sbatch -J e21 --partition gpu train.sh --version 1 --seed 20
-# sbatch -J e22 --partition gpu train.sh --version 1 --seed 21
-# sbatch -J e23 --partition gpu train.sh --version 1 --seed 22
-# sbatch -J e24 --partition gpu train.sh --version 1 --seed 23
-# sbatch -J e25 --partition gpu train.sh --version 1 --seed 24
-# sbatch -J e26 --partition gpu train.sh --version 1 --seed 25
-# sbatch -J e27 --partition gpu train.sh --version 1 --seed 26
-# sbatch -J e28 --partition gpu train.sh --version 1 --seed 27
-# sbatch -J e29 --partition gpu train.sh --version 1 --seed 28
-# sbatch -J e30 --partition gpu train.sh --version 1 --seed 29
+# sbatch -J f2_20_0 --partition gpu train.sh --f2_depth 0 --hidden 20
+# sbatch -J f2_20_1 --partition gpu train.sh --f2_depth 1 --hidden 20
+# sbatch -J f2_40_1 --partition gpu train.sh --f2_depth 1 --hidden 40
+# sbatch -J f2_40_2 --partition gpu train.sh --f2_depth 2 --hidden 40
+# sbatch -J f2_80_2 --partition gpu train.sh --f2_depth 2 --hidden 80
 
-# sbatch -J l13 --partition ellis train.sh --f1_variant linear --f2_reg 1.3
-# sbatch -J l9 --partition ellis train.sh --f1_variant linear --f2_reg 0.9
-# sbatch -J l11 --partition ellis train.sh --f1_variant linear --f2_reg 1.1
+# sbatch -J l_v_nn1 --partition gpu train.sh --f1_variant linear --latent 1
+# sbatch -J l_v_nn2 --partition gpu train.sh --f1_variant linear --latent 2
+# sbatch -J l_v_nn4 --partition gpu train.sh --f1_variant linear --latent 4
+# sbatch -J l_v_nn8 --partition gpu train.sh --f1_variant linear --latent 8
+# sbatch -J l_v_nn16 --partition gpu train.sh --f1_variant linear --latent 16
+# sbatch -J l_v_nn32 --partition gpu train.sh --f1_variant linear --latent 32
+# sbatch -J l_v_nn64 --partition gpu train.sh --f1_variant linear --latent 64
+# sbatch -J l_v_nn128 --partition gpu train.sh --f1_variant linear --latent 128
 
-# sbatch -J earlymc --partition ellis --mem=100G train.sh --f1_variant mean_cov --total_steps 40000
+# sbatch -J nn_v_l1 --partition gpu train.sh --latent 1
+# sbatch -J nn_v_l2 --partition gpu train.sh --latent 2
+# sbatch -J nn_v_l4 --partition gpu train.sh --latent 4
+# sbatch -J nn_v_l8 --partition gpu train.sh --latent 8
+# sbatch -J nn_v_l16 --partition gpu train.sh --latent 16
+# sbatch -J nn_v_l32 --partition gpu train.sh --latent 32
+# sbatch -J nn_v_l64 --partition gpu train.sh --latent 64
+# sbatch -J nn_v_l128 --partition gpu train.sh --latent 128
+
+# sbatch -J lw015 --partition gpu train.sh --f1_variant linear --l1_reg weights --l1_coeff 0.15
+# sbatch -J lw005 --partition gpu train.sh --f1_variant linear --l1_reg weights --l1_coeff 0.005
+# sbatch -J lw02 --partition gpu train.sh --f1_variant linear --l1_reg weights --l1_coeff 0.2
+# sbatch -J lw05 --partition gpu train.sh --f1_variant linear --l1_reg weights --l1_coeff 0.5
+# sbatch -J lw07 --partition gpu train.sh --f1_variant linear --l1_reg weights --l1_coeff 0.7
+
+# sbatch -J l3 --partition ellis train.sh --load 19698

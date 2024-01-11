@@ -1,5 +1,3 @@
-from load_model import load
-
 #!/usr/bin/env python
 # coding: utf-8
 # from custom_cmap import custom_cmap
@@ -34,10 +32,12 @@ import spock_reg_model
 from tqdm.notebook import tqdm
 # import utils
 import wandb
-import load_model
+import utils
 
-def calc_scores(args, checkpoint_filename, logger=None, name=''):
+def calc_scores(version, seed=0, plot_random=False, logger=None, name=''):
     stuff_to_return = {}
+
+    checkpoint_filename = utils.ckpt_path(version, seed, glob=True)
 
     s = checkpoint_filename + "*output.pkl"
     print(len(glob.glob(s)))
@@ -49,7 +49,7 @@ def calc_scores(args, checkpoint_filename, logger=None, name=''):
     if len(swag_ensemble) == 0:
         raise ValueError(s + " not found!")
 
-    if args.plot_random:
+    if plot_random:
         checkpoint_filename += '_random'
 
 
@@ -106,7 +106,7 @@ def calc_scores(args, checkpoint_filename, logger=None, name=''):
     colors = np.array(colors)/255.0
 
     swag_ensemble[0].make_dataloaders()
-    if args.plot_random:
+    if plot_random:
         assert swag_ensemble[0].ssX is not None
         tmp_ssX = copy(swag_ensemble[0].ssX)
         # print(tmp_ssX.mean_)
@@ -405,7 +405,7 @@ def calc_scores(args, checkpoint_filename, logger=None, name=''):
         fig = plt.figure(figsize=(4, 4),
                          dpi=300,
                          constrained_layout=True)
-        # if args.plot_random:
+        # if plot_random:
             # ic('random')
             # ic(len(ppx))
             # alpha = min([0.05 * 72471 / len(ppx), 1.0])
@@ -414,7 +414,7 @@ def calc_scores(args, checkpoint_filename, logger=None, name=''):
             # ic(len(ppx))
 
     #     alpha = min([0.05 * 8740 / len(ppx), 1.0])
-    #     ic(alpha, args.plot_random, len(ppx))
+    #     ic(alpha, plot_random, len(ppx))
         alpha = 1.0
 
         #colors[2, 3]
@@ -432,8 +432,8 @@ def calc_scores(args, checkpoint_filename, logger=None, name=''):
         ax = g.ax_joint
         snr = (ppy/p_std)**2
         relative_snr = snr / max(snr)
-        point_color = relative_snr
-        # point_color = snr / MAX_SNR
+        # point_color = relative_snr
+        point_color = snr / MAX_SNR
 
         rmse = np.average(np.square(ppx[ppx < 8.99] - ppy[ppx < 8.99]))**0.5
         snr_rmse = np.average(np.square(ppx[ppx < 8.99] - ppy[ppx < 8.99]), weights=snr[ppx<8.99])**0.5
@@ -460,7 +460,7 @@ def calc_scores(args, checkpoint_filename, logger=None, name=''):
 
         #Transparency:
         if show_transparency:
-            if args.plot_random:
+            if plot_random:
                 transparency_adjuster = 1.0 #0.5 * 0.2
             else:
                 transparency_adjuster = 1.0
@@ -609,22 +609,19 @@ def calc_scores(args, checkpoint_filename, logger=None, name=''):
 
 
 # computed from linear model earlier
-# MAX_SNR = 181.75647
+MAX_SNR = 181.75647
 
 # linear = load(version=21101)
-# l_args, l_checkpoint_filename = load_model.ARGS, load_model.CHECKPOINT_FILENAME
 # default = load(version=1278, seed=1)
-# d_args, d_checkpoint_filename = load_model.ARGS, load_model.CHECKPOINT_FILENAME
 # identity = load(version=4434, seed=1, latent=41)
-# i_args, i_checkpoint_filename = load_model.ARGS, load_model.CHECKPOINT_FILENAME
 
-# linear_stuff = calc_scores(l_args, l_checkpoint_filename, name='linear')
-# default_stuff = calc_scores(d_args, d_checkpoint_filename, name='default')
-# identity_stuff = calc_scores(i_args, i_checkpoint_filename, name='identity')
+linear_stuff = calc_scores(version=21101, name='linear_same_max_snr')
+default_stuff = calc_scores(version=1278, seed=1, name='default_same_max_snr')
+identity_stuff = calc_scores(version=4434, seed=1, name='identity_same_max_snr')
 
 # p_args, p_checkpoint_filename = load_model.args_and_ckpt(version=0, glob=True)
 # para_stuff = calc_scores(p_args, p_checkpoint_filename, name='para')
 
-e_args, e_checkpoint_filename = load_model.args_and_ckpt(version=1, glob=True)
-ensemble_stuff = calc_scores(e_args, e_checkpoint_filename, name='ensemble')
+# e_args, e_checkpoint_filename = load_model.args_and_ckpt(version=1, glob=True)
+# ensemble_stuff = calc_scores(version=1, name='ensemble_same_max_snr')
 
