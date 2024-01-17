@@ -1,51 +1,34 @@
 
+import subprocess
+import wandb
 import pysr
+from pysr import PySRRegressor
 pysr.julia_helpers.init_julia()
+import random
 
-import seaborn as sns
-sns.set_style('darkgrid')
 from matplotlib import pyplot as plt
+import seaborn as sns
+import os
+sns.set_style('darkgrid')
 import spock_reg_model
 from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
-import torch
 import numpy as np
-from scipy.stats import truncnorm
-import sys
-import parse_swag_args
+import argparse
 from einops import rearrange
 from sklearn.decomposition import PCA
 import utils
+import pickle
 from utils import assert_equal
 import json
 import einops
 
-ARGS, CHECKPOINT_FILENAME = parse_swag_args.parse()
 
-def compute_features(inputs):
-    model = PySRRegressor.from_file('results/hall_of_fame.pkl')
-    assert inputs.shape[-1] == 31
-
-
-def load_model():
-    # Fixed hyperparams:
-    name = 'full_swag_pre_' + CHECKPOINT_FILENAME
-    checkpoint_path = CHECKPOINT_FILENAME + '/version=0-v0.ckpt'
-    try:
-        model = spock_reg_model.VarModel.load_from_checkpoint(checkpoint_path)
-    except FileNotFoundError:
-        checkpoint_path = CHECKPOINT_FILENAME + '/version=0.ckpt'
-        model = spock_reg_model.VarModel.load_from_checkpoint(checkpoint_path)
-
-    return model
-
-def get_f1_inputs_and_targets():
-    model = load_model()
+def get_f1_inputs_and_targets(args):
+    model = spock_reg_model.load(version=args.version, seed=args.seed)
     model.make_dataloaders()
     model.eval()
-    # print(model.inputs_mask.mask.data)
-    # print(model.features_mask.mask.data)
 
     # just takes a random batch of inputs and passes them through the neural network
     batch = next(iter(model.train_dataloader()))
@@ -53,37 +36,25 @@ def get_f1_inputs_and_targets():
     return inputs, targets
 
 
-def update_args(version=1278, seed=0, total_steps=300000, megno=False, angles=True, power_transform=False,
-        hidden=40, latent=20, no_mmr=True, no_nan=True, no_eplusminus=True, train_all=False):
-    extra = ''
-    if no_nan:
-        extra += '_nonan=1'
-    if no_eplusminus:
-        extra += '_noeplusminus=1'
-    if train_all:
-        extra += '_train_all=1'
-    checkpoint_filename = (
-            "results/steps=%d_megno=%d_angles=%d_power=%d_hidden=%d_latent=%d_nommr=%d" %
-            (total_steps, megno, angles, power_transform, hidden, latent, no_mmr)
-        + extra + '_v' + str(version)
-    )
-    checkpoint_filename += '_%d' %(seed,)
+def get_f2_inputs_and_targets(args):
+    model = spock_reg_model.load(version=args.version, seed=args.seed)
+    model.make_dataloaders()
+    model.eval()
 
-    global ARGS, CHECKPOINT_FILENAME
-    ARGS.version = version
-    ARGS.seed = seed
-    CHECKPOINT_FILENAME = checkpoint_filename
+    # just takes a random batch of inputs and passes them through the neural network
+    batch = next(iter(model.train_dataloader()))
+    inputs, targets, stds = model.generate_f2_inputs_and_targets(batch, batch_idx=0)
+    return inputs, targets, stds
 
 
-def import_Xy(included_ixs):
-    inputs, targets =  get_f1_inputs_and_targets()
-    print(f'inputs: {inputs.shape}')
+def import_Xy(args, included_ixs):
+    inputs, targets =  get_f1_inputs_and_targets(args)
 
     N = 500
     X = rearrange(inputs, 'B T F -> (B T) F')
     y = rearrange(targets, 'B T F -> (B T) F')
-    indices = np.random.choice(X.shape[0], size=N, replace=False)
-    X, y = X[indices], y[indices]
+    ixs = np.random.choice(X.shape[0], size=N, replace=False)
+    X, y = X[ixs], y[ixs]
     X, y = X.detach().numpy(), y.detach().numpy()
 
     assert_equal(len(LABELS), X.shape[1])
@@ -91,8 +62,22 @@ def import_Xy(included_ixs):
     assert np.all(X[..., [i for i in range(len(LABELS)) if i not in included_ixs]] == 0)
 
     X = X[..., included_ixs]
-    assert_equal(X.shape, (500, 31))
-    assert_equal(y.shape, (500, 20))
+    assert_equal(X.shape, (500, len(included_ixs)))
+    assert_equal(y.shape[0], 500)
+
+    return X, y
+
+
+def import_Xy_f2(args):
+    # [B, 40] and [B, 2] and [B, ]
+    X, y, stds =  get_f2_inputs_and_targets(args)
+
+    good_stds = stds < args.max_std
+
+    N = 500
+    ixs = np.random.choice(X.shape[0], size=N, replace=False)
+    X, y = X[ixs], y[ixs]
+    X, y = X.detach().numpy(), y.detach().numpy()
 
     return X, y
 
@@ -100,7 +85,6 @@ def import_Xy(included_ixs):
 LABELS = ['time', 'e+_near', 'e-_near', 'max_strength_mmr_near', 'e+_far', 'e-_far', 'max_strength_mmr_far', 'megno', 'a1', 'e1', 'i1', 'cos_Omega1', 'sin_Omega1', 'cos_pomega1', 'sin_pomega1', 'cos_theta1', 'sin_theta1', 'a2', 'e2', 'i2', 'cos_Omega2', 'sin_Omega2', 'cos_pomega2', 'sin_pomega2', 'cos_theta2', 'sin_theta2', 'a3', 'e3', 'i3', 'cos_Omega3', 'sin_Omega3', 'cos_pomega3', 'sin_pomega3', 'cos_theta3', 'sin_theta3', 'm1', 'm2', 'm3', 'nan_mmr_near', 'nan_mmr_far', 'nan_megno']
 
 LABEL_TO_IX = {label: i for i, label in enumerate(LABELS)}
-
 
 def get_sr_included_ixs():
     # hard coded based off the default CL args passed
@@ -112,46 +96,79 @@ def get_sr_included_ixs():
     return included_ixs
 
 
-def run_regression(X, y, args):
-    included_indices = get_sr_included_ixs()
-    X, y = import_Xy(included_indices)
+def run_pysr(args):
+    id = random.randint(0, 100000)
+    while os.path.exists(f'sr_results/{id}.pkl'):
+        id = random.randint(0, 100000)
 
-    # go down to 6 features to make SR easier?
-    # X = PCA(n_components=6).fit_transform(X)
+    included_ixs = get_sr_included_ixs()
 
-    path = utils.next_unused_path(f'sr_results/hall_of_fame_{ARGS.version}_{ARGS.seed}.pkl', lambda i: f'_{i}')
+    path = f'sr_results/{id}.pkl'
     # replace '.pkl' with '.csv'
     path = path[:-3] + 'csv'
     # save the included ixs
-    indices_path = path[:-4] + '_indices.json'
-    with open(indices_path, 'w') as f:
-        json.dump(included_indices, f)
+    ixs_path = path[:-4] + '_ixs.json'
+    with open(ixs_path, 'w') as f:
+        json.dump(included_ixs, f)
 
-    model = pysr.PySRRegressor(
+    pysr_config = dict(
+        procs=10,
+        cluster_manager='slurm',
         equation_file=path,
         niterations=500000,
         binary_operators=["+", "*", '/', '-', '^'],
-        unary_operators=[
-           # use fewer operators, nonredundant
-           # "square",
-           # "cube",
-           # "exp",
-           "log",
-           # 'abs',
-           # 'sqrt',
-           'sin',
-           # 'cos',
-           # 'tan',
-        ],
-        maxsize=60,
+        unary_operators=["log", 'sin'],
+        maxsize=args.max_size,
         timeout_in_seconds=int(60*60*args.time_in_hours),
         # prevent ^ from using complex exponents, nesting power laws is expressive but uninterpretable
         # base can have any complexity, exponent can have max 1 complexity
         constraints={'^': (-1, 1)},
         nested_constraints={"sin": {"sin": 0}},
     )
-    model.fit(X, y)
 
+    config = vars(args)
+    config.update(pysr_config)
+    config.update({
+        'id': id,
+        'results_cmd': f'vim $(ls {path[:-4]}.csv*)',
+    })
+
+    wandb.init(
+        entity='bnn-chaos-model',
+        project='planets-sr',
+        config=config,
+    )
+
+    command = utils.get_script_execution_command()
+    print(command)
+
+    if args.target == 'f1':
+        X, y = import_Xy(args, included_ixs)
+        variables = variable_names(included_ixs)
+    elif args.target == 'f2':
+        X, y = import_Xy_f2(args)
+        n = X.shape[1] // 2
+        variables = [f'm{i}' for i in range(n)] + [f's{i}' for i in range(n)]
+
+    model = pysr.PySRRegressor(**pysr_config)
+    model.fit(X, y, variable_names=variables)
+
+    losses = [min(eqs['loss']) for eqs in model.equation_file_contents_]
+    wandb.log({'avg_loss': sum(losses)/len(losses),
+               'losses': losses,
+               })
+
+    # delete the backup files
+    try:
+        subprocess.run(f'rm {path[:-4]}.csv.out*.bkup', shell=True, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"An error occurred while trying to delete the backup files: {e}")
+
+    print(f'Saved to path: {path}')
+
+
+def variable_names(included_ixs):
+    return [LABELS[ix] for ix in included_ixs]
 
 def spock_features(X):
     features = ['a1', 'a2', 'a3']
@@ -170,47 +187,49 @@ def spock_features(X):
     return y
 
 
+def parse_args():
+    # Instantiate the parser
+    parser = argparse.ArgumentParser(description='Optional app description')
+    # when importing from jupyter nb, it passes an arg to --f which we should just ignore
+    parser.add_argument('--no_log', action='store_true', default=False, help='disable wandb logging')
+    parser.add_argument('--slurm_id', type=int, default=-1, help='slurm job id')
+    parser.add_argument('--slurm_name', type=str, default='', help='slurm job name')
+    parser.add_argument('--version', type=int, help='', default=1278)
+    parser.add_argument('--seed', type=int, default=0, help='default=0')
 
-def test_pysr():
-    included_indices = get_sr_included_ixs()
-    X, _ = import_Xy(included_indices)
-    y = spock_features(X)
+    parser.add_argument('--time_in_hours', type=float, default=1)
+    parser.add_argument('--max_size', type=int, default=60)
+    parser.add_argument('--target', type=str, default='f1', choices=['f1', 'f2'])
+    parser.add_argument('--max_std', type=float, default=-1)
 
-    path = utils.next_unused_path(f'sr_results/sr_test_hof.pkl', lambda i: f'_{i}')
-    # replace '.pkl' with '.csv'
-    path = path[:-3] + 'csv'
+    args = parser.parse_args()
 
-    model = pysr.PySRRegressor(
-        equation_file=path,
-        niterations=500,
-        binary_operators=["+", "*", '/', '-', '^'],
-        unary_operators=[
-           # use fewer operators, nonredundant
-           # "square",
-           # "cube",
-           # "exp",
-           "log",
-           # 'abs',
-           # 'sqrt',
-           'sin',
-           # 'cos',
-           # 'tan',
-        ],
-        maxsize=60,
-        timeout_in_seconds=60*60*24*6,
-        # prevent ^ from using complex exponents, nesting power laws is expressive but uninterpretable
-        # base can have any complexity, exponent can have max 1 complexity
-        constraints={'^': (-1, 1)},
-        nested_constraints={"sin": {"sin": 0}},
-    )
-    model.fit(X, y)
+    return args
 
+
+def load_results(id):
+    path = 'sr_results/id.pkl'
+    results: PySRRegressor = pickle.load(open(path, 'rb'))
+    return results
+
+
+def plot_pareto(path):
+    results = pickle.load(open(path, 'rb'))
+    results = results.equations_[0]
+    x = results['complexity']
+    y = results['loss']
+    # plot the pareto frontier
+    plt.scatter(x, y)
+    plt.xlabel('complexity')
+    plt.ylabel('loss')
+    plt.title('pareto frontier for' + path)
+    # save the plot
+    plt.savefig('pareto.png')
 
 
 if __name__ == '__main__':
-    test_pysr()
-    # useful if running from inside a shell
+    plot_pareto('sr_results/hall_of_fame_f2_21101_0_1.pkl')
 
-    # run_regression(X, y, ARGS)
-
-
+    # test_pysr()
+    # args = parse_args()
+    # run_pysr(args)

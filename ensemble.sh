@@ -10,7 +10,8 @@
 #SBATCH -n 1
 #SBATCH --requeue
  # total limit (hh:mm:ss)
-#SBATCH -t 24:00:00
+
+#SBATCH -t 48:00:00
 #SBATCH --mem=50G
 #SBATCH --gres=gpu:1
 #SBATCH --partition=ellis
@@ -21,8 +22,9 @@ conda activate bnn_chaos_model
 # Enable errexit (exit on error)
 set -e
 
-# gets the next available version number
-version=$(python versions.py)
+version=$((1 + RANDOM % 999999))
 
-python -u find_minima.py --version $version --slurm_id $SLURM_JOB_ID --slurm_name $SLURM_JOB_NAME "$@"
-python -u run_swag.py --version $version --slurm_id $SLURM_JOB_ID --slurm_name $SLURM_JOB_NAME "$@"
+for seed in `seq 0 2`; do
+    python find_minima.py --version $version --seed $seed --slurm_id $SLURM_JOB_ID --slurm_name $SLURM_JOB_NAME
+    python run_swag.py --version $version --seed $seed --slurm_id $SLURM_JOB_ID --slurm_name $SLURM_JOB_NAME
+done

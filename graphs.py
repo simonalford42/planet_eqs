@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 # coding: utf-8
-from custom_cmap import custom_cmap
+# from custom_cmap import custom_cmap
 from copy import deepcopy as copy
 import einops
-import fit_trunc_dist
+# import fit_trunc_dist
 from functools import partial
 import glob
 from icecream import ic
@@ -11,31 +11,36 @@ from matplotlib import pyplot as plt
 from matplotlib.colors import LogNorm
 import matplotlib as mpl
 import numpy as np
-from numpy import sqrt, pi, exp
-from numba import jit, prange
+# from numpy import sqrt, pi, exp
+# from numba import jit, prange
 from parse_swag_args import parse
 import pandas as pd
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 import seaborn as sns
-from scipy.optimize import minimize
-from scipy.stats import truncnorm
-from scipy.special import erf
-from scipy.stats import gaussian_kde
+# from scipy.optimize import minimize
+# from scipy.stats import truncnorm
+# from scipy.special import erf
+# from scipy.stats import gaussian_kde
 from scipy.integrate import quad
 from scipy.interpolate import interp1d
 from sklearn.metrics import roc_curve, roc_auc_score
 import spock_reg_model
-import sys
-import torch
-import time
+# import sys
+# import torch
+# import time
 from tqdm.notebook import tqdm
-import utils
+# import utils
 import wandb
+import utils
 
+def calc_scores(version, seed=0, plot_random=False, logger=None, name=''):
+    stuff_to_return = {}
 
-def calc_scores(args, checkpoint_filename, logger=None, plot_random=False):
+    checkpoint_filename = utils.ckpt_path(version, seed, glob=True)
+
     s = checkpoint_filename + "*output.pkl"
+    print(len(glob.glob(s)))
     swag_ensemble = [
         spock_reg_model.load_swag(fname).cuda()
         for fname in glob.glob(s) #
@@ -43,7 +48,6 @@ def calc_scores(args, checkpoint_filename, logger=None, plot_random=False):
 
     if len(swag_ensemble) == 0:
         raise ValueError(s + " not found!")
-
 
     if plot_random:
         checkpoint_filename += '_random'
@@ -121,6 +125,7 @@ def calc_scores(args, checkpoint_filename, logger=None, plot_random=False):
         assert np.all(tmp_ssX.mean_ == swag_ensemble[0].ssX.mean_)
 
     val_dataloader = swag_ensemble[0]._val_dataloader
+    stuff_to_return['dataloader'] = val_dataloader
 
     def sample_full_swag(X_sample):
         """Pick a random model from the ensemble and sample from it
@@ -152,6 +157,7 @@ def calc_scores(args, checkpoint_filename, logger=None, plot_random=False):
         raw_preds.append(
             np.array([sample_full_swag(X_sample).cpu().detach().numpy() for _ in range(2000)])
         )
+
 
     truths = np.concatenate(truths)
 
@@ -426,17 +432,21 @@ def calc_scores(args, checkpoint_filename, logger=None, plot_random=False):
         ax = g.ax_joint
         snr = (ppy/p_std)**2
         relative_snr = snr / max(snr)
-        point_color = relative_snr
+        # point_color = relative_snr
+        point_color = snr / MAX_SNR
 
         rmse = np.average(np.square(ppx[ppx < 8.99] - ppy[ppx < 8.99]))**0.5
         snr_rmse = np.average(np.square(ppx[ppx < 8.99] - ppy[ppx < 8.99]), weights=snr[ppx<8.99])**0.5
         print(f'{confidence} confidence gets RMSE of {rmse:.2f}')
         print(f'Weighted by SNR, this is: {snr_rmse:.2f}')
+        # np.save(ppx, f'ppx_{args.version}.npy')
+        # np.save(ppx, f'ppy_{args.version}.npy')
+        stuff_to_return['ppx'] = ppx
+        stuff_to_return['ppy'] = ppy
+        stuff_to_return['snr'] = snr
+        stuff_to_return['rmse'] = rmse
+        stuff_to_return['snr_rmse'] = snr_rmse
 
-        # np.save(f'ppx_{args.version}.npy', ppx)
-        # np.save(f'ppy_{args.version}.npy', ppy)
-        # np.save(f'p_std_{args.version}.npy', p_std)
-        # assert False
 
         ######################################################
         # Bias scores:
@@ -482,9 +492,11 @@ def calc_scores(args, checkpoint_filename, logger=None, plot_random=False):
         plt.tight_layout()
 
         if confidence == 'low':
-            plt.savefig(checkpoint_filename + 'comparison.png', dpi=300)
+            # plt.savefig(checkpoint_filename + 'comparison.png', dpi=300)
+            plt.savefig(name + 'comparison.png', dpi=300)
         else:
-            plt.savefig(checkpoint_filename + f'_{confidence}_confidence_' + 'comparison.png', dpi=300)
+            # plt.savefig(checkpoint_filename + f'_{confidence}_confidence_' + 'comparison.png', dpi=300)
+            plt.savefig(name + 'comparison.png', dpi=300)
 
         if logger:
             logger.log_metrics({"comparison": wandb.Image(plt)})
@@ -565,6 +577,7 @@ def calc_scores(args, checkpoint_filename, logger=None, plot_random=False):
     # snr =  np.average(sample_preds, axis=0)**2/np.std(sample_preds, axis=0)**2
     y_weight = einops.repeat(snr, 'sample -> (sample run)', run=2)
 
+
     roc = roc_auc_score(
         y_true=y_roc,
         y_score=y_score,
@@ -592,10 +605,23 @@ def calc_scores(args, checkpoint_filename, logger=None, plot_random=False):
                                     'weighted_roc': weight_roc,})
         logger.log_metrics({"classification": wandb.Image(fig)})
 
+    return stuff_to_return
 
-if __name__ == '__main__':
-    args = parse()
-    checkpoint_filename = utils.ckpt_path(args.version, args.seed)
-    calc_scores(args, checkpoint_filename)
 
+# computed from linear model earlier
+MAX_SNR = 181.75647
+
+# linear = load(version=21101)
+# default = load(version=1278, seed=1)
+# identity = load(version=4434, seed=1, latent=41)
+
+linear_stuff = calc_scores(version=21101, name='linear_same_max_snr')
+default_stuff = calc_scores(version=1278, seed=1, name='default_same_max_snr')
+identity_stuff = calc_scores(version=4434, seed=1, name='identity_same_max_snr')
+
+# p_args, p_checkpoint_filename = load_model.args_and_ckpt(version=0, glob=True)
+# para_stuff = calc_scores(p_args, p_checkpoint_filename, name='para')
+
+# e_args, e_checkpoint_filename = load_model.args_and_ckpt(version=1, glob=True)
+# ensemble_stuff = calc_scores(version=1, name='ensemble_same_max_snr')
 
