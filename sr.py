@@ -4,8 +4,11 @@ import wandb
 import pysr
 from pysr import PySRRegressor
 pysr.julia_helpers.init_julia()
+import random
 
+from matplotlib import pyplot as plt
 import seaborn as sns
+import os
 sns.set_style('darkgrid')
 import spock_reg_model
 from pytorch_lightning import Trainer
@@ -16,13 +19,10 @@ import argparse
 from einops import rearrange
 from sklearn.decomposition import PCA
 import utils
+import pickle
 from utils import assert_equal
 import json
 import einops
-
-def compute_features(inputs):
-    model = PySRRegressor.from_file('results/hall_of_fame.pkl')
-    assert inputs.shape[-1] == 31
 
 
 def get_f1_inputs_and_targets(args):
@@ -47,10 +47,7 @@ def get_f2_inputs_and_targets(args):
     return inputs, targets, stds
 
 
-def import_Xy(args, included_ixs=None):
-    if not included_ixs:
-        included_ixs = INCLUDED_IXS
-
+def import_Xy(args, included_ixs):
     inputs, targets =  get_f1_inputs_and_targets(args)
 
     N = 500
@@ -100,10 +97,13 @@ def get_sr_included_ixs():
 
 
 def run_pysr(args):
+    id = random.randint(0, 100000)
+    while os.path.exists(f'sr_results/{id}.pkl'):
+        id = random.randint(0, 100000)
 
     included_ixs = get_sr_included_ixs()
 
-    path = utils.next_unused_path(f'sr_results/hall_of_fame_{args.target}_{args.version}_{args.seed}.pkl', lambda i: f'_{i}')
+    path = f'sr_results/{id}.pkl'
     # replace '.pkl' with '.csv'
     path = path[:-3] + 'csv'
     # save the included ixs
@@ -126,12 +126,12 @@ def run_pysr(args):
         nested_constraints={"sin": {"sin": 0}},
     )
 
-    config = {
-        'version': args.version,
-        'seed': args.seed,
-        **pysr_config,
+    config = vars(args)
+    config.update(pysr_config)
+    config.update({
+        'id': id,
         'results_cmd': f'vim $(ls {path[:-4]}.csv*)',
-    }
+    })
 
     wandb.init(
         entity='bnn-chaos-model',
@@ -200,7 +200,6 @@ def parse_args():
     parser.add_argument('--time_in_hours', type=float, default=1)
     parser.add_argument('--max_size', type=int, default=60)
     parser.add_argument('--target', type=str, default='f1', choices=['f1', 'f2'])
-    parser.add_argument('--target', type=str, default='f1', choices=['f1', 'f2'])
     parser.add_argument('--max_std', type=float, default=-1)
 
     args = parser.parse_args()
@@ -208,7 +207,29 @@ def parse_args():
     return args
 
 
+def load_results(id):
+    path = 'sr_results/id.pkl'
+    results: PySRRegressor = pickle.load(open(path, 'rb'))
+    return results
+
+
+def plot_pareto(path):
+    results = pickle.load(open(path, 'rb'))
+    results = results.equations_[0]
+    x = results['complexity']
+    y = results['loss']
+    # plot the pareto frontier
+    plt.scatter(x, y)
+    plt.xlabel('complexity')
+    plt.ylabel('loss')
+    plt.title('pareto frontier for' + path)
+    # save the plot
+    plt.savefig('pareto.png')
+
+
 if __name__ == '__main__':
+    plot_pareto('sr_results/hall_of_fame_f2_21101_0_1.pkl')
+
     # test_pysr()
-    args = parse_args()
-    run_pysr(args)
+    # args = parse_args()
+    # run_pysr(args)
