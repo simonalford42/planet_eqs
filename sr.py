@@ -57,11 +57,11 @@ def update_args(version=1278, seed=0, total_steps=300000, megno=False, angles=Tr
         hidden=40, latent=20, no_mmr=True, no_nan=True, no_eplusminus=True, train_all=False):
     extra = ''
     if no_nan:
-        extra += '_nonan=1' 
+        extra += '_nonan=1'
     if no_eplusminus:
-        extra += '_noeplusminus=1' 
+        extra += '_noeplusminus=1'
     if train_all:
-        extra += '_train_all=1' 
+        extra += '_train_all=1'
     checkpoint_filename = (
             "results/steps=%d_megno=%d_angles=%d_power=%d_hidden=%d_latent=%d_nommr=%d" %
             (total_steps, megno, angles, power_transform, hidden, latent, no_mmr)
