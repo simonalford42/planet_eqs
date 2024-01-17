@@ -376,6 +376,8 @@ class VarModel(pl.LightningModule):
 
         self.n_features = hparams['time_series_features'] * (1 + int(hparams['include_derivatives']))
 
+        # --------------------- f1 ---------------------
+
         if 'load_f1' in hparams and hparams['load_f1']:
             net = eval('load_model.load(' + hparams['load_f1'] + ')').feature_nn
             self.feature_nn = net
@@ -414,7 +416,15 @@ class VarModel(pl.LightningModule):
                                                   # self.features_mask)
         self.l1_reg_weights = 'l1_reg' in hparams and hparams['l1_reg'] == 'weights'
 
-        if hparams['f1_variant'] == 'mean_cov':
+        # -------------------------- f2 --------------------------
+
+
+        if 'load_f2' in hparams and hparams['load_f2'] is not None:
+            net = eval('load_model.load(' + hparams['load_f2'] + ')').regress_nn
+            self.regress_nn = net
+        elif 'pysr_f2' in hparams and hparams['pysr_f2'] is not None:
+            self.regress_nn = modules.PySRNet(hparams['pysr_f2'], hparams['pysr_model_selection'])
+        elif hparams['f1_variant'] == 'mean_cov':
             i = self.n_features
             if 'mean_var' in hparams and hparams['mean_var']:
                 summary_dim = i + i

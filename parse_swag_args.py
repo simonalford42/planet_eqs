@@ -54,10 +54,13 @@ def parse():
     parser.add_argument('--f2_ablate', type=int, default=None) # ix to drop from f2 input
     parser.add_argument('--f2_reg', type=float, default=None) # l1 reg coeff for f2 input
     parser.add_argument('--f2_dropout', type=float, default=None) # dropout p for f2 input
+
     parser.add_argument('--lr', type=float, default=5e-4)
     parser.add_argument('--mean_var', action='store_true')
     parser.add_argument('--f2_linear', action='store_true')
     parser.add_argument('--load', type=str, default=None, help='ckpt path to load, e.g. model.ckpt')
+
+    parser.add_argument('--pysr_f2', type=str, default=None) # PySR model to load and replace f2 with, e.g. 'sr_resuls/hall_of_fame_f2_21101_0_1.pkl'
 
     args = parser.parse_args()
 

@@ -76,7 +76,12 @@ logger = WandbLogger(project='bnn-chaos-model', entity='bnn-chaos-model', name=n
 checkpointer = ModelCheckpoint(filepath=checkpoint_filename + '/{version}')
 if args['load']:
     model = spock_reg_model.load(args['load'])
-    spock_reg_model.update_l1_model(model)
+    # spock_reg_model.update_l1_model(model)
+
+    if args['pysr_f2']:
+        import modules
+        model.regress_nn = modules.PySRNet(args['pysr_f2'], args['pysr_model_selection'])
+
 else:
     model = spock_reg_model.VarModel(args)
     model.make_dataloaders()
@@ -100,7 +105,10 @@ except ValueError as e:
     print(e)
     model.load_state_dict(torch.load(checkpointer.best_model_path)['state_dict'])
 
-# logger.log_hyperparams(params=model.hparams, metrics={'val_loss': checkpointer.best_model_score.item()})
+logger.log_hyperparams(params=model.hparams)
+logger.log_metrics({'val_loss': checkpointer.best_model_score.item()})
+# in case we load the model, we want to override the hparams from the model with the args actually passed in
+logger.log_hyperparams(params=args)
 
 logger.experiment.config['val_loss'] = checkpointer.best_model_score.item()
 

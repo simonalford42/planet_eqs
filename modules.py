@@ -96,6 +96,26 @@ class Cyborg(nn.Module):
         return out
 
 
+class PySRNet(nn.Module):
+    def __init__(self, filepath='sr_results/hall_of_fame_21101_0_1.pkl', model_selection='best'):
+        super().__init__()
+        # something like 'sr_results/hall_of_fame_21101_0_1.pkl'
+        self.filepath = filepath
+        assert os.path.exists(filepath), f'filepath does not exist: {filepath}'
+        self.module_list = nn.ModuleList(pysr.PySRRegressor.from_file(filepath, model_selection=model_selection).pytorch())
+
+        # print('PySR NN equations:')
+        # for m in self.module_list:
+            # print(m)
+
+    def forward(self, x):
+        # input: [B, d]
+        # output: [B, n]
+        x = [module(x) for module in self.module_list]
+        x = einops.rearrange(x, 'n B -> B n')
+        return x
+
+
 class PySRFeatureNN(torch.nn.Module):
     def __init__(self, filepath='sr_results/hall_of_fame_1278_1_0.pkl', model_selection='best'):
         super().__init__()
