@@ -19,7 +19,6 @@ import einops
 from utils import assert_equal
 import utils
 import modules
-from modules import mlp
 
 
 def load(version, seed=0):
@@ -358,7 +357,7 @@ class VarModel(pl.LightningModule):
             else:
                 assert hparams['f1_variant'] == 'pysr'
             if hparams['cyborg_max_pysr_ix'] is not None:
-                default_nn = mlp(self.n_features, hparams['latent'], hparams['hidden'], hparams['in'])
+                default_nn = modules.mlp(self.n_features, hparams['latent'], hparams['hidden'], hparams['in'])
                 self.feature_nn = modules.Cyborg(default_nn, self.feature_nn, out_n=hparams['latent'], nn2_ixs=list(range(hparams['cyborg_max_pysr_ix'])))
         elif hparams['f1_variant'] == 'random_features':
             self.feature_nn = modules.RandomFeatureNN(in_n=self.n_features, out_n=hparams['latent'])
@@ -372,7 +371,7 @@ class VarModel(pl.LightningModule):
             pass
         else:
             assert hparams['f1_variant'] == 'default'
-            self.feature_nn = mlp(self.n_features, hparams['latent'], hparams['hidden'], hparams['in'])
+            self.feature_nn = modules.mlp(self.n_features, hparams['latent'], hparams['hidden'], hparams['in'])
 
         self.l1_reg_inputs = 'l1_reg' in hparams and hparams['l1_reg'] == 'inputs'
         if self.l1_reg_inputs:
@@ -396,7 +395,7 @@ class VarModel(pl.LightningModule):
             i = self.n_features
             if 'mean_var' in hparams and hparams['mean_var']:
                 summary_dim = i + i
-                self.regress_nn = mlp(summary_dim, 2, hparams['hidden'], hparams['out'])
+                self.regress_nn = modules.mlp(summary_dim, 2, hparams['hidden'], hparams['out'])
             else:
                 summary_dim = i + i*i
                 # in: n_inputs + n_inputs * n_inputs, out: 2 * n_features
@@ -406,7 +405,7 @@ class VarModel(pl.LightningModule):
                 self.regress_nn = nn.Sequential(
                         special_linear,
                         nn.BatchNorm1d(2 * hparams['latent']),
-                        mlp(2 * hparams['latent'], 2, hparams['hidden'], hparams['out']))
+                        modules.mlp(2 * hparams['latent'], 2, hparams['hidden'], hparams['out']))
         else:
             if (('no_std' in hparams and hparams['no_std'])
                 or ('no_mean' in hparams and hparams['no_mean'])):
@@ -418,7 +417,7 @@ class VarModel(pl.LightningModule):
             if hparams['f2_variant'] == 'ifthen':
                 self.regress_nn = modules.IfThenNN2(hparams['n_predicates'], summary_dim, 2, hparams['hidden'], hparams['out'])
             else:
-                self.regress_nn = mlp(summary_dim, 2, hparams['hidden'], hparams['out'])
+                self.regress_nn = modules.mlp(summary_dim, 2, hparams['hidden'], hparams['out'])
 
         if 'f2_ablate' in hparams and hparams['f2_ablate'] is not None:
             self.regress_nn = nn.Sequential(
