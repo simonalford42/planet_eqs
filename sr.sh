@@ -3,7 +3,7 @@
  # job name
 #SBATCH -J planet_sr
  # output file (%j expands to jobID)
-#SBATCH -o out/sr_%A.out
+#SBATCH -o sr_out/%A.out
  # total nodes
 #SBATCH -N 1
  # total cores

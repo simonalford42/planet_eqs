@@ -9,3 +9,8 @@ wandb
 out
 tb_logs
 sr_results
+sr_out
+models
+*.ckpt
+*.pt
+*.npy

@@ -23,6 +23,8 @@ import pickle
 from utils import assert_equal
 import json
 import einops
+import torch
+import math
 
 
 def get_f1_inputs_and_targets(args):
@@ -32,18 +34,28 @@ def get_f1_inputs_and_targets(args):
 
     # just takes a random batch of inputs and passes them through the neural network
     batch = next(iter(model.train_dataloader()))
-    inputs, targets = model.generate_f1_inputs_and_targets(batch, batch_idx=0)
+    inputs, targets = model.generate_f1_inputs_and_targets(batch)
     return inputs, targets
 
 
-def get_f2_inputs_and_targets(args):
+def get_f2_inputs_and_targets(args, N=500):
     model = spock_reg_model.load(version=args.version, seed=args.seed)
     model.make_dataloaders()
     model.eval()
 
-    # just takes a random batch of inputs and passes them through the neural network
-    batch = next(iter(model.train_dataloader()))
-    inputs, targets, stds = model.generate_f2_inputs_and_targets(batch, batch_idx=0)
+    all_inputs, all_targets, all_stds = [], [], []
+    data_iterator = iter(model.train_dataloader())
+    while sum([len(i) for i in all_inputs]) < N:
+        # just takes a random batch of inputs and passes them through the neural network
+        batch = next(data_iterator)
+        inputs, targets, stds = model.generate_f2_inputs_and_targets(batch)
+        all_inputs.append(inputs)
+        all_targets.append(targets)
+        all_stds.append(stds)
+
+    inputs = rearrange(all_inputs, 'l B ... -> (l B) ...')
+    targets = rearrange(all_targets, 'l B ... -> (l B) ...')
+    stds = rearrange(all_stds, 'l B ... -> (l B) ...')
     return inputs, targets, stds
 
 
@@ -69,12 +81,15 @@ def import_Xy(args, included_ixs):
 
 
 def import_Xy_f2(args):
-    # [B, 40] and [B, 2] and [B, ]
-    X, y, stds =  get_f2_inputs_and_targets(args)
-
-    good_stds = stds < args.max_std
-
     N = 500
+    # [B, 40] and [B, 2] and [B, ]
+    X, y, stds =  get_f2_inputs_and_targets(args, N=N/args.std_percent_threshold)
+
+    sorted_stds, _ = torch.sort(stds)
+    max_std = sorted_stds[math.ceil(len(sorted_stds) * args.std_percent_threshold) - 1]
+    ixs = stds <= max_std
+    X, y, stds = X[ixs], y[ixs], stds[ixs]
+
     ixs = np.random.choice(X.shape[0], size=N, replace=False)
     X, y = X[ixs], y[ixs]
     X, y = X.detach().numpy(), y.detach().numpy()
@@ -112,7 +127,8 @@ def run_pysr(args):
         json.dump(included_ixs, f)
 
     pysr_config = dict(
-        procs=10,
+        # https://stackoverflow.com/a/57474787/4383594
+        procs=int(os.environ.get('SLURM_CPUS_ON_NODE')) * int(os.environ.get('SLURM_JOB_NUM_NODES')),
         cluster_manager='slurm',
         equation_file=path,
         niterations=500000,
@@ -124,6 +140,7 @@ def run_pysr(args):
         # base can have any complexity, exponent can have max 1 complexity
         constraints={'^': (-1, 1)},
         nested_constraints={"sin": {"sin": 0}},
+        ncyclesperiteration=2000, # increase utilization since usually using 32-ish cores?
     )
 
     config = vars(args)
@@ -194,13 +211,14 @@ def parse_args():
     parser.add_argument('--no_log', action='store_true', default=False, help='disable wandb logging')
     parser.add_argument('--slurm_id', type=int, default=-1, help='slurm job id')
     parser.add_argument('--slurm_name', type=str, default='', help='slurm job name')
-    parser.add_argument('--version', type=int, help='', default=1278)
+    parser.add_argument('--version', type=int, help='', default=63524)
     parser.add_argument('--seed', type=int, default=0, help='default=0')
 
     parser.add_argument('--time_in_hours', type=float, default=1)
-    parser.add_argument('--max_size', type=int, default=60)
+    parser.add_argument('--max_size', type=int, default=30)
     parser.add_argument('--target', type=str, default='f1', choices=['f1', 'f2'])
-    parser.add_argument('--max_std', type=float, default=-1)
+    # use the bottom % of stds to target sr on higher confidence predictions
+    parser.add_argument('--std_percent_threshold', type=float, default=1)
 
     args = parser.parse_args()
 
@@ -228,8 +246,5 @@ def plot_pareto(path):
 
 
 if __name__ == '__main__':
-    plot_pareto('sr_results/hall_of_fame_f2_21101_0_1.pkl')
-
-    # test_pysr()
-    # args = parse_args()
-    # run_pysr(args)
+    args = parse_args()
+    run_pysr(args)
