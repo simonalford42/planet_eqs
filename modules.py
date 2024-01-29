@@ -6,7 +6,69 @@ import pysr
 import json
 import einops
 import spock_reg_model
+import numpy as np
+import torch.nn.functional as F
 
+
+class IfThenNN(nn.Module):
+    def __init__(self, n_preds, in_dim, out_dim, hidden_dim, n_layers):
+        super().__init__()
+        self.n_preds = n_preds
+        self.mlp = mlp(in_dim, n_preds * (1 + out_dim), hidden_dim, n_layers)
+
+    def forward(self, x):
+        out = self.mlp(x)
+        preds = out[..., :self.n_preds]
+        bodies = out[..., self.n_preds:]
+        bodies = einops.rearrange(bodies, '... (n o) -> ... n o', n=self.n_preds)
+        preds = torch.sigmoid(preds)
+        return torch.einsum('... n, ... n o -> ... o', preds, bodies)
+
+
+class IfThenNN2(nn.Module):
+    def __init__(self, n_preds, in_dim, out_dim, hidden_dim, n_layers):
+        super().__init__()
+        self.n_preds = n_preds
+        self.mlp = mlp(in_dim, n_preds, hidden_dim, n_layers)
+        self.bodies = nn.Parameter(torch.randn(n_preds, out_dim))
+
+    def forward(self, x):
+        preds = self.mlp(x)
+        preds = torch.sigmoid(preds)
+        return torch.einsum('... n, n o -> ... o', preds, self.bodies)
+
+
+def mlp(in_n, out_n, hidden, layers, act='relu'):
+    '''
+        layers is the number of "hidden" layers,
+        aka layers besides the input layer (which reduces to hidden dim)
+        and output layer (which changes hidden dim to out dim)
+        so:
+        if layers = -1, returns Linear(in, out)
+        if layers =  0, returns [Linear(in, h), Linear(h, out)
+        if layers =  1, returns [Linear(in, h), Linear(h, h), Linear(h, out)]
+        etc.
+    '''
+    if act == 'relu':
+        act = nn.ReLU
+    elif act == 'softplus':
+        act = nn.Softplus
+    else:
+        raise NotImplementedError('act must be relu or softplus')
+
+    if layers == -1:
+        return nn.Linear(in_n, out_n)
+
+    result = [nn.Linear(in_n, hidden),
+             act()]
+    for i in reversed(range(layers)):
+        result.extend([
+            nn.Linear(hidden, hidden),
+            act()
+            ])
+
+    result.extend([nn.Linear(hidden, out_n)])
+    return nn.Sequential(*result)
 
 class ZeroFeatureAtIx(nn.Module):
     def __init__(self, n_features, ix):
@@ -70,6 +132,30 @@ class MaskLayer(nn.Module):
         return torch.sum(torch.abs(self.mask))
 
 
+class MaskedLinear(nn.Module):
+    def __init__(self, linear, mask):
+        super().__init__()
+        self.linear = linear
+        self.mask = nn.Parameter(mask, requires_grad=False)
+
+    def forward(self, x):
+        weight = self.linear.weight * self.mask
+        return F.linear(x, weight, self.linear.bias)
+
+
+def pruned_linear(linear: nn.Linear, k=None, threshold=None):
+    if k is not None:
+        mask = torch.zeros_like(linear.weight)
+        for r in range(linear.weight.shape[0]):
+            _, ixs = torch.topk(linear.weight[r].abs(), k=k)
+            mask[r][ixs] = 1
+    elif threshold is not None:
+        mask = torch.zeros_like(linear.weight)
+        mask[linear.weight.abs() > threshold] = 1
+
+    return MaskedLinear(linear, mask)
+
+
 class Cyborg(nn.Module):
     def __init__(self, nn1, nn2, out_n, nn1_ixs=None, nn2_ixs=None):
         super().__init__()
@@ -96,24 +182,50 @@ class Cyborg(nn.Module):
         return out
 
 
+class SumModule(nn.Module):
+    def __init__(self, module1, module2):
+        super(SumModule, self).__init__()
+        self.module1 = module1
+        self.module2 = module2
+
+    def forward(self, x):
+        return self.module1(x) + self.module2(x)
+
+
+def load_pysr_module_list(filepath, model_selection):
+    if model_selection in ['best', 'accuracy', 'score']:
+        return nn.ModuleList(pysr.PySRRegressor.from_file(filepath, model_selection=model_selection).pytorch())
+    else:
+        reg = pysr.PySRRegressor.from_file(filepath)
+        # find the ixs with closest complexity equal to model_selection
+        ixs = []
+        for i in range(reg.nout_):
+            ix = np.argmin(np.abs(reg.equations_[i]['complexity'] - int(model_selection)))
+            ixs.append(ix)
+
+        print('PySR model selection ixs: ', ixs)
+        return nn.ModuleList(reg.pytorch(index=ixs))
+
+
 class PySRNet(nn.Module):
     def __init__(self, filepath='sr_results/hall_of_fame_21101_0_1.pkl', model_selection='best'):
         super().__init__()
         # something like 'sr_results/hall_of_fame_21101_0_1.pkl'
         self.filepath = filepath
         assert os.path.exists(filepath), f'filepath does not exist: {filepath}'
-        self.module_list = nn.ModuleList(pysr.PySRRegressor.from_file(filepath, model_selection=model_selection).pytorch())
-
-        # print('PySR NN equations:')
-        # for m in self.module_list:
-            # print(m)
+        self.module_list = load_pysr_module_list(filepath, model_selection)
 
     def forward(self, x):
         # input: [B, d]
         # output: [B, n]
-        x = [module(x) for module in self.module_list]
-        x = einops.rearrange(x, 'n B -> B n')
-        return x
+        out = [module(x) for module in self.module_list]
+        # if the pysr equation is a constant, it returns a scalar for some reason
+        # repeat [,] to [B, ]
+        if len(out[0].shape) == 0:
+            out = einops.repeat(torch.tensor(out, device=x.device), 'n -> B n', B=x.shape[0])
+        else:
+            out = einops.rearrange(out, 'n B -> B n')
+        return out
 
 
 class PySRFeatureNN(torch.nn.Module):
@@ -123,13 +235,11 @@ class PySRFeatureNN(torch.nn.Module):
         self.filepath = filepath
         assert os.path.exists(filepath), f'filepath does not exist: {filepath}'
         indices_path = filepath[:-4] + '_indices.json'
-        self.module_list = nn.ModuleList(pysr.PySRRegressor.from_file(filepath, model_selection=model_selection).pytorch())
+
+        self.module_list = load_pysr_module_list(filepath, model_selection)
+
         with open(indices_path, 'r') as f:
             self.included_indices = json.load(f)
-
-        print('PySR NN equations:')
-        for m in self.module_list:
-            print(m)
 
     def forward(self, x):
         B, T, d = x.shape

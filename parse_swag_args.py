@@ -32,7 +32,7 @@ def parse():
     parser.add_argument('--swa_steps', type=int, default=50000, help='default=50000')
 
     parser.add_argument('--pysr_model', type=str, default=None, help='PySR model to load and replace f1 with, e.g. sr_results/hall_of_fame_9723_0.pkl')
-    parser.add_argument('--pysr_model_selection', type=str, default='best', choices=['best', 'accuracy', 'score'], help='')
+    parser.add_argument('--pysr_model_selection', type=str, default='best', help='best, accuracy, score, or ix')
     parser.add_argument('--sr_f1', action='store_true', default=False, help='do misc. stuff with f1 and SR')
     parser.add_argument('--f1_variant', type=str, default='default',
                         choices=['zero', 'identity', 'pysr', 'pysr_frozen', 'random_features', 'linear', 'mean_cov', 'default'])
@@ -51,16 +51,22 @@ def parse():
     # string of args that would be passed into load_model.load(-), example 'version=1278'
     parser.add_argument('--load_f1', type=str, default=None)
 
+    parser.add_argument('--f2_variant', type=str, default='default',
+                        choices=['pysr', 'pysr_residual', 'ifthen', 'default', 'linear'])
     parser.add_argument('--f2_ablate', type=int, default=None) # ix to drop from f2 input
     parser.add_argument('--f2_reg', type=float, default=None) # l1 reg coeff for f2 input
     parser.add_argument('--f2_dropout', type=float, default=None) # dropout p for f2 input
 
     parser.add_argument('--lr', type=float, default=5e-4)
     parser.add_argument('--mean_var', action='store_true')
-    parser.add_argument('--f2_linear', action='store_true')
     parser.add_argument('--load', type=str, default=None, help='ckpt path to load, e.g. model.ckpt')
 
     parser.add_argument('--pysr_f2', type=str, default=None) # PySR model to load and replace f2 with, e.g. 'sr_resuls/hall_of_fame_f2_21101_0_1.pkl'
+    parser.add_argument('--eval', action='store_true')
+    parser.add_argument('--prune_f1_topk', type=int, default=None)
+    parser.add_argument('--prune_f1_threshold', type=float, default=None)
+    parser.add_argument('--no_bias', action='store_true')
+    parser.add_argument('--n_predicates', default=10, type=int)
 
     args = parser.parse_args()
 

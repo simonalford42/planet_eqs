@@ -19,6 +19,7 @@ import einops
 from utils import assert_equal
 import utils
 import modules
+from modules import mlp
 
 
 def load(version, seed=0):
@@ -304,40 +305,6 @@ def get_data(
 def soft_clamp(x, lo, high):
     return 0.5*(torch.tanh(x)+1)*(high-lo) + lo
 
-Linear = nn.Linear
-module = nn.Module
-
-def mlp(in_n, out_n, hidden, layers, act='relu'):
-    '''
-        layers is the number of "hidden" layers,
-        aka layers besides the input layer (which reduces to hidden dim)
-        and output layer (which changes hidden dim to out dim)
-        so:
-        if layers = -1, returns Linear(in, out)
-        if layers =  0, returns [Linear(in, h), Linear(h, out)
-        if layers =  1, returns [Linear(in, h), Linear(h, h), Linear(h, out)]
-        etc.
-    '''
-    if act == 'relu':
-        act = nn.ReLU
-    elif act == 'softplus':
-        act = nn.Softplus
-    else:
-        raise NotImplementedError('act must be relu or softplus')
-
-    if layers == -1:
-        return Linear(in_n, out_n)
-
-    result = [Linear(in_n, hidden),
-             act()]
-    for i in reversed(range(layers)):
-        result.extend([
-            Linear(hidden, hidden),
-            act()
-            ])
-
-    result.extend([nn.Linear(hidden, out_n)])
-    return nn.Sequential(*result)
 
 def safe_log_erf(x):
     base_mask = x < -1
@@ -379,7 +346,7 @@ class VarModel(pl.LightningModule):
         # --------------------- f1 ---------------------
 
         if 'load_f1' in hparams and hparams['load_f1']:
-            net = eval('load_model.load(' + hparams['load_f1'] + ')').feature_nn
+            net = eval('load(' + hparams['load_f1'] + ')').feature_nn
             self.feature_nn = net
             # self.feature_nn.requires_grad = False
         elif hparams['pysr_model']:
@@ -400,7 +367,7 @@ class VarModel(pl.LightningModule):
         elif hparams['f1_variant'] == 'zero':
             self.feature_nn = modules.ZeroNN(in_n=self.n_features, out_n=hparams['latent'])
         elif hparams['f1_variant'] == 'linear':
-            self.feature_nn = nn.Linear(self.n_features, hparams['latent'])
+            self.feature_nn = nn.Linear(self.n_features, hparams['latent'], bias='no_bias' not in hparams or not hparams['no_bias'])
         elif hparams['f1_variant'] == 'mean_cov':
             pass
         else:
@@ -418,9 +385,10 @@ class VarModel(pl.LightningModule):
 
         # -------------------------- f2 --------------------------
 
-
+        if 'f2_variant' not in hparams:
+            hparams['f2_variant'] = 'default'
         if 'load_f2' in hparams and hparams['load_f2'] is not None:
-            net = eval('load_model.load(' + hparams['load_f2'] + ')').regress_nn
+            net = eval('load(' + hparams['load_f2'] + ')').regress_nn
             self.regress_nn = net
         elif 'pysr_f2' in hparams and hparams['pysr_f2'] is not None:
             self.regress_nn = modules.PySRNet(hparams['pysr_f2'], hparams['pysr_model_selection'])
@@ -446,7 +414,11 @@ class VarModel(pl.LightningModule):
             else:
                 c = 2
             summary_dim = hparams['latent']*c + int(self.fix_megno)*2
-            self.regress_nn = mlp(summary_dim, 2, hparams['hidden'], hparams['out'])
+
+            if hparams['f2_variant'] == 'ifthen':
+                self.regress_nn = modules.IfThenNN2(hparams['n_predicates'], summary_dim, 2, hparams['hidden'], hparams['out'])
+            else:
+                self.regress_nn = mlp(summary_dim, 2, hparams['hidden'], hparams['out'])
 
         if 'f2_ablate' in hparams and hparams['f2_ablate'] is not None:
             self.regress_nn = nn.Sequential(
@@ -506,6 +478,24 @@ class VarModel(pl.LightningModule):
 
         self.ssX = None
         self.ssy = None
+
+    def do_nothing_optimizer_step(
+        self,
+        epoch,
+        batch_idx,
+        optimizer,
+        optimizer_idx,
+        optimizer_closure,
+        on_tpu,
+        using_native_amp,
+        using_lbfgs,
+    ):
+        # Override this method to adjust the optimizer's behavior.
+        pass  # Doing nothing means gradients are not updated.
+
+    def disable_optimization(self):
+        self.optimizer_step = self.do_nothing_optimizer_step
+
 
     def augment(self, x):
         # This randomly samples times.
@@ -809,7 +799,7 @@ class VarModel(pl.LightningModule):
         if self.l1_reg_inputs:
             loss = loss + self.hparams['l1_coeff'] * self.inputs_mask.l1_cost()
         if self.l1_reg_weights:
-            l1_cost = sum([p.sum() for p in self.feature_nn.parameters()])
+            l1_cost = sum([p.abs().sum() for p in self.feature_nn.parameters()])
             loss = loss + self.hparams['l1_coeff'] * l1_cost
         if 'f2_reg' in self.hparams and self.hparams['f2_reg'] is not None:
             loss = loss + self.hparams['f2_reg'] * self.regress_nn[0].l1_cost()
@@ -825,12 +815,12 @@ class VarModel(pl.LightningModule):
     def summary_kl(self):
         return self._summary_kl.sum()
 
-    def generate_f1_inputs_and_targets(self, batch, batch_idx):
+    def generate_f1_inputs_and_targets(self, batch):
         X_sample, y_sample = batch
         inputs, summary_stats = self.forward_to_summary_only(X_sample, noisy_val=False)
         return inputs, summary_stats
 
-    def generate_f2_inputs_and_targets(self, batch, batch_idx):
+    def generate_f2_inputs_and_targets(self, batch):
         x, _ = batch
         noisy_val = False
 
@@ -879,7 +869,7 @@ class VarModel(pl.LightningModule):
         mu, std = self.predict_instability(summary_stats)
         #Each is (batch,)
 
-        return summary_stats, torch.cat((mu, std), dim=1), std
+        return summary_stats, torch.cat((mu, std), dim=1), std[:, 0]
 
     def training_step(self, batch, batch_idx):
         fraction = self.global_step / self.hparams['steps']

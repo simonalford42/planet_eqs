@@ -12,6 +12,8 @@ from scipy.stats import truncnorm
 import sys
 from parse_swag_args import parse
 import utils
+import modules
+from spock_reg_model import mlp
 
 rand = lambda lo, hi: np.random.rand()*(hi-lo) + lo
 irand = lambda lo, hi: int(np.random.rand()*(hi-lo) + lo)
@@ -78,9 +80,29 @@ if args['load']:
     model = spock_reg_model.load(args['load'])
     # spock_reg_model.update_l1_model(model)
 
+    if 'prune_f1_topk' in args and args['prune_f1_topk'] is not None:
+        model.feature_nn = modules.pruned_linear(model.feature_nn, k=args['prune_f1_topk'])
+    elif 'prune_f1_threshold' in args and args['prune_f1_threshold'] is not None:
+        model.feature_nn = modules.pruned_linear(model.feature_nn, threshold=args['prune_f1_threshold'])
+
     if args['pysr_f2']:
-        import modules
         model.regress_nn = modules.PySRNet(args['pysr_f2'], args['pysr_model_selection'])
+        if args['freeze_pysr_f2']:
+            model.regress_nn.requires_grad = False
+
+    if args['f2_variant'] == 'pysr_residual':
+        pysr_net = modules.PySRNet(args['pysr_f2'], args['pysr_model_selection'])
+        pysr_net.requires_grad = False
+        base_net = mlp(args['latent'] * 2, 2, args['hidden'], args['out'])
+        model.regress_nn = modules.SumModule(pysr_net, base_net)
+
+    if args['eval']:
+        model.disable_optimization()
+
+    # trying to prevent nans from happening
+    model.input_noise_logvar = torch.nn.Parameter(torch.zeros(model.input_noise_logvar.shape)-2)
+    model.summary_noise_logvar = torch.nn.Parameter(torch.zeros(model.summary_noise_logvar.shape) - 2) # add to summaries, not direct latents
+
 
 else:
     model = spock_reg_model.VarModel(args)
@@ -97,6 +119,8 @@ trainer = Trainer(
 )
 
 # torch.autograd.set_detect_anomaly(True)
+# do this early too so they show up while training, or if the run crashes before finishing
+logger.log_hyperparams(params=args)
 
 try:
     trainer.fit(model)
@@ -119,5 +143,9 @@ logger.save()
 
 model.load_state_dict(torch.load(checkpointer.best_model_path)['state_dict'])
 model.make_dataloaders()
+
+# loading models with pt lightning sometimes doesnt work, so lets also save the feature_nn and regress_nn directly
+torch.save(model.feature_nn, f'models/{args["version"]}_feature_nn.pt')
+torch.save(model.regress_nn, f'models/{args["version"]}_regress_nn.pt')
 
 print('Finished running')
