@@ -24,5 +24,5 @@ set -e
 # gets the next available version number
 version=$(python versions.py)
 
-python -u find_minima.py --version $version --slurm_id $SLURM_JOB_ID --slurm_name $SLURM_JOB_NAME "$@"
+python -u find_minima.py --version $version --slurm_id $SLURM_JOB_ID --slurm_name $SLURM_JOB_NAME "$@" --f1_variant linear --f2_variant bimt
 python -u run_swag.py --version $version --slurm_id $SLURM_JOB_ID --slurm_name $SLURM_JOB_NAME "$@"
