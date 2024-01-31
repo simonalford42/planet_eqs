@@ -57,7 +57,7 @@ def get_f1_inputs_and_targets(model=None):
     return inputs, targets
 
 
-def update_args(version=1278, seed=0, total_steps=300000, megno=False, angles=True, power_transform=False,
+def update_args(version=1278, seed=0, total_steps=300, megno=False, angles=True, power_transform=False,
         hidden=40, latent=20, no_mmr=True, no_nan=True, no_eplusminus=True, train_all=False):
     extra = ''
     if no_nan:
@@ -199,11 +199,6 @@ def spock_features(X):
     y = einops.rearrange(y, 'n B -> B n')
     return y
 
-
-
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
 def test_pysr():
     included_indices = get_sr_included_ixs()
     X, _ = import_Xy(included_indices)
@@ -216,7 +211,7 @@ def test_pysr():
 
     model = pysr.PySRRegressor(
         equation_file=path,
-        niterations=500,
+        niterations=5000,
         binary_operators=["+", "*", '/', '-', '^'],
         unary_operators=[
            # use fewer operators, nonredundant
@@ -239,11 +234,6 @@ def test_pysr():
     )
     model.fit(X, y)
 
-
-
-=======
->>>>>>> fb3a18083c6c2caf5d1d4caff4d3b19f776297b7
->>>>>>> master
 if __name__ == '__main__':
     # test_pysr()
     # useful if running from inside a shell

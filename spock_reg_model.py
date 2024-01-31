@@ -31,9 +31,8 @@ import wandb
 import json
 from modules import *
 
-
-<<<<<<< HEAD
-=======
+import os
+os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
 class BioLinear(nn.Module):
     # BioLinear is just Linear, but each neuron comes with coordinates.
@@ -100,29 +99,28 @@ class BioMLP(nn.Module):
         self.original_params = None
 
     def forward(self, x):
-        
+
         B, T, d = x.shape
         x = einops.rearrange(x, 'B T d -> (B T) d')
 
         shp = x.shape
         in_fold = self.linears[0].in_fold
         x = x.reshape(shp[0], in_fold, int(shp[1]/in_fold))
-        x = x[:,:,self.in_perm.long()]
+        x = x[:, :, self.in_perm.long()]
         x = x.reshape(shp[0], shp[1])
         f = torch.nn.SiLU()
-        for i in range(self.depth-1):
+        for i in range(self.depth - 1):
             x = f(self.linears[i](x))
         x = self.linears[-1](x)
-        
+
         out_perm_inv = torch.zeros(self.out_dim, dtype=torch.long)
         out_perm_inv[self.out_perm.long()] = torch.arange(self.out_dim)
-        x = x[:,out_perm_inv]
-        #x = x[:,self.out_perm]
+        x = x[:, out_perm_inv]
         
         x = einops.rearrange(x, '(B T) n -> B T n', B=B, T=T)
 
         return x
-    
+
     def get_linear_layers(self):
         return self.linears
     
@@ -320,7 +318,6 @@ class BioMLP(nn.Module):
 
 
 
->>>>>>> master
 class CustomOneCycleLR(torch.optim.lr_scheduler._LRScheduler):
     """Custom version of one-cycle learning rate to stop early"""
     def __init__(self,
@@ -700,8 +697,8 @@ class VarModel(pl.LightningModule):
             summary_dim = hparams['latent']*2 + int(self.fix_megno)*2
 
         #self.regress_nn = mlp(hparams['latent']*2 + int(self.fix_megno)*2, 2, hparams['hidden'], hparams['out'])
-        #self.regress_nn = BioMLP(in_dim=hparams['latent']*2 + int(self.fix_megno)*2, depth=2, w=hparams['hidden'], out_dim=hparams['out'])
-        self.regress_nn = mlp(summary_dim, 2, hparams['hidden'], hparams['out'])
+        self.regress_nn = BioMLP(in_dim=hparams['latent']*2 + int(self.fix_megno)*2, depth=2, w=hparams['hidden'], out_dim=hparams['out'])
+        #self.regress_nn = mlp(summary_dim, 2, hparams['hidden'], hparams['out'])
         self.input_noise_logvar = nn.Parameter(torch.zeros(self.n_features)-2)
         self.summary_noise_logvar = nn.Parameter(torch.zeros(summary_dim) - 2) # add to summaries, not direct latents
         self.lowest = 0.5
