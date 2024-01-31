@@ -2,89 +2,65 @@
 import subprocess
 import wandb
 import pysr
+from pysr import PySRRegressor
 pysr.julia_helpers.init_julia()
+import random
 
-import seaborn as sns
-sns.set_style('darkgrid')
 from matplotlib import pyplot as plt
+import seaborn as sns
+import os
+sns.set_style('darkgrid')
 import spock_reg_model
 from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
-import torch
 import numpy as np
-from scipy.stats import truncnorm
-import sys
-import parse_swag_args
+import argparse
 from einops import rearrange
 from sklearn.decomposition import PCA
 import utils
+import pickle
 from utils import assert_equal
 import json
 import einops
-
-ARGS, CHECKPOINT_FILENAME = parse_swag_args.parse_sr()
-
-def compute_features(inputs):
-    model = PySRRegressor.from_file('results/hall_of_fame.pkl')
-    assert inputs.shape[-1] == 31
+import torch
+import math
 
 
-def load_model(**kwargs):
-    # update_args(**kwargs)
-    # Fixed hyperparams:
-    name = 'full_swag_pre_' + CHECKPOINT_FILENAME
-    checkpoint_path = CHECKPOINT_FILENAME + '/version=0-v0.ckpt'
-    try:
-        model = spock_reg_model.VarModel.load_from_checkpoint(checkpoint_path)
-    except FileNotFoundError:
-        checkpoint_path = CHECKPOINT_FILENAME + '/version=0.ckpt'
-        model = spock_reg_model.VarModel.load_from_checkpoint(checkpoint_path)
-
-    return model
-
-def get_f1_inputs_and_targets(model=None):
-    if model is None:
-        model = load_model()
+def get_f1_inputs_and_targets(args):
+    model = spock_reg_model.load(version=args.version, seed=args.seed)
     model.make_dataloaders()
     model.eval()
-    # print(model.inputs_mask.mask.data)
-    # print(model.features_mask.mask.data)
 
     # just takes a random batch of inputs and passes them through the neural network
     batch = next(iter(model.train_dataloader()))
-    inputs, targets = model.generate_f1_inputs_and_targets(batch, batch_idx=0)
+    inputs, targets = model.generate_f1_inputs_and_targets(batch)
     return inputs, targets
 
 
-def update_args(version=1278, seed=0, total_steps=300, megno=False, angles=True, power_transform=False,
-        hidden=40, latent=20, no_mmr=True, no_nan=True, no_eplusminus=True, train_all=False):
-    extra = ''
-    if no_nan:
-        extra += '_nonan=1' 
-    if no_eplusminus:
-        extra += '_noeplusminus=1' 
-    if train_all:
-        extra += '_train_all=1' 
-    checkpoint_filename = (
-            "results/steps=%d_megno=%d_angles=%d_power=%d_hidden=%d_latent=%d_nommr=%d" %
-            (total_steps, megno, angles, power_transform, hidden, latent, no_mmr)
-        + extra + '_v' + str(version)
-    )
-    checkpoint_filename += '_%d' %(seed,)
+def get_f2_inputs_and_targets(args, N=500):
+    model = spock_reg_model.load(version=args.version, seed=args.seed)
+    model.make_dataloaders()
+    model.eval()
 
-    global ARGS, CHECKPOINT_FILENAME
-    ARGS.version = version
-    ARGS.seed = seed
-    CHECKPOINT_FILENAME = checkpoint_filename
+    all_inputs, all_targets, all_stds = [], [], []
+    data_iterator = iter(model.train_dataloader())
+    while sum([len(i) for i in all_inputs]) < N:
+        # just takes a random batch of inputs and passes them through the neural network
+        batch = next(data_iterator)
+        inputs, targets, stds = model.generate_f2_inputs_and_targets(batch)
+        all_inputs.append(inputs)
+        all_targets.append(targets)
+        all_stds.append(stds)
+
+    inputs = rearrange(all_inputs, 'l B ... -> (l B) ...')
+    targets = rearrange(all_targets, 'l B ... -> (l B) ...')
+    stds = rearrange(all_stds, 'l B ... -> (l B) ...')
+    return inputs, targets, stds
 
 
-def import_Xy(included_ixs=None):
-    if not included_ixs:
-        included_ixs = INCLUDED_IXS
-
-    inputs, targets =  get_f1_inputs_and_targets()
-    print(f'inputs: {inputs.shape}')
+def import_Xy(args, included_ixs):
+    inputs, targets =  get_f1_inputs_and_targets(args)
 
     N = 500
     X = rearrange(inputs, 'B T F -> (B T) F')
@@ -104,6 +80,23 @@ def import_Xy(included_ixs=None):
     return X, y
 
 
+def import_Xy_f2(args):
+    N = 500
+    # [B, 40] and [B, 2] and [B, ]
+    X, y, stds =  get_f2_inputs_and_targets(args, N=N/args.std_percent_threshold)
+
+    sorted_stds, _ = torch.sort(stds)
+    max_std = sorted_stds[math.ceil(len(sorted_stds) * args.std_percent_threshold) - 1]
+    ixs = stds <= max_std
+    X, y, stds = X[ixs], y[ixs], stds[ixs]
+
+    ixs = np.random.choice(X.shape[0], size=N, replace=False)
+    X, y = X[ixs], y[ixs]
+    X, y = X.detach().numpy(), y.detach().numpy()
+
+    return X, y
+
+
 LABELS = ['time', 'e+_near', 'e-_near', 'max_strength_mmr_near', 'e+_far', 'e-_far', 'max_strength_mmr_far', 'megno', 'a1', 'e1', 'i1', 'cos_Omega1', 'sin_Omega1', 'cos_pomega1', 'sin_pomega1', 'cos_theta1', 'sin_theta1', 'a2', 'e2', 'i2', 'cos_Omega2', 'sin_Omega2', 'cos_pomega2', 'sin_pomega2', 'cos_theta2', 'sin_theta2', 'a3', 'e3', 'i3', 'cos_Omega3', 'sin_Omega3', 'cos_pomega3', 'sin_pomega3', 'cos_theta3', 'sin_theta3', 'm1', 'm2', 'm3', 'nan_mmr_near', 'nan_mmr_far', 'nan_megno']
 
 LABEL_TO_IX = {label: i for i, label in enumerate(LABELS)}
@@ -117,14 +110,15 @@ def get_sr_included_ixs():
     included_labels = [LABELS[i] for i in included_ixs]
     return included_ixs
 
-INCLUDED_IXS = get_sr_included_ixs()
 
+def run_pysr(args):
+    id = random.randint(0, 100000)
+    while os.path.exists(f'sr_results/{id}.pkl'):
+        id = random.randint(0, 100000)
 
-def run_regression(args):
+    included_ixs = get_sr_included_ixs()
 
-    included_ixs = INCLUDED_IXS
-
-    path = utils.next_unused_path(f'sr_results/hall_of_fame_{ARGS.version}_{ARGS.seed}.pkl', lambda i: f'_{i}')
+    path = f'sr_results/{id}.pkl'
     # replace '.pkl' with '.csv'
     path = path[:-3] + 'csv'
     # save the included ixs
@@ -133,6 +127,9 @@ def run_regression(args):
         json.dump(included_ixs, f)
 
     pysr_config = dict(
+        # https://stackoverflow.com/a/57474787/4383594
+        procs=int(os.environ.get('SLURM_CPUS_ON_NODE')) * int(os.environ.get('SLURM_JOB_NUM_NODES')),
+        cluster_manager='slurm',
         equation_file=path,
         niterations=500000,
         binary_operators=["+", "*", '/', '-', '^'],
@@ -143,14 +140,15 @@ def run_regression(args):
         # base can have any complexity, exponent can have max 1 complexity
         constraints={'^': (-1, 1)},
         nested_constraints={"sin": {"sin": 0}},
+        ncyclesperiteration=2000, # increase utilization since usually using 32-ish cores?
     )
 
-    config = {
-        'version': ARGS.version,
-        'seed': ARGS.seed,
-        **pysr_config,
+    config = vars(args)
+    config.update(pysr_config)
+    config.update({
+        'id': id,
         'results_cmd': f'vim $(ls {path[:-4]}.csv*)',
-    }
+    })
 
     wandb.init(
         entity='bnn-chaos-model',
@@ -161,10 +159,16 @@ def run_regression(args):
     command = utils.get_script_execution_command()
     print(command)
 
-    X, y = import_Xy(included_ixs)
+    if args.target == 'f1':
+        X, y = import_Xy(args, included_ixs)
+        variables = variable_names(included_ixs)
+    elif args.target == 'f2':
+        X, y = import_Xy_f2(args)
+        n = X.shape[1] // 2
+        variables = [f'm{i}' for i in range(n)] + [f's{i}' for i in range(n)]
 
     model = pysr.PySRRegressor(**pysr_config)
-    model.fit(X, y, variable_names=variable_names(included_ixs))
+    model.fit(X, y, variable_names=variables)
 
     losses = [min(eqs['loss']) for eqs in model.equation_file_contents_]
     wandb.log({'avg_loss': sum(losses)/len(losses),
@@ -205,38 +209,47 @@ def test_pysr():
     # X = torch.ones((500, 31))
     y = spock_features(X)
 
-    path = utils.next_unused_path(f'sr_results/sr_test_hof.pkl', lambda i: f'_{i}')
-    # replace '.pkl' with '.csv'
-    path = path[:-3] + 'csv'
+def parse_args():
+    # Instantiate the parser
+    parser = argparse.ArgumentParser(description='Optional app description')
+    # when importing from jupyter nb, it passes an arg to --f which we should just ignore
+    parser.add_argument('--no_log', action='store_true', default=False, help='disable wandb logging')
+    parser.add_argument('--slurm_id', type=int, default=-1, help='slurm job id')
+    parser.add_argument('--slurm_name', type=str, default='', help='slurm job name')
+    parser.add_argument('--version', type=int, help='', default=63524)
+    parser.add_argument('--seed', type=int, default=0, help='default=0')
 
-    model = pysr.PySRRegressor(
-        equation_file=path,
-        niterations=5000,
-        binary_operators=["+", "*", '/', '-', '^'],
-        unary_operators=[
-           # use fewer operators, nonredundant
-           # "square",
-           # "cube",
-           # "exp",
-           "log",
-           # 'abs',
-           # 'sqrt',
-           'sin',
-           # 'cos',
-           # 'tan',
-        ],
-        maxsize=60,
-        timeout_in_seconds=60*60*24*6,
-        # prevent ^ from using complex exponents, nesting power laws is expressive but uninterpretable
-        # base can have any complexity, exponent can have max 1 complexity
-        constraints={'^': (-1, 1)},
-        nested_constraints={"sin": {"sin": 0}},
-    )
-    model.fit(X, y)
+    parser.add_argument('--time_in_hours', type=float, default=1)
+    parser.add_argument('--max_size', type=int, default=30)
+    parser.add_argument('--target', type=str, default='f1', choices=['f1', 'f2'])
+    # use the bottom % of stds to target sr on higher confidence predictions
+    parser.add_argument('--std_percent_threshold', type=float, default=1)
+
+    args = parser.parse_args()
+
+    return args
+
+
+def load_results(id):
+    path = 'sr_results/id.pkl'
+    results: PySRRegressor = pickle.load(open(path, 'rb'))
+    return results
+
+
+def plot_pareto(path):
+    results = pickle.load(open(path, 'rb'))
+    results = results.equations_[0]
+    x = results['complexity']
+    y = results['loss']
+    # plot the pareto frontier
+    plt.scatter(x, y)
+    plt.xlabel('complexity')
+    plt.ylabel('loss')
+    plt.title('pareto frontier for' + path)
+    # save the plot
+    plt.savefig('pareto.png')
+
 
 if __name__ == '__main__':
-    # test_pysr()
-    # useful if running from inside a shell
-    run_regression(ARGS)
-
-
+    args = parse_args()
+    run_pysr(args)

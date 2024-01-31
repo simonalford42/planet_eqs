@@ -15,6 +15,12 @@ DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 WARNINGS = set()
 
 
+def ckpt_path(version, seed=0, glob=False):
+    if glob:
+        return "results/" + str(version) + '_*'
+    else:
+        return "results/" + str(version) + '_' + str(seed)
+
 
 # batched covariance calculation:
 # https://stackoverflow.com/a/71357620/4383594

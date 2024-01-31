@@ -23,14 +23,19 @@ irand = lambda lo, hi: int(np.random.rand()*(hi-lo) + lo)
 log_rand = lambda lo, hi: 10**rand(np.log10(lo), np.log10(hi))
 ilog_rand = lambda lo, hi: int(10**rand(np.log10(lo), np.log10(hi)))
 
-
 from parse_swag_args import parse
-args, checkpoint_filename = parse()
+args = parse()
+checkpoint_filename = utils.ckpt_path(args.version, args.seed)
+
 seed = args.seed
+
+if args.no_swag:
+    print('no swag, exiting')
+    exit(0)
 
 TOTAL_STEPS = args.swa_steps
 TRAIN_LEN = 78660
-batch_size = 2000 #ilog_rand(32, 3200)
+batch_size = args.batch_size  # 2000 #ilog_rand(32, 3200)
 steps_per_epoch = int(1+TRAIN_LEN/batch_size)
 epochs = int(1+TOTAL_STEPS/steps_per_epoch)
 print(f"epochs: {epochs}")
@@ -109,8 +114,4 @@ print('saved model to ' + output_filename + '.pkl ...')
 
 print('Finished running')
 import main_figures2
-rmse, snr_rmse, roc, weighted_roc = main_figures2.calc_scores()
-logger.log_metrics(metrics={'rmse': rmse,
-                            'snr_rmse': snr_rmse,
-                            'roc': roc,
-                            'weighted_roc': weighted_roc,})
+main_figures2.calc_scores(args, checkpoint_filename, logger=logger)
