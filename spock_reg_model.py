@@ -369,8 +369,21 @@ class VarModel(pl.LightningModule):
             self.feature_nn = nn.Linear(self.n_features, hparams['latent'], bias='no_bias' not in hparams or not hparams['no_bias'])
         elif hparams['f1_variant'] == 'mean_cov':
             pass
+        elif hparams['f1_variant'] in ['random', 'random_frozen']:
+            self.feature_nn = nn.Linear(self.n_features, hparams['latent'], bias='no_bias' not in hparams or not hparams['no_bias'])
+            # make the linear projection random combinations of two input variables, with coefficients from U[-1, 1]
+            weight = torch.zeros_like(self.feature_nn.weight)
+            for i in range(weight.shape[0]):
+                weight[i, np.random.choice(self.n_features, 2, replace=False)] = torch.rand(2) * 2 - 1
+
+            self.feature_nn.weight = torch.nn.Parameter(weight)
+            if hparams['f1_variant'] == 'random_frozen':
+                self.feature_nn.requires_grad = False
+            else:
+                self.feature_nn = modules.pruned_linear(self.feature_nn, k=2)
+
         else:
-            assert hparams['f1_variant'] == 'default'
+            assert hparams['f1_variant'] == 'mlp'
             self.feature_nn = modules.mlp(self.n_features, hparams['latent'], hparams['hidden'], hparams['in'])
 
         self.l1_reg_inputs = 'l1_reg' in hparams and hparams['l1_reg'] == 'inputs'
@@ -380,12 +393,13 @@ class VarModel(pl.LightningModule):
             self.feature_nn = torch.nn.Sequential(self.inputs_mask,
                                                   self.feature_nn)
                                                   # self.features_mask)
-        self.l1_reg_weights = 'l1_reg' in hparams and hparams['l1_reg'] == 'weights'
+        self.l1_reg_weights = 'l1_reg' in hparams and hparams['l1_reg'] in ['weights', 'both_weights']
+        self.l1_reg_f2_weights = 'l1_reg' in hparams and hparams['l1_reg'] in ['f2_weights', 'both_weights']
 
         # -------------------------- f2 --------------------------
 
         if 'f2_variant' not in hparams:
-            hparams['f2_variant'] = 'default'
+            hparams['f2_variant'] = 'mlp'
         if 'load_f2' in hparams and hparams['load_f2'] is not None:
             net = eval('load(' + hparams['load_f2'] + ')').regress_nn
             self.regress_nn = net
@@ -416,6 +430,8 @@ class VarModel(pl.LightningModule):
 
             if hparams['f2_variant'] == 'ifthen':
                 self.regress_nn = modules.IfThenNN2(hparams['n_predicates'], summary_dim, 2, hparams['hidden'], hparams['out'])
+            elif hparams['f2_variant'] == 'linear':
+                self.regress_nn = nn.Linear(summary_dim, 2)
             else:
                 self.regress_nn = modules.mlp(summary_dim, 2, hparams['hidden'], hparams['out'])
 
@@ -800,8 +816,9 @@ class VarModel(pl.LightningModule):
         if self.l1_reg_weights:
             l1_cost = sum([p.abs().sum() for p in self.feature_nn.parameters()])
             loss = loss + self.hparams['l1_coeff'] * l1_cost
-        if 'f2_reg' in self.hparams and self.hparams['f2_reg'] is not None:
-            loss = loss + self.hparams['f2_reg'] * self.regress_nn[0].l1_cost()
+        if self.l1_reg_f2_weights:
+            l1_cost = sum([p.abs().sum() for p in self.regress_nn.parameters()])
+            loss = loss + self.hparams['l1_coeff'] * l1_cost
         return loss
 
     def input_kl(self):

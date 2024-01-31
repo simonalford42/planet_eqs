@@ -133,17 +133,29 @@ class MaskLayer(nn.Module):
 
 
 class MaskedLinear(nn.Module):
-    def __init__(self, linear, mask):
+    def __init__(self, linear, mask, debug='none'):
         super().__init__()
         self.linear = linear
         self.mask = nn.Parameter(mask, requires_grad=False)
+        self.debug = debug
 
     def forward(self, x):
-        weight = self.linear.weight * self.mask
+        if self.debug == '1':
+            assert torch.all(self.mask == 1)
+        elif self.debug == '2':
+            weight = self.linear.weight * self.mask
+            assert torch.all(weight == self.linear.weight)
+        elif self.debug == '3':
+            weight = self.linear.weight
+        elif self.debug == '4':
+            return self.linear(x)
+        else:
+            weight = self.linear.weight * self.mask
+
         return F.linear(x, weight, self.linear.bias)
 
 
-def pruned_linear(linear: nn.Linear, k=None, threshold=None):
+def pruned_linear(linear: nn.Linear, k=None, threshold=None, debug=None):
     if k is not None:
         mask = torch.zeros_like(linear.weight)
         for r in range(linear.weight.shape[0]):
@@ -153,7 +165,11 @@ def pruned_linear(linear: nn.Linear, k=None, threshold=None):
         mask = torch.zeros_like(linear.weight)
         mask[linear.weight.abs() > threshold] = 1
 
-    return MaskedLinear(linear, mask)
+        if debug is not None:
+            linear = nn.Linear(linear.weight.shape[1], linear.weight.shape[0])
+            mask = torch.ones_like(mask)
+
+    return MaskedLinear(linear, mask, debug)
 
 
 class Cyborg(nn.Module):

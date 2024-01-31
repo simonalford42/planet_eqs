@@ -13,7 +13,7 @@ import sys
 from parse_swag_args import parse
 import utils
 import modules
-from spock_reg_model import mlp
+from modules import mlp
 
 rand = lambda lo, hi: np.random.rand()*(hi-lo) + lo
 irand = lambda lo, hi: int(np.random.rand()*(hi-lo) + lo)
@@ -82,8 +82,10 @@ if args['load']:
 
     if 'prune_f1_topk' in args and args['prune_f1_topk'] is not None:
         model.feature_nn = modules.pruned_linear(model.feature_nn, k=args['prune_f1_topk'])
+        model.l1_reg_weights = args['l1_reg'] == 'weights'
     elif 'prune_f1_threshold' in args and args['prune_f1_threshold'] is not None:
         model.feature_nn = modules.pruned_linear(model.feature_nn, threshold=args['prune_f1_threshold'])
+        model.l1_reg_weights = args['l1_reg'] == 'weights'
 
     if args['pysr_f2']:
         model.regress_nn = modules.PySRNet(args['pysr_f2'], args['pysr_model_selection'])

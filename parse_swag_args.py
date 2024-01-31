@@ -34,9 +34,9 @@ def parse():
     parser.add_argument('--pysr_model', type=str, default=None, help='PySR model to load and replace f1 with, e.g. sr_results/hall_of_fame_9723_0.pkl')
     parser.add_argument('--pysr_model_selection', type=str, default='best', help='best, accuracy, score, or ix')
     parser.add_argument('--sr_f1', action='store_true', default=False, help='do misc. stuff with f1 and SR')
-    parser.add_argument('--f1_variant', type=str, default='default',
-                        choices=['zero', 'identity', 'pysr', 'pysr_frozen', 'random_features', 'linear', 'mean_cov', 'default'])
-    parser.add_argument('--l1_reg', type=str, choices=['inputs', 'weights'], default=None)
+    parser.add_argument('--f1_variant', type=str, default='linear',
+                        choices=['zero', 'identity', 'pysr', 'pysr_frozen', 'random_features', 'linear', 'mean_cov', 'mlp', 'random', 'random_frozen'])
+    parser.add_argument('--l1_reg', type=str, choices=['inputs', 'weights', 'f2_weights', 'both_weights'], default=None)
     parser.add_argument('--l1_coeff', type=float, default=0.01)
     parser.add_argument('--cyborg_max_pysr_ix', default=None, type=int, help='indices up to and including the max index will be replaced with the pysr features')
     parser.add_argument('--loss_ablate', default='default', type=str, choices=['no_classification', 'no_normalize', 'default', 'no_normalize_no_classification'], help='ablate loss things')
@@ -51,10 +51,8 @@ def parse():
     # string of args that would be passed into load_model.load(-), example 'version=1278'
     parser.add_argument('--load_f1', type=str, default=None)
 
-    parser.add_argument('--f2_variant', type=str, default='default',
-                        choices=['pysr', 'pysr_residual', 'ifthen', 'default', 'linear'])
+    parser.add_argument('--f2_variant', type=str, default='mlp', choices=['pysr', 'pysr_residual', 'ifthen', 'mlp', 'linear'])
     parser.add_argument('--f2_ablate', type=int, default=None) # ix to drop from f2 input
-    parser.add_argument('--f2_reg', type=float, default=None) # l1 reg coeff for f2 input
     parser.add_argument('--f2_dropout', type=float, default=None) # dropout p for f2 input
 
     parser.add_argument('--lr', type=float, default=5e-4)
@@ -67,6 +65,7 @@ def parse():
     parser.add_argument('--prune_f1_threshold', type=float, default=None)
     parser.add_argument('--no_bias', action='store_true')
     parser.add_argument('--n_predicates', default=10, type=int)
+    parser.add_argument('--pruned_debug', default=None, type=str, choices=['1','2','3','4','5','6'])
 
     args = parser.parse_args()
 
