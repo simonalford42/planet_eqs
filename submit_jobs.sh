@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+sbatch -J f2_bimt --partition gpu train.sh --f1_variant linear --f2_variant bimt
+
 # -------------------- Fri 1/26 jobs --------------------------
 
 # sbatch -J pred2 --partition gpu train.sh --f2_variant ifthen --n_predicates 10

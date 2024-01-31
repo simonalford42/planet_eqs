@@ -10,6 +10,13 @@ import numpy as np
 import torch.nn.functional as F
 
 
+# instead of sigmoid and sum, use a softmax.
+# sum over predicates is 1, decrease temperature over training so it specializes
+# make it not worry about std - set to constant, etc
+# lower lr, train longer
+
+
+
 class IfThenNN(nn.Module):
     def __init__(self, n_preds, in_dim, out_dim, hidden_dim, n_layers):
         super().__init__()
