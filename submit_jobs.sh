@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
 
 
+# ------------------- Thu Feb 15 -------------------------
+# sbatch -J rand_fr --partition ellis train.sh --f1_variant random_frozen --no_bias --seed 0
+# sbatch -J rand_fr --partition ellis train.sh --f1_variant random_frozen --no_bias --seed 1
+
+sbatch -J 2res --partition gpu train.sh --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 2 --f2_variant pysr_residual
+# sbatch -J 14res --partition gpu train.sh --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 14 --f2_variant pysr_residual
+# sbatch -J 25res --partition gpu train.sh --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 25 --f2_variant pysr_residual
+# sbatch -J 60res --partition gpu train.sh --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 60 --f2_variant pysr_residual
+
+
 # -------------------- Tue 1/30 jobs --------------------------
 
 # sbatch -J prune --partition gpu prune_train.sh --no_bias --no_swag --seed 1
@@ -20,11 +30,6 @@
 # sbatch -J lin22 --partition gpu --mem 100G train.sh --f1_variant mlp --f2_variant linear
 
 # sbatch -J f2_reg02 --partition gpu --mem 100G train.sh --l1_reg f2_weights --l1_coeff 0.2
-
-# sbatch -J 2res --partition gpu train.sh --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 2 --pysr_f2_residual
-# sbatch -J 14res --partition gpu train.sh --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 14 --pysr_f2_residual
-# sbatch -J 25res --partition gpu train.sh --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 25 --pysr_f2_residual
-# sbatch -J 60res --partition gpu train.sh --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 60 --pysr_f2_residual
 
 # sbatch -J rand --partition gpu train.sh --f1_variant random --no_bias
 # sbatch -J rand_fr --partition gpu train.sh --f1_variant random_frozen --no_bias

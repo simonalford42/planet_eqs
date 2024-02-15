@@ -461,10 +461,10 @@ for confidence in confidences_to_plot:
 
     print(f'{confidence} confidence gets RMSE of {np.average(np.square(ppx[ppx < 8.99] - ppy[ppx < 8.99]))**0.5:.2f}')
     print(f'Weighted by SNR, this is: {np.average(np.square(ppx[ppx < 8.99] - ppy[ppx < 8.99]), weights=snr[ppx<8.99])**0.5:.2f}')
-    np.save(checkpoint_filename + '_ppx.npy', ppx)
-    np.save(checkpoint_filename + '_ppy.npy', ppy)
-    np.save(checkpoint_filename + '_snr.npy', snr)
-    assert False
+    # np.save(checkpoint_filename + '_ppx.npy', ppx)
+    # np.save(checkpoint_filename + '_ppy.npy', ppy)
+    # np.save(checkpoint_filename + '_snr.npy', snr)
+    # assert False
 
     ######################################################
     # Bias scores:

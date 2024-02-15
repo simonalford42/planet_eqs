@@ -51,7 +51,7 @@ def parse():
     # string of args that would be passed into load_model.load(-), example 'version=1278'
     parser.add_argument('--load_f1', type=str, default=None)
 
-    parser.add_argument('--f2_variant', type=str, default='mlp', choices=['pysr', 'pysr_residual', 'ifthen', 'mlp', 'linear'])
+    parser.add_argument('--f2_variant', type=str, default='mlp', choices=['pysr', 'pysr_residual', 'ifthen', 'mlp', 'linear', 'pysr_frozen'])
     parser.add_argument('--f2_ablate', type=int, default=None) # ix to drop from f2 input
     parser.add_argument('--f2_dropout', type=float, default=None) # dropout p for f2 input
 

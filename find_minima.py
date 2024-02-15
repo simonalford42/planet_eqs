@@ -89,12 +89,12 @@ if args['load']:
 
     if args['pysr_f2']:
         model.regress_nn = modules.PySRNet(args['pysr_f2'], args['pysr_model_selection'])
-        if args['freeze_pysr_f2']:
-            model.regress_nn.requires_grad = False
+        if args['f1_variant'] == 'pysr_frozen':
+            utils.freeze_module(model.regress_nn)
 
     if args['f2_variant'] == 'pysr_residual':
         pysr_net = modules.PySRNet(args['pysr_f2'], args['pysr_model_selection'])
-        pysr_net.requires_grad = False
+        utils.freeze_module(pysr_net)
         base_net = mlp(args['latent'] * 2, 2, args['hidden'], args['out'])
         model.regress_nn = modules.SumModule(pysr_net, base_net)
 

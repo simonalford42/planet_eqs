@@ -347,13 +347,12 @@ class VarModel(pl.LightningModule):
         if 'load_f1' in hparams and hparams['load_f1']:
             net = eval('load(' + hparams['load_f1'] + ')').feature_nn
             self.feature_nn = net
-            # self.feature_nn.requires_grad = False
+            utils.freeze_module(self.feature_nn)
         elif hparams['pysr_model']:
             # constants can still be optimized with SGD
             self.feature_nn = modules.PySRFeatureNN(hparams['pysr_model'], model_selection=hparams['pysr_model_selection'])
             if hparams['f1_variant'] == 'pysr_frozen':
-                for param in self.feature_nn.parameters():
-                    param.requires_grad = False
+                utils.freeze_module(self.feature_nn)
             else:
                 assert hparams['f1_variant'] == 'pysr'
             if hparams['cyborg_max_pysr_ix'] is not None:
@@ -378,7 +377,7 @@ class VarModel(pl.LightningModule):
 
             self.feature_nn.weight = torch.nn.Parameter(weight)
             if hparams['f1_variant'] == 'random_frozen':
-                self.feature_nn.requires_grad = False
+                utils.freeze_module(self.feature_nn)
             else:
                 self.feature_nn = modules.pruned_linear(self.feature_nn, k=2)
 
@@ -415,7 +414,7 @@ class VarModel(pl.LightningModule):
                 # in: n_inputs + n_inputs * n_inputs, out: 2 * n_features
                 special_linear = modules.SpecialLinear(n_inputs=self.n_features, n_features=hparams['latent'],
                                                        init=hparams['init_special'])
-                special_linear.requires_grad = False
+                utils.freeze_module(special_linear)
                 self.regress_nn = nn.Sequential(
                         special_linear,
                         nn.BatchNorm1d(2 * hparams['latent']),

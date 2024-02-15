@@ -162,11 +162,11 @@ class MaskedLinear(nn.Module):
         return F.linear(x, weight, self.linear.bias)
 
 
-def pruned_linear(linear: nn.Linear, k=None, threshold=None, debug=None):
-    if k is not None:
+def pruned_linear(linear: nn.Linear, top_k=None, threshold=None, debug=None):
+    if top_k is not None:
         mask = torch.zeros_like(linear.weight)
         for r in range(linear.weight.shape[0]):
-            _, ixs = torch.topk(linear.weight[r].abs(), k=k)
+            _, ixs = torch.topk(linear.weight[r].abs(), k=top_k)
             mask[r][ixs] = 1
     elif threshold is not None:
         mask = torch.zeros_like(linear.weight)
