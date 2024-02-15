@@ -1,3 +1,11 @@
+import torch
+import numpy as np
+import einops
+import torch.nn as nn
+import torch.nn.functional as F
+import matplotlib.pyplot as plt
+from matplotlib.patches import Ellipse
+
 class BioLinear(nn.Module):
     # BioLinear is just Linear, but each neuron comes with coordinates.
     def __init__(self, in_dim, out_dim, in_fold=1, out_fold=1):

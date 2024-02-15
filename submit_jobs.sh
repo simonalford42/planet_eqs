@@ -5,7 +5,9 @@
 # sbatch -J rand_fr --partition ellis train.sh --f1_variant random_frozen --no_bias --seed 0
 # sbatch -J rand_fr --partition ellis train.sh --f1_variant random_frozen --no_bias --seed 1
 
-sbatch -J 2res --partition gpu train.sh --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 2 --f2_variant pysr_residual
+sbatch -J bimt --partition gpu train.sh --f1_variant bimt
+
+# sbatch -J 2res --partition gpu train.sh --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 2 --f2_variant pysr_residual
 # sbatch -J 14res --partition gpu train.sh --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 14 --f2_variant pysr_residual
 # sbatch -J 25res --partition gpu train.sh --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 25 --f2_variant pysr_residual
 # sbatch -J 60res --partition gpu train.sh --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 60 --f2_variant pysr_residual

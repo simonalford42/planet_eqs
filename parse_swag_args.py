@@ -37,7 +37,6 @@ def parse():
     parser.add_argument('--f1_variant', type=str, default='linear',
                         choices=['zero', 'identity', 'pysr', 'pysr_frozen', 'random_features', 'linear', 'mean_cov', 'mlp', 'random', 'random_frozen', 'bimt'])
     parser.add_argument('--l1_reg', type=str, choices=['inputs', 'weights', 'f2_weights', 'both_weights'], default=None)
-    parser.add_argument('--l1_reg', action='store_true', default=False)
     parser.add_argument('--l1_coeff', type=float, default=0.01)
     parser.add_argument('--cyborg_max_pysr_ix', default=None, type=int, help='indices up to and including the max index will be replaced with the pysr features')
     parser.add_argument('--loss_ablate', default='default', type=str, choices=['no_classification', 'no_normalize', 'default', 'no_normalize_no_classification'], help='ablate loss things')
@@ -73,8 +72,5 @@ def parse():
     if args.f1_variant == 'identity':
         # just hard coding for the n features with the default arguments..
         args.latent = 41
-
-    if args.pysr_model is not None and args.f1_variant == 'default':
-        args.f1_variant = 'pysr'
 
     return args
