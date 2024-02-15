@@ -220,10 +220,6 @@ def parse_args():
     # use the bottom % of stds to target sr on higher confidence predictions
     parser.add_argument('--std_percent_threshold', type=float, default=1)
 
-    args = parser.parse_args()
-
-    return args
-
 
 def load_results(id):
     path = 'sr_results/id.pkl'

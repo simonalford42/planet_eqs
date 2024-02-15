@@ -19,6 +19,7 @@ import einops
 from utils import assert_equal
 import utils
 import modules
+import bimt
 
 
 def load(version, seed=0):
@@ -366,6 +367,8 @@ class VarModel(pl.LightningModule):
             self.feature_nn = modules.ZeroNN(in_n=self.n_features, out_n=hparams['latent'])
         elif hparams['f1_variant'] == 'linear':
             self.feature_nn = nn.Linear(self.n_features, hparams['latent'], bias='no_bias' not in hparams or not hparams['no_bias'])
+        elif hparams['f1_variant'] == 'bimt':
+            self.feature_nn = bimt.BioMLP(in_dim=self.n_features, out_dim=hparams['latent'])
         elif hparams['f1_variant'] == 'mean_cov':
             pass
         elif hparams['f1_variant'] in ['random', 'random_frozen']:
@@ -450,6 +453,11 @@ class VarModel(pl.LightningModule):
                 self.regress_nn,
             )
 
+        if hparams['f2_variant'] == 'bimt':
+            self.regress_nn = bimt.BioMLP(in_dim=hparams['latent']*2 + int(self.fix_megno)*2, depth=2, w=hparams['hidden'], out_dim=hparams['out'])
+        else:
+            self.regress_nn = modules.mlp(summary_dim, 2, hparams['hidden'], hparams['out'])
+
         self.input_noise_logvar = nn.Parameter(torch.zeros(self.n_features)-2)
         self.summary_noise_logvar = nn.Parameter(torch.zeros(summary_dim) - 2) # add to summaries, not direct latents
         self.lowest = 0.5
@@ -526,12 +534,12 @@ class VarModel(pl.LightningModule):
     def compute_summary_stats2(self, x):
         # no sampling
         x = self.feature_nn(x)
-        sample_mu = torch.mean(x, dim=1)
-        sample_var = torch.std(x, dim=1)**2
+        sample_mu = torch.mean(x, dim=1, keepdim=True)
+        sample_var = torch.std(x, dim=1, keepdim=True)**2
         sample_std = torch.sqrt(torch.abs(sample_var) + EPSILON)
 
-        clatent = torch.cat((sample_mu, sample_var), dim=1)
-        # clatent = torch.cat((sample_mu, sample_std), dim=1)
+        # clatent = torch.cat((sample_mu, sample_var), dim=1)
+        clatent = torch.cat((sample_mu, sample_std), dim=-1)
         self.latents = x
 
         return clatent
@@ -622,7 +630,12 @@ class VarModel(pl.LightningModule):
         return clatent
 
     def predict_instability(self, summary_stats):
-        testy = self.regress_nn(summary_stats)
+        with torch.no_grad():
+            z = torch.zeros_like(summary_stats)
+            print(z.shape)
+            print(self.hparams['latent']*2 + int(self.fix_megno)*2, self.hparams['hidden'], self.hparams['out'])
+            testy = self.regress_nn(z)
+        # testy = self.regress_nn(summary_stats)
         # Outputs mu, std
         mu = soft_clamp(testy[:, [0]], 4.0, 12.0)
         std = soft_clamp(testy[:, [1]], self.lowest, 6.0)

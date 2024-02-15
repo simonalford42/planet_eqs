@@ -15,8 +15,8 @@
 #SBATCH --gres=gpu:1
 #SBATCH --partition=ellis
 
-source /home/sca63/mambaforge/etc/profile.d/conda.sh
-conda activate bnn_chaos_model
+# source /home/sca63/mambaforge/etc/profile.d/conda.sh
+# conda activate bnn_chaos_model
 
 # Enable errexit (exit on error)
 set -e
