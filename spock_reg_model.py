@@ -343,120 +343,24 @@ class VarModel(pl.LightningModule):
 
         self.n_features = hparams['time_series_features'] * (1 + int(hparams['include_derivatives']))
 
-        # --------------------- f1 ---------------------
-
-        if 'load_f1' in hparams and hparams['load_f1']:
-            net = eval('load(' + hparams['load_f1'] + ')').feature_nn
-            self.feature_nn = net
-            utils.freeze_module(self.feature_nn)
-        elif hparams['pysr_model']:
-            # constants can still be optimized with SGD
-            self.feature_nn = modules.PySRFeatureNN(hparams['pysr_model'], model_selection=hparams['pysr_model_selection'])
-            if hparams['f1_variant'] == 'pysr_frozen':
-                utils.freeze_module(self.feature_nn)
-            else:
-                assert hparams['f1_variant'] == 'pysr'
-            if hparams['cyborg_max_pysr_ix'] is not None:
-                default_nn = modules.mlp(self.n_features, hparams['latent'], hparams['hidden'], hparams['in'])
-                self.feature_nn = modules.Cyborg(default_nn, self.feature_nn, out_n=hparams['latent'], nn2_ixs=list(range(hparams['cyborg_max_pysr_ix'])))
-        elif hparams['f1_variant'] == 'random_features':
-            self.feature_nn = modules.RandomFeatureNN(in_n=self.n_features, out_n=hparams['latent'])
-        elif hparams['f1_variant'] == 'identity':
-            self.feature_nn = torch.nn.Identity()
-        elif hparams['f1_variant'] == 'zero':
-            self.feature_nn = modules.ZeroNN(in_n=self.n_features, out_n=hparams['latent'])
-        elif hparams['f1_variant'] == 'linear':
-            self.feature_nn = nn.Linear(self.n_features, hparams['latent'], bias='no_bias' not in hparams or not hparams['no_bias'])
-        elif hparams['f1_variant'] == 'bimt':
-            self.feature_nn = bimt.BioMLP(in_dim=self.n_features, out_dim=hparams['latent'])
-        elif hparams['f1_variant'] == 'mean_cov':
-            pass
-        elif hparams['f1_variant'] in ['random', 'random_frozen']:
-            self.feature_nn = nn.Linear(self.n_features, hparams['latent'], bias='no_bias' not in hparams or not hparams['no_bias'])
-            # make the linear projection random combinations of two input variables, with coefficients from U[-1, 1]
-            weight = torch.zeros_like(self.feature_nn.weight)
-            for i in range(weight.shape[0]):
-                weight[i, np.random.choice(self.n_features, 2, replace=False)] = torch.rand(2) * 2 - 1
-
-            self.feature_nn.weight = torch.nn.Parameter(weight)
-            if hparams['f1_variant'] == 'random_frozen':
-                utils.freeze_module(self.feature_nn)
-            else:
-                self.feature_nn = modules.pruned_linear(self.feature_nn, k=2)
-
-        else:
-            assert hparams['f1_variant'] == 'mlp'
-            self.feature_nn = modules.mlp(self.n_features, hparams['latent'], hparams['hidden'], hparams['in'])
+        self.feature_nn = self.get_feature_nn(hparams)
 
         self.l1_reg_inputs = 'l1_reg' in hparams and hparams['l1_reg'] == 'inputs'
         if self.l1_reg_inputs:
             self.inputs_mask = modules.MaskLayer(self.n_features)
-            # self.features_mask = modules.MaskLayer(hparams['latent'])
             self.feature_nn = torch.nn.Sequential(self.inputs_mask,
                                                   self.feature_nn)
-                                                  # self.features_mask)
         self.l1_reg_weights = 'l1_reg' in hparams and hparams['l1_reg'] in ['weights', 'both_weights']
         self.l1_reg_f2_weights = 'l1_reg' in hparams and hparams['l1_reg'] in ['f2_weights', 'both_weights']
 
-        # -------------------------- f2 --------------------------
-
-        if 'f2_variant' not in hparams:
-            hparams['f2_variant'] = 'mlp'
-        if 'load_f2' in hparams and hparams['load_f2'] is not None:
-            net = eval('load(' + hparams['load_f2'] + ')').regress_nn
-            self.regress_nn = net
-        elif 'pysr_f2' in hparams and hparams['pysr_f2'] is not None:
-            self.regress_nn = modules.PySRNet(hparams['pysr_f2'], hparams['pysr_model_selection'])
-        elif hparams['f1_variant'] == 'mean_cov':
-            i = self.n_features
-            if 'mean_var' in hparams and hparams['mean_var']:
-                summary_dim = i + i
-                self.regress_nn = modules.mlp(summary_dim, 2, hparams['hidden'], hparams['out'])
-            else:
-                summary_dim = i + i*i
-                # in: n_inputs + n_inputs * n_inputs, out: 2 * n_features
-                special_linear = modules.SpecialLinear(n_inputs=self.n_features, n_features=hparams['latent'],
-                                                       init=hparams['init_special'])
-                utils.freeze_module(special_linear)
-                self.regress_nn = nn.Sequential(
-                        special_linear,
-                        nn.BatchNorm1d(2 * hparams['latent']),
-                        modules.mlp(2 * hparams['latent'], 2, hparams['hidden'], hparams['out']))
+        if (('no_std' in hparams and hparams['no_std'])
+            or ('no_mean' in hparams and hparams['no_mean'])):
+            c = 1
         else:
-            if (('no_std' in hparams and hparams['no_std'])
-                or ('no_mean' in hparams and hparams['no_mean'])):
-                c = 1
-            else:
-                c = 2
-            summary_dim = hparams['latent']*c + int(self.fix_megno)*2
+            c = 2
+        summary_dim = hparams['latent'] * c + int(self.fix_megno) * 2
 
-            if hparams['f2_variant'] == 'ifthen':
-                self.regress_nn = modules.IfThenNN2(hparams['n_predicates'], summary_dim, 2, hparams['hidden'], hparams['out'])
-            elif hparams['f2_variant'] == 'linear':
-                self.regress_nn = nn.Linear(summary_dim, 2)
-            else:
-                self.regress_nn = modules.mlp(summary_dim, 2, hparams['hidden'], hparams['out'])
-
-        if 'f2_ablate' in hparams and hparams['f2_ablate'] is not None:
-            self.regress_nn = nn.Sequential(
-                modules.ZeroFeatureAtIx(n_features=summary_dim, ix=hparams['f2_ablate']),
-                self.regress_nn,
-            )
-        elif 'f2_reg' in hparams and hparams['f2_reg'] is not None:
-            self.regress_nn = nn.Sequential(
-                modules.MaskLayer(summary_dim),
-                self.regress_nn,
-            )
-        elif 'f2_dropout' in hparams and hparams['f2_dropout']:
-            self.regress_nn = nn.Sequential(
-                nn.Dropout(p=hparams['f2_dropout']),
-                self.regress_nn,
-            )
-
-        if hparams['f2_variant'] == 'bimt':
-            self.regress_nn = bimt.BioMLP(in_dim=hparams['latent']*2 + int(self.fix_megno)*2, depth=2, w=hparams['hidden'], out_dim=hparams['out'])
-        else:
-            self.regress_nn = modules.mlp(summary_dim, 2, hparams['hidden'], hparams['out'])
+        self.regress_nn = self.get_regress_nn(hparams, summary_dim)
 
         self.input_noise_logvar = nn.Parameter(torch.zeros(self.n_features)-2)
         self.summary_noise_logvar = nn.Parameter(torch.zeros(summary_dim) - 2) # add to summaries, not direct latents
@@ -500,6 +404,93 @@ class VarModel(pl.LightningModule):
 
         self.ssX = None
         self.ssy = None
+
+
+    def get_regress_nn(self, hparams, summary_dim):
+        if 'f2_variant' not in hparams:
+            hparams['f2_variant'] = 'mlp'
+        if 'load_f2' in hparams and hparams['load_f2'] is not None:
+            return eval('load(' + hparams['load_f2'] + ')').regress_nn
+        elif 'pysr_f2' in hparams and hparams['pysr_f2'] is not None:
+            return modules.PySRNet(hparams['pysr_f2'], hparams['pysr_model_selection'])
+        elif hparams['f1_variant'] == 'mean_cov':
+            i = self.n_features
+            if 'mean_var' in hparams and hparams['mean_var']:
+                summary_dim = i + i
+                return modules.mlp(summary_dim, 2, hparams['hidden'], hparams['out'])
+            else:
+                summary_dim = i + i*i
+                # in: n_inputs + n_inputs * n_inputs, out: 2 * n_features
+                special_linear = modules.SpecialLinear(n_inputs=self.n_features, n_features=hparams['latent'],
+                                                       init=hparams['init_special'])
+                utils.freeze_module(special_linear)
+                return nn.Sequential(special_linear,
+                                     nn.BatchNorm1d(2 * hparams['latent']),
+                                     modules.mlp(2 * hparams['latent'], 2, hparams['hidden'], hparams['out']))
+        if hparams['f2_variant'] == 'ifthen':
+            return modules.IfThenNN(hparams['n_predicates'], summary_dim, 2, hparams['hidden'], hparams['out'])
+        if hparams['f2_variant'] == 'ifthen2':
+            return modules.IfThenNN2(hparams['n_predicates'], summary_dim, 2, hparams['hidden'], hparams['out'])
+        elif hparams['f2_variant'] == 'linear':
+            return nn.Linear(summary_dim, 2)
+        elif hparams['f2_variant'] == 'bimt':
+            return bimt.BioMLP(in_dim=summary_dim, depth=2, w=hparams['hidden'], out_dim=hparams['out'])
+        else:
+            return modules.mlp(summary_dim, 2, hparams['hidden'], hparams['out'])
+
+
+    def get_feature_nn(self, hparams):
+        if 'load_f1' in hparams and hparams['load_f1']:
+            feature_nn = eval('load(' + hparams['load_f1'] + ')').feature_nn
+            utils.freeze_module(feature_nn)
+            return feature_nn
+        elif hparams['pysr_model']:
+            # constants can still be optimized with SGD
+            feature_nn = modules.PySRFeatureNN(hparams['pysr_model'], model_selection=hparams['pysr_model_selection'])
+            if hparams['f1_variant'] == 'pysr_frozen':
+                utils.freeze_module(feature_nn)
+            else:
+                assert hparams['f1_variant'] == 'pysr'
+            if hparams['cyborg_max_pysr_ix'] is not None:
+                default_nn = modules.mlp(self.n_features, hparams['latent'], hparams['hidden'], hparams['in'])
+                feature_nn = modules.Cyborg(default_nn, feature_nn, out_n=hparams['latent'], nn2_ixs=list(range(hparams['cyborg_max_pysr_ix'])))
+
+            return feature_nn
+        elif hparams['f1_variant'] == 'random_features':
+            return modules.RandomFeatureNN(in_n=self.n_features, out_n=hparams['latent'])
+        elif hparams['f1_variant'] == 'identity':
+            return torch.nn.Identity()
+        elif hparams['f1_variant'] == 'zero':
+            return modules.ZeroNN(in_n=self.n_features, out_n=hparams['latent'])
+        elif hparams['f1_variant'] == 'linear':
+            return nn.Linear(self.n_features, hparams['latent'], bias='no_bias' not in hparams or not hparams['no_bias'])
+        elif hparams['f1_variant'] == 'bimt':
+            return bimt.BioMLP(in_dim=self.n_features, out_dim=hparams['latent'])
+        elif hparams['f1_variant'] == 'mean_cov':
+            pass
+        elif hparams['f1_variant'] == 'products':
+            linear = nn.Linear(self.n_features * self.n_features, hparams['latent'],
+                               bias='no_bias' not in hparams or not hparams['no_bias'])
+            return nn.Sequential(modules.Products(),
+                                            linear)
+        elif hparams['f1_variant'] in ['random', 'random_frozen']:
+            feature_nn = nn.Linear(self.n_features, hparams['latent'], bias='no_bias' not in hparams or not hparams['no_bias'])
+            # make the linear projection random combinations of two input variables, with coefficients from U[-1, 1]
+            weight = torch.zeros_like(feature_nn.weight)
+            for i in range(weight.shape[0]):
+                weight[i, np.random.choice(self.n_features, 2, replace=False)] = torch.rand(2) * 2 - 1
+
+            feature_nn.weight = torch.nn.Parameter(weight)
+            if hparams['f1_variant'] == 'random_frozen':
+                utils.freeze_module(feature_nn)
+            else:
+                feature_nn = modules.pruned_linear(feature_nn, k=2)
+
+            return feature_nn
+        else:
+            assert hparams['f1_variant'] == 'mlp'
+            return modules.mlp(self.n_features, hparams['latent'], hparams['hidden'], hparams['in'])
+
 
     def do_nothing_optimizer_step(
         self,
@@ -630,12 +621,7 @@ class VarModel(pl.LightningModule):
         return clatent
 
     def predict_instability(self, summary_stats):
-        with torch.no_grad():
-            z = torch.zeros_like(summary_stats)
-            print(z.shape)
-            print(self.hparams['latent']*2 + int(self.fix_megno)*2, self.hparams['hidden'], self.hparams['out'])
-            testy = self.regress_nn(z)
-        # testy = self.regress_nn(summary_stats)
+        testy = self.regress_nn(summary_stats)
         # Outputs mu, std
         mu = soft_clamp(testy[:, [0]], 4.0, 12.0)
         std = soft_clamp(testy[:, [1]], self.lowest, 6.0)

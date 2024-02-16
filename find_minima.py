@@ -97,6 +97,10 @@ if args['load']:
         utils.freeze_module(pysr_net)
         base_net = mlp(args['latent'] * 2, 2, args['hidden'], args['out'])
         model.regress_nn = modules.SumModule(pysr_net, base_net)
+        model.l1_reg_f2_weights = args['l1_reg'] in ['f2_weights', 'both_weights']
+    elif args['f2_variant'] == 'new':
+        model.regress_nn = modules.mlp(model.regress_nn[0].in_features, 2, model.hparams['hidden'], model.hparams['out'])
+        model.l1_reg_f2_weights = args['l1_reg'] in ['f2_weights', 'both_weights']
 
     if args['eval']:
         model.disable_optimization()

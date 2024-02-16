@@ -436,7 +436,6 @@ def calc_scores(args, checkpoint_filename, logger=None, plot_random=False):
         # np.save(f'ppx_{args.version}.npy', ppx)
         # np.save(f'ppy_{args.version}.npy', ppy)
         # np.save(f'p_std_{args.version}.npy', p_std)
-        # assert False
 
         ######################################################
         # Bias scores:

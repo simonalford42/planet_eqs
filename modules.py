@@ -10,14 +10,24 @@ import numpy as np
 import torch.nn.functional as F
 
 
+class Products(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x):
+        # x: [..., d]
+        # returns: [..., d * d]
+        x = torch.einsum('... i, ... j -> ... ij', x, x)
+        x = einops.rearrange(x, '... i j -> ... (i j)')
+        return x
+
 # instead of sigmoid and sum, use a softmax.
 # sum over predicates is 1, decrease temperature over training so it specializes
 # make it not worry about std - set to constant, etc
 # lower lr, train longer
 
-
-
 class IfThenNN(nn.Module):
+    # predicates are mlp's, bodies are mlp's
     def __init__(self, n_preds, in_dim, out_dim, hidden_dim, n_layers):
         super().__init__()
         self.n_preds = n_preds
@@ -33,6 +43,7 @@ class IfThenNN(nn.Module):
 
 
 class IfThenNN2(nn.Module):
+    # predicates are mlp's, bodies are constants
     def __init__(self, n_preds, in_dim, out_dim, hidden_dim, n_layers):
         super().__init__()
         self.n_preds = n_preds
