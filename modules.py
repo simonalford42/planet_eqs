@@ -33,12 +33,12 @@ class IfThenNN(nn.Module):
         self.n_preds = n_preds
         self.mlp = mlp(in_dim, n_preds * (1 + out_dim), hidden_dim, n_layers)
 
-    def forward(self, x):
+    def forward(self, x, temperature=1):
         out = self.mlp(x)
         preds = out[..., :self.n_preds]
         bodies = out[..., self.n_preds:]
         bodies = einops.rearrange(bodies, '... (n o) -> ... n o', n=self.n_preds)
-        preds = torch.sigmoid(preds)
+        preds = F.softmax(preds / temperature, dim=-1)
         return torch.einsum('... n, ... n o -> ... o', preds, bodies)
 
 
@@ -50,9 +50,9 @@ class IfThenNN2(nn.Module):
         self.mlp = mlp(in_dim, n_preds, hidden_dim, n_layers)
         self.bodies = nn.Parameter(torch.randn(n_preds, out_dim))
 
-    def forward(self, x):
+    def forward(self, x, temperature=1):
         preds = self.mlp(x)
-        preds = torch.sigmoid(preds)
+        preds = F.softmax(preds / temperature, dim=-1)
         return torch.einsum('... n, n o -> ... o', preds, self.bodies)
 
 

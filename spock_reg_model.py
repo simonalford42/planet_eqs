@@ -325,6 +325,15 @@ EPSILON = 1e-5
 class VarModel(pl.LightningModule):
     """Bayesian Neural Network model for predicting instability time"""
     def __init__(self, hparams):
+        # so we can load old runs before the variable names were changed
+        if 'hidden_dim' not in hparams:
+            hparams['hidden_dim'] = hparams['hidden']
+        if 'f2_depth' not in hparams:
+            hparams['f2_depth'] = hparams['out']
+        if 'f1_depth' not in hparams:
+            hparams['f1_depth'] = hparams['in']
+
+
         super().__init__()
         if 'seed' not in hparams: hparams['seed'] = 0
         pl.seed_everything(hparams['seed'])
@@ -417,7 +426,7 @@ class VarModel(pl.LightningModule):
             i = self.n_features
             if 'mean_var' in hparams and hparams['mean_var']:
                 summary_dim = i + i
-                return modules.mlp(summary_dim, 2, hparams['hidden'], hparams['out'])
+                return modules.mlp(summary_dim, 2, hparams['hidden_dim'], hparams['f2_depth'])
             else:
                 summary_dim = i + i*i
                 # in: n_inputs + n_inputs * n_inputs, out: 2 * n_features
@@ -426,17 +435,17 @@ class VarModel(pl.LightningModule):
                 utils.freeze_module(special_linear)
                 return nn.Sequential(special_linear,
                                      nn.BatchNorm1d(2 * hparams['latent']),
-                                     modules.mlp(2 * hparams['latent'], 2, hparams['hidden'], hparams['out']))
+                                     modules.mlp(2 * hparams['latent'], 2, hparams['hidden_dim'], hparams['f2_depth']))
         if hparams['f2_variant'] == 'ifthen':
-            return modules.IfThenNN(hparams['n_predicates'], summary_dim, 2, hparams['hidden'], hparams['out'])
+            return modules.IfThenNN(hparams['n_predicates'], summary_dim, 2, hparams['hidden_dim'], hparams['f2_depth'])
         if hparams['f2_variant'] == 'ifthen2':
-            return modules.IfThenNN2(hparams['n_predicates'], summary_dim, 2, hparams['hidden'], hparams['out'])
+            return modules.IfThenNN2(hparams['n_predicates'], summary_dim, 2, hparams['hidden_dim'], hparams['f2_depth'])
         elif hparams['f2_variant'] == 'linear':
             return nn.Linear(summary_dim, 2)
         elif hparams['f2_variant'] == 'bimt':
-            return bimt.BioMLP(in_dim=summary_dim, depth=2, w=hparams['hidden'], out_dim=hparams['out'])
+            return bimt.BioMLP(in_dim=summary_dim, depth=2, w=hparams['hidden_dim'], out_dim=hparams['f2_depth'])
         else:
-            return modules.mlp(summary_dim, 2, hparams['hidden'], hparams['out'])
+            return modules.mlp(summary_dim, 2, hparams['hidden_dim'], hparams['f2_depth'])
 
 
     def get_feature_nn(self, hparams):
@@ -452,7 +461,7 @@ class VarModel(pl.LightningModule):
             else:
                 assert hparams['f1_variant'] == 'pysr'
             if hparams['cyborg_max_pysr_ix'] is not None:
-                default_nn = modules.mlp(self.n_features, hparams['latent'], hparams['hidden'], hparams['in'])
+                default_nn = modules.mlp(self.n_features, hparams['latent'], hparams['hidden_dim'], hparams['f1_depth'])
                 feature_nn = modules.Cyborg(default_nn, feature_nn, out_n=hparams['latent'], nn2_ixs=list(range(hparams['cyborg_max_pysr_ix'])))
 
             return feature_nn
@@ -471,8 +480,7 @@ class VarModel(pl.LightningModule):
         elif hparams['f1_variant'] == 'products':
             linear = nn.Linear(self.n_features * self.n_features, hparams['latent'],
                                bias='no_bias' not in hparams or not hparams['no_bias'])
-            return nn.Sequential(modules.Products(),
-                                            linear)
+            return nn.Sequential(modules.Products(), linear)
         elif hparams['f1_variant'] in ['random', 'random_frozen']:
             feature_nn = nn.Linear(self.n_features, hparams['latent'], bias='no_bias' not in hparams or not hparams['no_bias'])
             # make the linear projection random combinations of two input variables, with coefficients from U[-1, 1]
@@ -489,7 +497,7 @@ class VarModel(pl.LightningModule):
             return feature_nn
         else:
             assert hparams['f1_variant'] == 'mlp'
-            return modules.mlp(self.n_features, hparams['latent'], hparams['hidden'], hparams['in'])
+            return modules.mlp(self.n_features, hparams['latent'], hparams['hidden_dim'], hparams['f1_depth'])
 
 
     def do_nothing_optimizer_step(
@@ -900,8 +908,7 @@ class VarModel(pl.LightningModule):
 
         prior = input_kl + summary_kl
 
-        # total_loss = loss + prior
-        total_loss = loss
+        total_loss = loss + prior
 
         tensorboard_logs = {'train_loss_no_reg': loss/len(X_sample),
                             'train_loss_with_reg': total_loss/len(X_sample),

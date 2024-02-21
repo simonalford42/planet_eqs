@@ -26,7 +26,7 @@ def parse():
     parser.add_argument('--seed', type=int, default=0, help='default=0')
 
     parser.add_argument('--total_steps', type=int, default=300000, help='default=300000')
-    parser.add_argument('--hidden', type=int, default=40, help='regress nn hidden dim')
+    parser.add_argument('--hidden_dim', type=int, default=40, help='regress nn and feature nn hidden dim')
     parser.add_argument('--latent', type=int, default=20, help='number of features f1 outputs')
 
     parser.add_argument('--swa_steps', type=int, default=50000, help='default=50000')
@@ -37,9 +37,10 @@ def parse():
     parser.add_argument('--f1_variant', type=str, default='linear',
                         choices=['zero', 'identity', 'pysr', 'pysr_frozen', 'random_features', 'linear', 'mean_cov', 'mlp', 'random', 'random_frozen', 'bimt', 'products'])
     parser.add_argument('--l1_reg', type=str, choices=['inputs', 'weights', 'f2_weights', 'both_weights'], default=None)
-    parser.add_argument('--l1_coeff', type=float, default=0.01)
+    parser.add_argument('--l1_coeff', type=float, default=None)
     parser.add_argument('--cyborg_max_pysr_ix', default=None, type=int, help='indices up to and including the max index will be replaced with the pysr features')
     parser.add_argument('--loss_ablate', default='default', type=str, choices=['no_classification', 'no_normalize', 'default', 'no_normalize_no_classification'], help='ablate loss things')
+    # remember that f2_depth = 1 is one hidden layer of (h, h) shape, plus the input and output dim layers.
     parser.add_argument('--f2_depth', type=int,  default=1, help='regress nn number of hidden layers')
     parser.add_argument('--zero_theta', type=int,  nargs='+', default=0, help='ix or ixs of sin/cos theta1-3 to zero, doing at 1-6')
     parser.add_argument('--batch_size', type=int, default=2000, help='swag batch size')
