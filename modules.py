@@ -257,15 +257,10 @@ class PySRFeatureNN(torch.nn.Module):
         # something like 'sr_results/hall_of_fame_7955_1.pkl'
         self.filepath = filepath
         assert os.path.exists(filepath), f'filepath does not exist: {filepath}'
-<<<<<<< HEAD
-        indices_path = filepath[:-4] + '_ixs.json'
-        self.module_list = nn.ModuleList(pysr.PySRRegressor.from_file(filepath, model_selection=model_selection).pytorch())
-=======
         indices_path = filepath[:-4] + '_indices.json'
 
         self.module_list = load_pysr_module_list(filepath, model_selection)
 
->>>>>>> b9a0fe7a90ec56067bb55a4b785d3d7109a9604a
         with open(indices_path, 'r') as f:
             self.included_indices = json.load(f)
 

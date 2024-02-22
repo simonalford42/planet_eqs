@@ -100,9 +100,11 @@ class BioMLP(nn.Module):
         self.original_params = None
 
     def forward(self, x):
-
-        B, T, d = x.shape
-        x = einops.rearrange(x, 'B T d -> (B T) d')
+        rearranged = False
+        if x.dim() > 2:
+            rearranged = True
+            B, T, d = x.shape
+            x = einops.rearrange(x, 'B T d -> (B T) d')        
 
         shp = x.shape
         in_fold = self.linears[0].in_fold
@@ -118,7 +120,8 @@ class BioMLP(nn.Module):
         out_perm_inv[self.out_perm.long()] = torch.arange(self.out_dim)
         x = x[:, out_perm_inv]
         
-        x = einops.rearrange(x, '(B T) n -> B T n', B=B, T=T)
+        if rearranged:
+            x = einops.rearrange(x, '(B T) n -> B T n', B=B, T=T)
 
         return x
 
@@ -315,8 +318,6 @@ class BioMLP(nn.Module):
         with torch.no_grad():
             for param, original_param in zip(self.parameters(), self.original_params):
                 param.data.copy_(original_param.data)
-
-
 
 
 class CustomOneCycleLR(torch.optim.lr_scheduler._LRScheduler):
@@ -655,6 +656,8 @@ class VarModel(pl.LightningModule):
             self.feature_nn = nn.Linear(self.n_features, hparams['latent'], bias='no_bias' not in hparams or not hparams['no_bias'])
         elif hparams['f1_variant'] == 'bimt':
             self.feature_nn = BioMLP(in_dim=self.n_features, out_dim=hparams['latent'])
+        elif hparams['f1_variant'] == 'biolinear':
+            self.feature_nn = BioLinear(in_dim=self.n_features, out_dim=hparams['latent'])
         elif hparams['f1_variant'] == 'mean_cov':
             pass
         elif hparams['f1_variant'] in ['random', 'random_frozen']:
@@ -740,8 +743,9 @@ class VarModel(pl.LightningModule):
             )
 
         #self.regress_nn = mlp(hparams['latent']*2 + int(self.fix_megno)*2, 2, hparams['hidden'], hparams['out'])
-        self.regress_nn = BioMLP(in_dim=hparams['latent']*2 + int(self.fix_megno)*2, depth=2, w=hparams['hidden'], out_dim=hparams['out'])
-        #self.regress_nn = mlp(summary_dim, 2, hparams['hidden'], hparams['out'])
+        #self.regress_nn = BioMLP(in_dim=hparams['latent']*2 + int(self.fix_megno)*2, depth=2, w=hparams['hidden'], out_dim=hparams['out'])
+        self.regress_nn = BioMLP(summary_dim, 2, hparams['hidden'], hparams['out'])
+        #self.regress_nn = modules.mlp(summary_dim, 2, hparams['hidden'], hparams['out'])
         self.input_noise_logvar = nn.Parameter(torch.zeros(self.n_features)-2)
         self.summary_noise_logvar = nn.Parameter(torch.zeros(summary_dim) - 2) # add to summaries, not direct latents
         self.lowest = 0.5
@@ -1193,8 +1197,15 @@ class VarModel(pl.LightningModule):
 
         prior = input_kl + summary_kl
 
-        # total_loss = loss + prior
-        total_loss = loss
+        total_loss = loss + prior
+
+        lamb = 0.001
+        weight_factor = 1
+        if self.hparams['f1_variant'] == 'bimt':
+            reg = self.regress_nn.get_cc(bias_penalize=False, weight_factor=weight_factor)
+            total_loss += lamb*reg
+            if self.hparams['steps'] % 200 == 0: 
+                self.regress_nn.relocate()
 
         tensorboard_logs = {'train_loss_no_reg': loss/len(X_sample),
                             'train_loss_with_reg': total_loss/len(X_sample),

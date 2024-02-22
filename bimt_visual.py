@@ -62,3 +62,6 @@ if __name__ == '__main__':
     #476 (epoch 1948)
     #19307 (epoch 1548)
     #29002 (epoch 1548)
+
+    #27223 (f1:linear, f2:bimt)
+    

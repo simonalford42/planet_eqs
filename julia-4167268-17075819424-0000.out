@@ -1,0 +1,170 @@
+julia_worker:9639#128.84.100.166
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: The call to compilecache failed to create a usable precompiled cache file for ArrayInterfaceCore [30b0a656-2188-435a-8636-2ec0e6a096e2]
+│   exception = Required dependency SnoopPrecompile [66db9d55-30c0-4569-8b51-7e840670fc0c] failed to load from a cache file.
+└ @ Base loading.jl:1055
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module StaticArrayInterface with build ID 5711763465217074 is missing from the cache.
+│ This may mean StaticArrayInterface [0d7ed370-da01-4f52-bd93-41d350b8b718] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module VectorizationBase with build ID 5711762323112531 is missing from the cache.
+│ This may mean VectorizationBase [3d5dd08c-fd9d-11e8-17fa-ed2836048c2f] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module StaticArrayInterface with build ID 5711763465217074 is missing from the cache.
+│ This may mean StaticArrayInterface [0d7ed370-da01-4f52-bd93-41d350b8b718] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module Requires with build ID 5711743643540790 is missing from the cache.
+│ This may mean Requires [ae029012-a4dd-5104-9daa-d747884805df] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module PackageExtensionCompat with build ID 5711743332076565 is missing from the cache.
+│ This may mean PackageExtensionCompat [65ce6f38-6b18-4e1d-a461-8949797d7930] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module ArrayInterface with build ID 5711763988233674 is missing from the cache.
+│ This may mean ArrayInterface [4fba245c-0d91-5ea0-9b3e-6abc04ee57a9] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module ArrayInterface with build ID 5711763988233674 is missing from the cache.
+│ This may mean ArrayInterface [4fba245c-0d91-5ea0-9b3e-6abc04ee57a9] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module ArrayInterface with build ID 5711763988233674 is missing from the cache.
+│ This may mean ArrayInterface [4fba245c-0d91-5ea0-9b3e-6abc04ee57a9] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module ArrayInterface with build ID 5711763988233674 is missing from the cache.
+│ This may mean ArrayInterface [4fba245c-0d91-5ea0-9b3e-6abc04ee57a9] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module ArrayInterface with build ID 5711763988233674 is missing from the cache.
+│ This may mean ArrayInterface [4fba245c-0d91-5ea0-9b3e-6abc04ee57a9] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module ArrayInterface with build ID 5711763988233674 is missing from the cache.
+│ This may mean ArrayInterface [4fba245c-0d91-5ea0-9b3e-6abc04ee57a9] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: Module ArrayInterface with build ID 5711763988233674 is missing from the cache.
+│ This may mean ArrayInterface [4fba245c-0d91-5ea0-9b3e-6abc04ee57a9] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+WARNING: using StaticArrays.setindex in module FiniteDiff conflicts with an existing identifier.
+┌ Warning: Module NLSolversBase with build ID 5711816307872466 is missing from the cache.
+│ This may mean NLSolversBase [d41bc354-129a-5804-8e4c-c37616107c6c] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:1030
+┌ Warning: You are using multithreading mode, but only one thread is available. Try starting julia with `--threads=auto`.
+└ @ SymbolicRegression ~/.julia/packages/SymbolicRegression/XKtla/src/SymbolicRegression.jl:546
+┌ Warning: You are using multithreading mode, but only one thread is available. Try starting julia with `--threads=auto`.
+└ @ SymbolicRegression ~/.julia/packages/SymbolicRegression/XKtla/src/SymbolicRegression.jl:546
+┌ Warning: You are using multithreading mode, but only one thread is available. Try starting julia with `--threads=auto`.
+└ @ SymbolicRegression ~/.julia/packages/SymbolicRegression/XKtla/src/SymbolicRegression.jl:546
+┌ Warning: You are using multithreading mode, but only one thread is available. Try starting julia with `--threads=auto`.
+└ @ SymbolicRegression ~/.julia/packages/SymbolicRegression/XKtla/src/SymbolicRegression.jl:546
+┌ Warning: Recreating population (output=2, population=1), as the saved one doesn't have the correct number of members.
+└ @ SymbolicRegression ~/.julia/packages/SymbolicRegression/XKtla/src/SymbolicRegression.jl:700
+┌ Warning: You are using multithreading mode, but only one thread is available. Try starting julia with `--threads=auto`.
+└ @ SymbolicRegression ~/.julia/packages/SymbolicRegression/XKtla/src/SymbolicRegression.jl:546
+┌ Warning: You are using multithreading mode, but only one thread is available. Try starting julia with `--threads=auto`.
+└ @ SymbolicRegression ~/.julia/packages/SymbolicRegression/XKtla/src/SymbolicRegression.jl:546
+┌ Warning: You are using multithreading mode, but only one thread is available. Try starting julia with `--threads=auto`.
+└ @ SymbolicRegression ~/.julia/packages/SymbolicRegression/XKtla/src/SymbolicRegression.jl:546
+┌ Warning: You are using multithreading mode, but only one thread is available. Try starting julia with `--threads=auto`.
+└ @ SymbolicRegression ~/.julia/packages/SymbolicRegression/XKtla/src/SymbolicRegression.jl:546
+┌ Warning: Recreating population (output=2, population=3), as the saved one doesn't have the correct number of members.
+└ @ SymbolicRegression ~/.julia/packages/SymbolicRegression/XKtla/src/SymbolicRegression.jl:700
+┌ Warning: The call to compilecache failed to create a usable precompiled cache file for SymbolicRegression [8254be44-1295-4e6a-a16d-46603ac705cb]
+│   exception = Required dependency Requires [ae029012-a4dd-5104-9daa-d747884805df] failed to load from a cache file.
+└ @ Base loading.jl:1055
+  Activating environment at `~/.julia/environments/pysr-0.16.3/Project.toml`
