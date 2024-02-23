@@ -1,5 +1,68 @@
 #!/usr/bin/env bash
 
+# --------------- Wed Feb 21 --------------------------
+
+# sbatch -J reg_h20 --partition gpu train.sh --hidden_dim 20
+# sbatch -J f2l2_2 --partition gpu train.sh --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 14 --f2_variant pysr_residual --l1_reg both_weights --l1_coeff 2 --seed 1
+
+# sbatch -J prod --partition ellis train.sh --f1_variant products
+# sbatch -J prod --partition ellis train.sh --f1_variant products --l1_reg weights --l1_coeff 0.2
+# sbatch -J prod --partition ellis train.sh --f1_variant products --l1_reg weights --l1_coeff 2 --seed 1
+sbatch -J prod --partition gpu train.sh --f1_variant products --l1_reg weights --l1_coeff 10
+
+# ------------------- Mon Feb 19 -------------------------
+# sbatch -J f2l2_s2 --partition gpu train.sh --l1_reg both_weights --l1_coeff 0.2
+# sbatch -J f2l2_s02 --partition gpu train.sh --l1_reg both_weights --l1_coeff 0.2 --f2_depth 0
+# sbatch -J f2l2_s-12 --partition gpu train.sh --l1_reg both_weights --l1_coeff 0.2 --f2_depth -1
+# sbatch -J f2l2_s0 --partition gpu train.sh --f2_depth 0
+# sbatch -J f2l2_s-1 --partition gpu train.sh --f2_depth -1
+
+# sbatch -J new_it2 --partition ellis train.sh --f2_variant ifthen2
+# sbatch -J new_it2 --partition ellis train.sh --f2_variant ifthen2 --l1_reg both_weights --l1_coeff 0.2
+# sbatch -J new_it2 --partition gpu train.sh --f2_variant ifthen2 --l1_reg both_weights --l1_coeff 2
+# sbatch -J new_it2 --partition gpu train.sh --f2_variant ifthen2 --f2_depth 0
+# sbatch -J new_it2 --partition gpu train.sh --f2_variant ifthen2 --f2_depth -1
+
+# sbatch -J f2l2_p --partition gpu train.sh --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 14 --f2_variant pysr_residual --l1_reg both_weights --l1_coeff 2
+# sbatch -J f2l2_p --partition gpu train.sh --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 14 --f2_variant pysr_residual --l1_reg both_weights --l1_coeff 0.2
+# sbatch -J f2l2_p0 --partition gpu train.sh --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 14 --f2_variant pysr_residual --l1_reg both_weights --l1_coeff 0.2 --f2_depth 0
+# sbatch -J f2l2_p-1 --partition gpu train.sh --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 14 --f2_variant pysr_residual --l1_reg both_weights --l1_coeff 0.2 --f2_depth -1
+# sbatch -J f2h20_p --partition gpu train.sh - a-load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 14 --f2_variant pysr_residual --l1_reg both_weights --l1_coeff 0.2 --hidden_dim 20
+
+# ------------------- Fri Feb 16 -------------------------
+# sbatch -J ifthen --partition ellis train.sh --f2_variant ifthen
+# sbatch -J ifthen2 --partition ellis train.sh --f2_variant ifthen2
+# sbatch -J ifthen --partition gpu train.sh --f2_variant ifthen --lr 1e-4
+# sbatch -J ifthen --partition gpu train.sh --f2_variant ifthen --lr 1e-4
+
+# sbatch -J f2l2_s --partition gpu train.sh --l1_reg both_weights --l1_coeff 2
+# sbatch -J f2l2_s0 --partition gpu train.sh --l1_reg both_weights --l1_coeff 2 --f2_depth 0
+# sbatch -J f2l2_s-1 --partition gpu train.sh --l1_reg both_weights --l1_coeff 2 --f2_depth -1
+
+
+# ------------------- Thu Feb 15 -------------------------
+# sbatch -J rand_fr --partition ellis train.sh --f1_variant random_frozen --no_bias --seed 0
+# sbatch -J rand_fr --partition ellis train.sh --f1_variant random_frozen --no_bias --seed 1
+
+# sbatch -J prod --partition ellis train.sh --f1_variant products --l1_reg weights --l1_coeff 2
+
+# sbatch -J bimt --partition gpu train.sh --f1_variant bimt
+# sbatch -J ifthen --partition gpu train.sh --f2_variant ifthen
+# sbatch -J ifthen2 --partition gpu train.sh --f2_variant ifthen2
+
+# sbatch -J 2res --partition gpu train.sh --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 2 --f2_variant pysr_residual
+# sbatch -J 14res --partition gpu train.sh --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 14 --f2_variant pysr_residual
+# sbatch -J 25res --partition gpu train.sh --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 25 --f2_variant pysr_residual
+# sbatch -J 60res --partition gpu train.sh --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 60 --f2_variant pysr_residual
+
+# sbatch -J f2l2 --partition gpu train.sh --load 21101 --f2_variant 'new'
+# sbatch -J f2l2 --partition gpu train.sh --load 21101 --f2_variant 'new' --l1_reg f2_weights --l1_coeff 0.2
+# sbatch -J f2l2 --partition gpu train.sh --load 21101 --f2_variant 'new' --l1_reg f2_weights --l1_coeff 2
+
+# sbatch -J f2l2 --partition gpu train.sh --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 14 --f2_variant pysr_residual --l1_reg f2_weights --l1_coeff 0.2
+# sbatch -J f2l2 --partition gpu train.sh --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 14 --f2_variant pysr_residual --l1_reg f2_weights --l1_coeff 2
+
+
 
 # -------------------- Tue 1/30 jobs --------------------------
 
@@ -20,11 +83,6 @@
 # sbatch -J lin22 --partition gpu --mem 100G train.sh --f1_variant mlp --f2_variant linear
 
 # sbatch -J f2_reg02 --partition gpu --mem 100G train.sh --l1_reg f2_weights --l1_coeff 0.2
-
-# sbatch -J 2res --partition gpu train.sh --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 2 --pysr_f2_residual
-# sbatch -J 14res --partition gpu train.sh --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 14 --pysr_f2_residual
-# sbatch -J 25res --partition gpu train.sh --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 25 --pysr_f2_residual
-# sbatch -J 60res --partition gpu train.sh --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 60 --pysr_f2_residual
 
 # sbatch -J rand --partition gpu train.sh --f1_variant random --no_bias
 # sbatch -J rand_fr --partition gpu train.sh --f1_variant random_frozen --no_bias

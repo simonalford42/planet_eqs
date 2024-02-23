@@ -10,38 +10,49 @@ import numpy as np
 import torch.nn.functional as F
 
 
+class Products(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x):
+        # x: [..., d]
+        # returns: [..., d * d]
+        x = torch.einsum('... i, ... j -> ... ij', x, x)
+        x = einops.rearrange(x, '... i j -> ... (i j)')
+        return x
+
 # instead of sigmoid and sum, use a softmax.
 # sum over predicates is 1, decrease temperature over training so it specializes
 # make it not worry about std - set to constant, etc
 # lower lr, train longer
 
-
-
 class IfThenNN(nn.Module):
+    # predicates are mlp's, bodies are mlp's
     def __init__(self, n_preds, in_dim, out_dim, hidden_dim, n_layers):
         super().__init__()
         self.n_preds = n_preds
         self.mlp = mlp(in_dim, n_preds * (1 + out_dim), hidden_dim, n_layers)
 
-    def forward(self, x):
+    def forward(self, x, temperature=1):
         out = self.mlp(x)
         preds = out[..., :self.n_preds]
         bodies = out[..., self.n_preds:]
         bodies = einops.rearrange(bodies, '... (n o) -> ... n o', n=self.n_preds)
-        preds = torch.sigmoid(preds)
+        preds = F.softmax(preds / temperature, dim=-1)
         return torch.einsum('... n, ... n o -> ... o', preds, bodies)
 
 
 class IfThenNN2(nn.Module):
+    # predicates are mlp's, bodies are constants
     def __init__(self, n_preds, in_dim, out_dim, hidden_dim, n_layers):
         super().__init__()
         self.n_preds = n_preds
         self.mlp = mlp(in_dim, n_preds, hidden_dim, n_layers)
         self.bodies = nn.Parameter(torch.randn(n_preds, out_dim))
 
-    def forward(self, x):
+    def forward(self, x, temperature=1):
         preds = self.mlp(x)
-        preds = torch.sigmoid(preds)
+        preds = F.softmax(preds / temperature, dim=-1)
         return torch.einsum('... n, n o -> ... o', preds, self.bodies)
 
 
@@ -162,11 +173,11 @@ class MaskedLinear(nn.Module):
         return F.linear(x, weight, self.linear.bias)
 
 
-def pruned_linear(linear: nn.Linear, k=None, threshold=None, debug=None):
-    if k is not None:
+def pruned_linear(linear: nn.Linear, top_k=None, threshold=None, debug=None):
+    if top_k is not None:
         mask = torch.zeros_like(linear.weight)
         for r in range(linear.weight.shape[0]):
-            _, ixs = torch.topk(linear.weight[r].abs(), k=k)
+            _, ixs = torch.topk(linear.weight[r].abs(), k=top_k)
             mask[r][ixs] = 1
     elif threshold is not None:
         mask = torch.zeros_like(linear.weight)
