@@ -14,6 +14,7 @@ from parse_swag_args import parse
 import utils
 import modules
 from modules import mlp
+import torch.nn as nn
 
 rand = lambda lo, hi: np.random.rand()*(hi-lo) + lo
 irand = lambda lo, hi: int(np.random.rand()*(hi-lo) + lo)
@@ -80,8 +81,8 @@ if args['load']:
     model = spock_reg_model.load(args['load'])
     # spock_reg_model.update_l1_model(model)
 
-    if 'prune_f1_topk' in args and args['prune_f1_topk'] is not None:
-        model.feature_nn = modules.pruned_linear(model.feature_nn, k=args['prune_f1_topk'])
+    if 'prune_f1_topk' in args and args['prune_f1_topk'] is not None and args['f1_variant'] != 'pruned_products':
+        model.feature_nn = modules.pruned_linear(model.feature_nn, top_k=args['prune_f1_topk'])
         model.l1_reg_weights = args['l1_reg'] == 'weights'
     elif 'prune_f1_threshold' in args and args['prune_f1_threshold'] is not None:
         model.feature_nn = modules.pruned_linear(model.feature_nn, threshold=args['prune_f1_threshold'])
@@ -151,8 +152,10 @@ model.load_state_dict(torch.load(checkpointer.best_model_path)['state_dict'])
 model.make_dataloaders()
 
 # loading models with pt lightning sometimes doesnt work, so lets also save the feature_nn and regress_nn directly
-torch.save(model.feature_nn, f'models/{args["version"]}_feature_nn.pt')
-torch.save(model.regress_nn, f'models/{args["version"]}_regress_nn.pt')
+if 'pysr' not in args['f1_variant']:
+    torch.save(model.feature_nn, f'models/{args["version"]}_feature_nn.pt')
+if 'pysr' not in args['f2_variant']:
+    torch.save(model.regress_nn, f'models/{args["version"]}_regress_nn.pt')
 if args['f2_variant'] == 'pysr_residual':
     torch.save(model.regress_nn.module1, f'models/{args["version"]}_pysr_nn.pt')
     torch.save(model.regress_nn.module2, f'models/{args["version"]}_base_nn.pt')

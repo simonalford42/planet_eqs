@@ -35,7 +35,7 @@ def parse():
     parser.add_argument('--pysr_model_selection', type=str, default='best', help='best, accuracy, score, or ix')
     parser.add_argument('--sr_f1', action='store_true', default=False, help='do misc. stuff with f1 and SR')
     parser.add_argument('--f1_variant', type=str, default='linear',
-                        choices=['zero', 'identity', 'pysr', 'pysr_frozen', 'random_features', 'linear', 'mean_cov', 'mlp', 'random', 'random_frozen', 'bimt', 'products'])
+                        choices=['zero', 'identity', 'pysr', 'pysr_frozen', 'random_features', 'linear', 'mean_cov', 'mlp', 'random', 'random_frozen', 'bimt', 'products', 'products2', 'pruned_products'])
     parser.add_argument('--l1_reg', type=str, choices=['inputs', 'weights', 'f2_weights', 'both_weights'], default=None)
     parser.add_argument('--l1_coeff', type=float, default=None)
     parser.add_argument('--cyborg_max_pysr_ix', default=None, type=int, help='indices up to and including the max index will be replaced with the pysr features')
@@ -67,6 +67,7 @@ def parse():
     parser.add_argument('--no_bias', action='store_true')
     parser.add_argument('--n_predicates', default=10, type=int)
     parser.add_argument('--pruned_debug', default=None, type=str, choices=['1','2','3','4','5','6'])
+    parser.add_argument('--freeze_f1', action='store_true')
 
     args = parser.parse_args()
 

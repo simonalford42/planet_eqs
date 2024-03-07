@@ -369,6 +369,12 @@ class VarModel(pl.LightningModule):
             c = 2
         summary_dim = hparams['latent'] * c + int(self.fix_megno) * 2
 
+        if hparams['f1_variant'] == 'pruned_products':
+            summary_dim = hparams['lantent'] * hparams['latent'] * c + int(self.fix_megno) * 2
+
+        if 'freeze_f1' in hparams and hparams['freeze_f1']:
+            utils.freeze_module(self.feature_nn)
+
         self.regress_nn = self.get_regress_nn(hparams, summary_dim)
 
         self.input_noise_logvar = nn.Parameter(torch.zeros(self.n_features)-2)
@@ -481,6 +487,10 @@ class VarModel(pl.LightningModule):
             linear = nn.Linear(self.n_features * self.n_features, hparams['latent'],
                                bias='no_bias' not in hparams or not hparams['no_bias'])
             return nn.Sequential(modules.Products(), linear)
+        elif hparams['f1_variant'] == 'products2':
+            linear = nn.Linear(self.n_features + 36, hparams['latent'],
+                               bias='no_bias' not in hparams or not hparams['no_bias'])
+            return nn.Sequential(modules.Products2(), linear)
         elif hparams['f1_variant'] in ['random', 'random_frozen']:
             feature_nn = nn.Linear(self.n_features, hparams['latent'], bias='no_bias' not in hparams or not hparams['no_bias'])
             # make the linear projection random combinations of two input variables, with coefficients from U[-1, 1]
@@ -495,6 +505,12 @@ class VarModel(pl.LightningModule):
                 feature_nn = modules.pruned_linear(feature_nn, k=2)
 
             return feature_nn
+        elif hparams['f1_variant'] == 'pruned_products':
+            model = load(hparams['load'])
+            linear = model.feature_nn
+            return nn.Sequential(
+                modules.pruned_linear(linear, top_k=hparams['prune_f1_topk']),
+                modules.Products())
         else:
             assert hparams['f1_variant'] == 'mlp'
             return modules.mlp(self.n_features, hparams['latent'], hparams['hidden_dim'], hparams['f1_depth'])
@@ -836,6 +852,57 @@ class VarModel(pl.LightningModule):
 
     def summary_kl(self):
         return self._summary_kl.sum()
+
+    def generate_f2_ifthen_inputs_and_targets(self, batch):
+        x, _ = batch
+        noisy_val = False
+
+        if self.fix_megno or self.fix_megno2:
+            if self.fix_megno:
+                megno_avg_std = self.summarize_megno(x)
+            #(batch, 2)
+            x = self.zero_megno(x)
+
+        if not self.include_mmr:
+            x = self.zero_mmr(x)
+
+        if not self.include_nan:
+            x = self.zero_nan(x)
+
+        if not self.include_eplusminus:
+            x = self.zero_eplusminus(x)
+
+        if 'zero_theta' in self.hparams and self.hparams['zero_theta'] != 0:
+            x = self.zero_theta(x)
+
+        if self.random_sample:
+            x = self.augment(x)
+        #x is (batch, time, feature)
+        if noisy_val:
+            x = self.add_input_noise(x)
+
+        summary_stats = self.compute_summary_stats(x)
+
+        if self.fix_megno:
+            summary_stats = torch.cat([summary_stats, megno_avg_std], dim=1)
+
+        self._cur_summary = summary_stats
+
+        #summary is (batch, feature)
+        self._summary_kl = (1/2) * (
+                summary_stats**2
+                + torch.exp(self.summary_noise_logvar)[None, :]
+                - self.summary_noise_logvar[None, :]
+                - 1
+            )
+
+        if noisy_val:
+            summary_stats = self.add_summary_noise(summary_stats)
+
+        # B, n_preds
+        preds = self.regress_nn.preds(summary_stats)
+
+        return summary_stats, preds
 
     def generate_f1_inputs_and_targets(self, batch):
         X_sample, y_sample = batch

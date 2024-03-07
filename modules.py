@@ -10,6 +10,28 @@ import numpy as np
 import torch.nn.functional as F
 
 
+class Products2(nn.Module):
+    def __init__(self):
+        super().__init__()
+        # [a1, e1], [a2, e2], [a3, e3]
+        self.arg1s = [[8, 9], [17, 18], [26, 27]]
+        # [sin/cos of angles for planet 1, planet 2, planet3]
+        self.arg2s = [[11, 12, 13, 14, 15, 16], [20, 21, 22, 23, 24, 25], [29, 30, 31, 32, 33, 34]]
+        self.products = []
+        for a, b in zip(self.arg1s, self.arg2s):
+            for i in a:
+                for j in b:
+                    self.products.append((i, j))
+
+        self.products = torch.tensor(self.products)
+
+    def forward(self, x):
+        # return all of the normal features, as well as the specified products
+        products = x[..., self.products[:, 0]] * x[..., self.products[:, 1]]
+        # x is [B, N, d] and products is [B, N, 36]. go to [B, N, d + 36]
+        return torch.cat([x, products], dim=-1)
+
+
 class Products(nn.Module):
     def __init__(self):
         super().__init__()
@@ -54,6 +76,10 @@ class IfThenNN2(nn.Module):
         preds = self.mlp(x)
         preds = F.softmax(preds / temperature, dim=-1)
         return torch.einsum('... n, n o -> ... o', preds, self.bodies)
+
+    def preds(self, x, temperature=1):
+        preds = self.mlp(x)
+        return F.softmax(preds / temperature, dim=-1)
 
 
 def mlp(in_n, out_n, hidden, layers, act='relu'):
@@ -174,6 +200,7 @@ class MaskedLinear(nn.Module):
 
 
 def pruned_linear(linear: nn.Linear, top_k=None, threshold=None, debug=None):
+    print('l2', linear)
     if top_k is not None:
         mask = torch.zeros_like(linear.weight)
         for r in range(linear.weight.shape[0]):
