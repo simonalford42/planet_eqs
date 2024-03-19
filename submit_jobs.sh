@@ -1,9 +1,36 @@
 #!/usr/bin/env bash
 
+# ---------------------- Mon Mar 18 ---------------------
+
+# sbatch -J prune2 --partition gpu prune_train.sh --prune_f1_topk 2 --latent 10
+# sbatch -J prune2 --partition gpu prune_train.sh --prune_f1_topk 2 --latent 5
+# sbatch -J prune2 --partition gpu prune_train.sh --prune_f1_topk 2 --prune_f1_topn 10 --latent 40
+# sbatch -J prune2 --partition gpu prune_train.sh --prune_f1_topk 2 --prune_f1_topn 10 --latent 20
+# sbatch -J prune2 --partition gpu prune_train.sh --prune_f1_topk 2 --prune_f1_topn 10
+# sbatch -J prune2 --partition gpu prune_train.sh --prune_f1_topk 2 --prune_f1_topn 5
+
+# ---------------------- Fri Mar 15 ---------------------
+
+# sbatch -J prune --partition gpu prune_train.sh --prune_f1_topk 1
+# sbatch -J prune --partition gpu prune_train.sh --prune_f1_topk 2
+# sbatch -J prune --partition gpu prune_train.sh --prune_f1_topk 3
+
+# ---------------------- Thu Mar 7 ----------------------
+
+# sbatch -J ifthen_pysr2 --partition ellis --mem 200G --time 08:00:00 sr.sh --version 42423 --target f2_ifthen --time_in_hours 1
+# sbatch -J ifthen_pysr2 --partition gpu --mem 200G --time 08:00:00 sr.sh --version 42423 --target f2_ifthen --time_in_hours 6
+
+# sbatch -J prod2 --partition gpu train.sh --f1_variant products2 --l1_reg weights --l1_coeff 2
+
+# sbatch -J pruneprod --partition gpu train.sh --load 95944 --prune_f1_topk 2 --f1_variant pruned_products --l1_reg weights --l1_coeff 2
+
+# sbatch -J prune --partition gpu prune_train.sh --total_steps 300000
+# sbatch -J prune --partition gpu prune_train.sh --total_steps 150000
+
 # --------------- Fri Mar 1 ------------------------
 
-# sbatch -J ifthen_pysr --partition gpu --mem 100G --time 08:00:00 sr.sh --version 42423 --target f2_ifthen --time_in_hours 1
-# sbatch -J ifthen_pysr --partition gpu --mem 100G --time 08:00:00 sr.sh --version 42423 --target f2_ifthen --time_in_hours 6
+# sbatch -J ifthen_pysr2 --partition ellis --mem 200G --time 08:00:00 sr.sh --version 42423 --target f2_ifthen --time_in_hours 1
+# sbatch -J ifthen_pysr2 --partition gpu --mem 200G --time 08:00:00 sr.sh --version 42423 --target f2_ifthen --time_in_hours 6
 
 # sbatch -J prod2 --partition gpu train.sh --f1_variant products2
 # sbatch -J prod2 --partition gpu train.sh --f1_variant products2 --l1_reg weights --l1_coeff 0.2

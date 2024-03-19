@@ -63,10 +63,8 @@ def parse():
     parser.add_argument('--pysr_f2', type=str, default=None) # PySR model to load and replace f2 with, e.g. 'sr_resuls/hall_of_fame_f2_21101_0_1.pkl'
     parser.add_argument('--eval', action='store_true')
     parser.add_argument('--prune_f1_topk', type=int, default=None)
-    parser.add_argument('--prune_f1_threshold', type=float, default=None)
-    parser.add_argument('--no_bias', action='store_true')
+    parser.add_argument('--prune_f1_topn', type=int, default=None)
     parser.add_argument('--n_predicates', default=10, type=int)
-    parser.add_argument('--pruned_debug', default=None, type=str, choices=['1','2','3','4','5','6'])
     parser.add_argument('--freeze_f1', action='store_true')
 
     args = parser.parse_args()

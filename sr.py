@@ -38,7 +38,7 @@ def get_f1_inputs_and_targets(args):
     return inputs, targets
 
 
-def get_f2_inputs_and_targets(args, N=500):
+def get_f2_inputs_and_targets(args, N=250):
     model = spock_reg_model.load(version=args.version, seed=args.seed)
     model.make_dataloaders()
     model.eval()
@@ -62,7 +62,7 @@ def get_f2_inputs_and_targets(args, N=500):
 def import_Xy(args, included_ixs):
     inputs, targets =  get_f1_inputs_and_targets(args)
 
-    N = 500
+    N = 250
     X = rearrange(inputs, 'B T F -> (B T) F')
     y = rearrange(targets, 'B T F -> (B T) F')
     ixs = np.random.choice(X.shape[0], size=N, replace=False)
@@ -81,7 +81,7 @@ def import_Xy(args, included_ixs):
 
 
 def import_Xy_f2(args):
-    N = 500
+    N = 250
     # [B, 40] and [B, 2] and [B, ]
     X, y, stds =  get_f2_inputs_and_targets(args, N=N/args.std_percent_threshold)
 
@@ -97,7 +97,7 @@ def import_Xy_f2(args):
     return X, y
 
 def import_Xy_f2_ifthen(args):
-    N = 500
+    N = 250
     # [B, 40] and [B, 2] and [B, ]
     X, y = get_f2_ifthen_inputs_and_targets(args, N=N)
 
@@ -203,6 +203,7 @@ def run_pysr(args):
 
     model = pysr.PySRRegressor(**pysr_config)
     model.fit(X, y, variable_names=variables)
+    print('Done running pysr')
 
     losses = [min(eqs['loss']) for eqs in model.equation_file_contents_]
     if not args.no_log:

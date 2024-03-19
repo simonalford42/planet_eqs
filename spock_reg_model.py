@@ -478,7 +478,7 @@ class VarModel(pl.LightningModule):
         elif hparams['f1_variant'] == 'zero':
             return modules.ZeroNN(in_n=self.n_features, out_n=hparams['latent'])
         elif hparams['f1_variant'] == 'linear':
-            return nn.Linear(self.n_features, hparams['latent'], bias='no_bias' not in hparams or not hparams['no_bias'])
+            return nn.Linear(self.n_features, hparams['latent'], bias=False)
         elif hparams['f1_variant'] == 'bimt':
             return bimt.BioMLP(in_dim=self.n_features, out_dim=hparams['latent'])
         elif hparams['f1_variant'] == 'mean_cov':

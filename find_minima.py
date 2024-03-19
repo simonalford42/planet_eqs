@@ -82,10 +82,7 @@ if args['load']:
     # spock_reg_model.update_l1_model(model)
 
     if 'prune_f1_topk' in args and args['prune_f1_topk'] is not None and args['f1_variant'] != 'pruned_products':
-        model.feature_nn = modules.pruned_linear(model.feature_nn, top_k=args['prune_f1_topk'])
-        model.l1_reg_weights = args['l1_reg'] == 'weights'
-    elif 'prune_f1_threshold' in args and args['prune_f1_threshold'] is not None:
-        model.feature_nn = modules.pruned_linear(model.feature_nn, threshold=args['prune_f1_threshold'])
+        model.feature_nn = modules.pruned_linear(model.feature_nn, top_k=args['prune_f1_topk'], top_n=args['prune_f1_topn'])
         model.l1_reg_weights = args['l1_reg'] == 'weights'
 
     if args['pysr_f2']:
