@@ -239,6 +239,11 @@ def spock_features(X):
     y = einops.rearrange(y, 'n B -> B n')
     return y
 
+def test_pysr():
+    included_indices = get_sr_included_ixs()
+    X, _ = import_Xy(included_indices)
+    # X = torch.ones((500, 31))
+    y = spock_features(X)
 
 def parse_args():
     # Instantiate the parser
