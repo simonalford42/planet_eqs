@@ -1,5 +1,15 @@
 #!/usr/bin/env bash
 
+# ---------------------- Tue Mar 19 ---------------------
+
+sbatch -J bimt --partition gpu train.sh --f1_variant linear --f2_variant bimt
+sbatch -J baseline --partition gpu train.sh --f1_variant linear
+
+# sbatch -J prune2 --partition gpu prune_train.sh --prune_f1_topk 2 --prune_f1_topn 5 --latent 40
+# sbatch -J prune2 --partition gpu prune_train.sh --prune_f1_topk 2 --prune_f1_topn 10 --latent 80
+# sbatch -J prune2 --partition gpu prune_train.sh --prune_f1_topk 2 --prune_f1_topn 5 --latent 80
+# sbatch -J prune2 --partition gpu prune_train.sh --prune_f1_topk 2 --prune_f1_topn 10 --latent 160
+
 # ---------------------- Mon Mar 18 ---------------------
 
 # sbatch -J prune2 --partition gpu prune_train.sh --prune_f1_topk 2 --latent 10
