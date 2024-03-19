@@ -819,18 +819,20 @@ class VarModel(pl.LightningModule):
 
         return -total_loss.sum(1)
 
-    def lossfnc(self, x, y, samples=1, noisy_val=True):
+    def lossfnc(self, x, y, samples=1, noisy_val=True, include_reg=True):
         testy = self(x, noisy_val=noisy_val)
         n_samp = y.shape[0]
         loss = self._lossfnc(testy, y).sum()
-        if self.l1_reg_inputs:
-            loss = loss + self.hparams['l1_coeff'] * self.inputs_mask.l1_cost()
-        if self.l1_reg_weights:
-            l1_cost = sum([p.abs().sum() for p in self.feature_nn.parameters()])
-            loss = loss + self.hparams['l1_coeff'] * l1_cost
-        if self.l1_reg_f2_weights:
-            l1_cost = sum([p.abs().sum() for p in self.regress_nn.parameters()])
-            loss = loss + self.hparams['l1_coeff'] * l1_cost
+
+        if include_reg:
+            if self.l1_reg_inputs:
+                loss = loss + self.hparams['l1_coeff'] * self.inputs_mask.l1_cost()
+            if self.l1_reg_weights:
+                l1_cost = sum([p.abs().sum() for p in self.feature_nn.parameters()])
+                loss = loss + self.hparams['l1_coeff'] * l1_cost
+            if self.l1_reg_f2_weights:
+                l1_cost = sum([p.abs().sum() for p in self.regress_nn.parameters()])
+                loss = loss + self.hparams['l1_coeff'] * l1_cost
         return loss
 
     def input_kl(self):
@@ -926,7 +928,7 @@ class VarModel(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         X_sample, y_sample = batch
-        loss = self.lossfnc(X_sample, y_sample, noisy_val=self.hparams['noisy_val'])/self.test_len
+        loss = self.lossfnc(X_sample, y_sample, noisy_val=self.hparams['noisy_val'], include_reg=False)/self.test_len
 
         return {'val_loss': loss}
 
@@ -1106,7 +1108,7 @@ class SWAGModel(VarModel):
         else:
             tmp = self.flatten()
             self.load(self.w_avg)
-            swa_loss = self.lossfnc(X_sample, y_sample, noisy_val=self.hparams['noisy_val'])/self.test_len
+            swa_loss = self.lossfnc(X_sample, y_sample, noisy_val=self.hparams['noisy_val'], include_reg=False)/self.test_len
             self.load(tmp)
 
         return {'val_loss': loss, 'swa_loss': swa_loss}
