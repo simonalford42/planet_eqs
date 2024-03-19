@@ -95,7 +95,8 @@ if args['load']:
     if args['f2_variant'] == 'pysr_residual':
         pysr_net = modules.PySRNet(args['pysr_f2'], args['pysr_model_selection'])
         utils.freeze_module(pysr_net)
-        base_net = mlp(args['latent'] * 2, 2, args['hidden_dim'], args['f2_depth'])
+        #base_net = mlp(args['latent'] * 2, 2, args['hidden_dim'], args['f2_depth'])
+        base_net = modules.BioMLP(args['latent'] * 2, 2, args['hidden_dim'], args['f2_depth'])
         model.regress_nn = modules.SumModule(pysr_net, base_net)
         model.l1_reg_f2_weights = args['l1_reg'] in ['f2_weights', 'both_weights']
     elif args['f2_variant'] == 'new':

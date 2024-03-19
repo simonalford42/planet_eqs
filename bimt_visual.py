@@ -58,10 +58,25 @@ def main():
 
 if __name__ == '__main__':
     main()
-    #16760 (epoch 1948)
-    #476 (epoch 1948)
-    #19307 (epoch 1548)
-    #29002 (epoch 1548)
 
-    #27223 (f1:linear, f2:bimt)
+    """
+    Runs:
+
+    16760 (epoch 1948)
+    476 (epoch 1948)
+    19307 (epoch 1548)
+    29002 (epoch 1548)
+
+    27223 (f1:linear, f2:bimt)
+    11891 (f1:linear, f2:bimt)
     
+    2547731 (f1: linear, f2: pysr_residual (base - bimt)) (7501 epochs) --> 250 (2563532) val_loss_no_reg = 2.10
+
+    2826851 (f1: linear, f2: mlp (40 hidden dim)) (1250 epochs) --> 17530 val_loss_no_reg = 2.12
+    2547714 (f1: linear, f2: bimt (40 hidden dim)) (1250 epochs) --> 27548 (2563531) val_loss_no_reg = 2.12
+    2826853 (f1: linear, f2: bimt (120 hidden dim)) (1250 epochs) --> 28437 val_loss_no_reg = 2.13
+
+    2882295 (f1: linear, f2: mlp (20 hidden dim)) (1250 epochs) --> 
+    
+    """
+

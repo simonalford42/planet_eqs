@@ -60,7 +60,7 @@ def parse():
     parser.add_argument('--mean_var', action='store_true')
     parser.add_argument('--load', type=str, default=None, help='ckpt path to load, e.g. model.ckpt')
 
-    parser.add_argument('--pysr_f2', type=str, default=None) # PySR model to load and replace f2 with, e.g. 'sr_resuls/hall_of_fame_f2_21101_0_1.pkl'
+    parser.add_argument('--pysr_f2', type=str, default=None) # PySR model to load and replace f2 with, e.g. 'sr_results/hall_of_fame_f2_21101_0_1.pkl'
     parser.add_argument('--eval', action='store_true')
     parser.add_argument('--prune_f1_topk', type=int, default=None)
     parser.add_argument('--prune_f1_threshold', type=float, default=None)
