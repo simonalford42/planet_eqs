@@ -14,6 +14,7 @@ from parse_swag_args import parse
 import utils
 import modules
 from modules import mlp
+import torch.nn as nn
 
 rand = lambda lo, hi: np.random.rand()*(hi-lo) + lo
 irand = lambda lo, hi: int(np.random.rand()*(hi-lo) + lo)
@@ -37,9 +38,9 @@ print(command)
 args = {
     'seed': parse_args.seed,
     'batch_size': batch_size,
-    'in': 1,
+    'f1_depth': 1,
     'swa_lr': parse_args.lr/2,
-    'out': parse_args.f2_depth,
+    'f2_depth': parse_args.f2_depth,
     'samp': 5,
     'swa_start': epochs//2,
     'weight_decay': 1e-14,
@@ -80,8 +81,8 @@ if args['load']:
     model = spock_reg_model.load(args['load'])
     # spock_reg_model.update_l1_model(model)
 
-    if 'prune_f1_topk' in args and args['prune_f1_topk'] is not None:
-        model.feature_nn = modules.pruned_linear(model.feature_nn, k=args['prune_f1_topk'])
+    if 'prune_f1_topk' in args and args['prune_f1_topk'] is not None and args['f1_variant'] != 'pruned_products':
+        model.feature_nn = modules.pruned_linear(model.feature_nn, top_k=args['prune_f1_topk'])
         model.l1_reg_weights = args['l1_reg'] == 'weights'
     elif 'prune_f1_threshold' in args and args['prune_f1_threshold'] is not None:
         model.feature_nn = modules.pruned_linear(model.feature_nn, threshold=args['prune_f1_threshold'])
@@ -95,8 +96,12 @@ if args['load']:
     if args['f2_variant'] == 'pysr_residual':
         pysr_net = modules.PySRNet(args['pysr_f2'], args['pysr_model_selection'])
         utils.freeze_module(pysr_net)
-        base_net = mlp(args['latent'] * 2, 2, args['hidden'], args['out'])
+        base_net = mlp(args['latent'] * 2, 2, args['hidden_dim'], args['f2_depth'])
         model.regress_nn = modules.SumModule(pysr_net, base_net)
+        model.l1_reg_f2_weights = args['l1_reg'] in ['f2_weights', 'both_weights']
+    elif args['f2_variant'] == 'new':
+        model.regress_nn = modules.mlp(model.regress_nn[0].in_features, 2, model.hparams['hidden_dim'], model.hparams['f2_depth'])
+        model.l1_reg_f2_weights = args['l1_reg'] in ['f2_weights', 'both_weights']
 
     if args['eval']:
         model.disable_optimization()
@@ -147,7 +152,12 @@ model.load_state_dict(torch.load(checkpointer.best_model_path)['state_dict'])
 model.make_dataloaders()
 
 # loading models with pt lightning sometimes doesnt work, so lets also save the feature_nn and regress_nn directly
-torch.save(model.feature_nn, f'models/{args["version"]}_feature_nn.pt')
-torch.save(model.regress_nn, f'models/{args["version"]}_regress_nn.pt')
+if 'pysr' not in args['f1_variant']:
+    torch.save(model.feature_nn, f'models/{args["version"]}_feature_nn.pt')
+if 'pysr' not in args['f2_variant']:
+    torch.save(model.regress_nn, f'models/{args["version"]}_regress_nn.pt')
+if args['f2_variant'] == 'pysr_residual':
+    torch.save(model.regress_nn.module1, f'models/{args["version"]}_pysr_nn.pt')
+    torch.save(model.regress_nn.module2, f'models/{args["version"]}_base_nn.pt')
 
 print('Finished running')

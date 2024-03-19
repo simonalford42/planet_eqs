@@ -138,24 +138,6 @@ def log1minus(x):
     return torch.log1p(-x.exp())
 
 
-class NoLogRun():
-    def __setitem__(self, key, item):
-        pass
-
-    def __getitem__(self, key):
-        class NoLogRunInner():
-            def log(self, *args, **kwargs):
-                pass
-
-            def upload(self, *args, **kwards):
-                pass
-
-        return NoLogRunInner()
-
-    def stop(self):
-        pass
-
-
 def compare_tensors(t1, t2):
     # (a, b, c, d), (a, b, c, d) -> (a, b, c, 2d)
     plot_tensor(torch.cat((t1, t2), dim=-1))

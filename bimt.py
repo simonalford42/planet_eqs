@@ -71,15 +71,16 @@ class BioMLP(nn.Module):
         self.original_params = None
 
     def forward(self, x):
-        B, T, d = x.shape
-        x = einops.rearrange(x, 'B T d -> (B T) d')
+        # B, T, d = x.shape
+        # x = einops.rearrange(x, 'B T d -> (B T) d')
 
         shp = x.shape
         in_fold = self.linears[0].in_fold
         x = x.reshape(shp[0], in_fold, int(shp[1]/in_fold))
         x = x[:,:,self.in_perm.long()]
         x = x.reshape(shp[0], shp[1])
-        f = torch.nn.SiLU()
+        # f = torch.nn.SiLU()
+        f = torch.nn.ReLU()
         for i in range(self.depth-1):
             x = f(self.linears[i](x))
         x = self.linears[-1](x)
@@ -89,7 +90,7 @@ class BioMLP(nn.Module):
         x = x[:,out_perm_inv]
         #x = x[:,self.out_perm]
 
-        x = einops.rearrange(x, '(B T) n -> B T n', B=B, T=T)
+        # x = einops.rearrange(x, '(B T) n -> B T n', B=B, T=T)
 
         return x
 
