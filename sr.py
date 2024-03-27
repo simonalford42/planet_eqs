@@ -111,7 +111,7 @@ def get_sr_included_ixs():
     return included_ixs
 
 
-def run_pysr(args):
+def run_pysr(xx, yy, args):
     id = random.randint(0, 100000)
     while os.path.exists(f'sr_results/{id}.pkl'):
         id = random.randint(0, 100000)
@@ -166,6 +166,8 @@ def run_pysr(args):
         X, y = import_Xy_f2(args)
         n = X.shape[1] // 2
         variables = [f'm{i}' for i in range(n)] + [f's{i}' for i in range(n)]
+    else:
+        X, y = xx, yy
 
     model = pysr.PySRRegressor(**pysr_config)
     model.fit(X, y, variable_names=variables)
@@ -182,7 +184,6 @@ def run_pysr(args):
         print(f"An error occurred while trying to delete the backup files: {e}")
 
     print(f'Saved to path: {path}')
-
 
 def variable_names(included_ixs):
     return [LABELS[ix] for ix in included_ixs]
@@ -250,6 +251,151 @@ def plot_pareto(path):
     plt.savefig('pareto.png')
 
 
+
+
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+# can try slope of previous to current, angles, first & last, random, etc.
+def choose_topk(self, version, top_k):
+    path = f'sr_results/{version}.pkl'
+    results = pickle.load(open(path, 'rb')) 
+    results = results.equations_[0]
+    x = results['complexity']
+    y = results['loss']
+    sorted_indices = np.argsort(x) # Sort the points by complexity (x)
+    x_sorted = np.array(x)[sorted_indices]
+    y_sorted = np.array(y)[sorted_indices]
+    slopes = np.diff(y_sorted) / np.diff(x_sorted)
+    slope_changes = np.abs(np.diff(slopes))
+    greatest_inflection_indices = np.argsort(slope_changes)[-top_k:]
+    top_k_points = [(x_sorted[i+1], y_sorted[i+1]) for i in greatest_inflection_indices]
+    return top_k_points
+
+
+def import_Xy_f2_direct(args):
+    N = 250
+
+    model = spock_reg_model.load(version=args.version, seed=args.seed)
+    model.make_dataloaders()
+    model.eval()
+
+    all_inputs, all_targets = [], []
+    data_iterator = iter(model.train_dataloader())
+    while sum([len(i) for i in all_inputs]) < N:
+        # just takes a random batch of inputs and passes them through the neural network
+        batch = next(data_iterator)
+        x, y = batch
+        # inputs to f2
+        summary_stats = model.forward_to_summary_only(x)
+        all_inputs.append(summary_stats)
+        # ground truth targets
+        all_targets.append(y)
+
+    # [B, 40] and [B, 2]
+    X = rearrange(all_inputs, 'l B ... -> (l B) ...')
+    y = rearrange(all_targets, 'l B ... -> (l B) ...')
+
+    ixs = np.random.choice(X.shape[0], size=N, replace=False)
+    X, y = X[ixs], y[ixs]
+    X, y = X.detach().numpy(), y.detach().numpy()
+
+    return X, y
+
+
+def import_Xy_f2_residual(args, model):
+    N = 250
+
+    model = spock_reg_model.load(version=args.version, seed=args.seed)
+    model.make_dataloaders()
+    model.eval()
+
+    all_inputs, all_targets, all_preds = [], [], []
+    data_iterator = iter(model.train_dataloader())
+    while sum([len(i) for i in all_inputs]) < N:
+        # just takes a random batch of inputs and passes them through the neural network
+        batch = next(data_iterator)
+        x, y = batch
+
+        # inputs to f2
+        summary_stats = model.forward_to_summary_only(x)
+        all_inputs.append(summary_stats)
+
+        # ground truth targets
+        all_targets.append(y)
+
+        # residual target predictions
+        y_preds = model(x, noisy_val=False)
+        all_preds.append(model(x, noisy_val=False))
+
+    # [B, 40] and [B, 2] and [B, 2]
+    X = rearrange(all_inputs, 'l B ... -> (l B) ...')
+    y = rearrange(all_targets, 'l B ... -> (l B) ...')
+    y_preds = rearrange(all_preds, 'l B ... -> (l B) ...')
+    # calculate the residual target: whatever of the target not explained by the preds
+    y = y - y_preds
+
+    ixs = np.random.choice(X.shape[0], size=N, replace=False)
+    X, y = X[ixs], y[ixs]
+    X, y = X.detach().numpy(), y.detach().numpy()
+
+    return X, y
+
+
+def load_pysr_module_list(filepath, model_selection):
+    if model_selection in ['best', 'accuracy', 'score']:
+        return nn.ModuleList(pysr.PySRRegressor.from_file(filepath, model_selection=model_selection).pytorch())
+    else:
+        reg = pysr.PySRRegressor.from_file(filepath)
+        # find the ixs with closest complexity equal to model_selection
+        ixs = []
+        for i in range(reg.nout_):
+            ix = np.argmin(np.abs(reg.equations_[i]['complexity'] - int(model_selection)))
+            ixs.append(ix)
+
+        print('PySR model selection ixs: ', ixs)
+        return nn.ModuleList(reg.pytorch(index=ixs))
+    
+"""
+for i in range(num_iters):
+    1) Run PySR on data
+        run_pysr(version=21101, target=direct) (this first round would use import_Xy_direct)
+        21101 is the version of the model with the desired f1 network
+        Output is model 87543.pkl, results, etc.
+    2) Construct pareto front and choose top_k models from the pareto front.
+        complexities = choose_topk(version=87543, top_k=top_k)
+        complexities might be [4, 8, 12]: gives the complexity of the models that we're choosing
+        note: for loading the residual model of a certain complexity, you can look at the code in modules.py
+    3) for each model chosen, calculate a separate residual.
+        for complexity in complexities:
+            load_pysr_module_list(path, model_selection)
+            run_pysr(version=21101, target=residual, residual_model=87543.pkl, complexity=4) (this round would use import_Xy_residual)
+    4) Next iteration of loop to get residual of residual
+"""
+def boosted_regression(num_iters, top_k, args):
+    for i in range(num_iters):
+        if i == 0:
+            X, y = import_Xy_f2_direct(args)
+            model_version = run_pysr(X, y, args) #target is direct
+        else:
+            complexities = choose_topk(args.version, top_k=top_k)
+            for complexity in complexities:
+
+                residual_model = load_pysr_module_list(args, model_selection=complexity)
+                
+                X, y = import_Xy_f2_residual(args, residual_model)
+
+                model_version = run_pysr(X, y, args) #target is residual
+
+        args.version = model_version
+
+
 if __name__ == '__main__':
     args = parse_args()
     run_pysr(args)
+
+    num_iters = 5
+    top_k = 3
+    boosted_regression(num_iters, top_k, args)
