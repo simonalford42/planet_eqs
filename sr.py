@@ -211,9 +211,11 @@ def run_pysr(args):
                    'losses': losses,
                    })
 
-    # delete the backup files
     try:
+        # delete the backup files
         subprocess.run(f'rm {path[:-4]}.csv.out*.bkup', shell=True, check=True)
+        # delete julia files: julia-1911988-17110333239-0016.out
+        subprocess.run(f'rm julia*.out', shell=True, check=True)
     except subprocess.CalledProcessError as e:
         print(f"An error occurred while trying to delete the backup files: {e}")
 
@@ -257,7 +259,7 @@ def parse_args():
 
     parser.add_argument('--time_in_hours', type=float, default=1)
     parser.add_argument('--max_size', type=int, default=30)
-    parser.add_argument('--target', type=str, default='f1', choices=['f1', 'f2', 'f2_ifthen'])
+    parser.add_argument('--target', type=str, default='f1', choices=['f1', 'f2', 'f2_ifthen', 'direct'])
     # use the bottom % of stds to target sr on higher confidence predictions
     parser.add_argument('--std_percent_threshold', type=float, default=1)
 

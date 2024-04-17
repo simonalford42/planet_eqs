@@ -19,7 +19,6 @@ import einops
 from utils import assert_equal
 import utils
 import modules
-import bimt
 
 
 def load(version, seed=0):
@@ -54,13 +53,13 @@ class BioLinear(nn.Module):
         self.out_coordinates = torch.tensor(list(np.linspace(1/(2*out_dim_fold), 1-1/(2*out_dim_fold), num=out_dim_fold))*out_fold, dtype=torch.float) # place output neurons in 1D Euclidean space
         self.input = None
         self.output = None
-        
+
     def forward(self, x):
         self.input = x.clone()
         self.output = self.linear(x).clone()
         return self.output
-    
-    
+
+
 class BioMLP(nn.Module):
     # BioMLP is just MLP, but each neuron comes with coordinates.
     def __init__(self, in_dim=2, out_dim=2, w=2, depth=2, shp=None, token_embedding=False, embedding_size=None):
@@ -70,7 +69,7 @@ class BioMLP(nn.Module):
             self.in_dim = in_dim
             self.out_dim = out_dim
             self.depth = depth
-                 
+
         else:
             self.in_dim = shp[0]
             self.out_dim = shp[-1]
@@ -80,16 +79,16 @@ class BioMLP(nn.Module):
         for i in range(self.depth):
             if i == 0:
                 linear_list.append(BioLinear(shp[i], shp[i+1], in_fold=1))
-                
+
             else:
                 linear_list.append(BioLinear(shp[i], shp[i+1]))
         self.linears = nn.ModuleList(linear_list)
-        
-        
+
+
         if token_embedding == True:
             # embedding size: number of tokens * embedding dimension
             self.embedding = torch.nn.Parameter(torch.normal(0,1,size=embedding_size))
-        
+
         self.shp = shp
         # parameters for the bio-inspired trick
         self.l0 = 0.1 # distance between two nearby layers
@@ -105,7 +104,7 @@ class BioMLP(nn.Module):
         if x.dim() > 2:
             rearranged = True
             B, T, d = x.shape
-            x = einops.rearrange(x, 'B T d -> (B T) d')        
+            x = einops.rearrange(x, 'B T d -> (B T) d')
 
         shp = x.shape
         in_fold = self.linears[0].in_fold
@@ -120,7 +119,7 @@ class BioMLP(nn.Module):
         out_perm_inv = torch.zeros(self.out_dim, dtype=torch.long)
         out_perm_inv[self.out_perm.long()] = torch.arange(self.out_dim)
         x = x[:, out_perm_inv]
-        
+
         if rearranged:
             x = einops.rearrange(x, '(B T) n -> B T n', B=B, T=T)
 
@@ -128,7 +127,7 @@ class BioMLP(nn.Module):
 
     def get_linear_layers(self):
         return self.linears
-    
+
     def get_cc(self, weight_factor=1.0, bias_penalize=True, no_penalize_last=False):
         # compute connection cost
         # bias_penalize = True penalizes biases, otherwise doesn't penalize biases
@@ -147,10 +146,10 @@ class BioMLP(nn.Module):
             cc += torch.sum(torch.abs(self.embedding)*(self.l0))
             #pass
         return cc
-    
+
     def swap_weight(self, weights, j, k, swap_type="out"):
         # Given a weight matrix, swap the j^th and k^th neuron in inputs/outputs when swap_type = "in"/"out"
-        with torch.no_grad():  
+        with torch.no_grad():
             if swap_type == "in":
                 temp = weights[:,j].clone()
                 weights[:,j] = weights[:,k].clone()
@@ -161,16 +160,16 @@ class BioMLP(nn.Module):
                 weights[k] = temp
             else:
                 raise Exception("Swap type {} is not recognized!".format(swap_type))
-            
+
     def swap_bias(self, biases, j, k):
         # Given a bias vector, swap the j^th and k^th neuron.
-        with torch.no_grad():  
+        with torch.no_grad():
             temp = biases[j].clone()
             biases[j] = biases[k].clone()
             biases[k] = temp
-    
+
     def swap(self, i, j, k):
-        # in the ith layer (of neurons), swap the jth and the kth neuron. 
+        # in the ith layer (of neurons), swap the jth and the kth neuron.
         # Note: n layers of weights means n+1 layers of neurons.
         linears = self.get_linear_layers()
         num_linear = len(linears)
@@ -222,7 +221,7 @@ class BioMLP(nn.Module):
         #print(score.shape)
         top_index = torch.flip(torch.argsort(score),[0])[:top_k]
         return top_index
-    
+
     def relocate_ij(self, i, j):
         # In the ith layer (of neurons), relocate the jth neuron
         linears = self.get_linear_layers()
@@ -238,20 +237,20 @@ class BioMLP(nn.Module):
             self.swap(i,j,k)
         k = torch.argmin(torch.stack(ccs))
         self.swap(i,j,k)
-            
+
     def relocate_i(self, i):
         # Relocate neurons in the ith layer
         top_id = self.get_top_id(i, top_k=self.top_k)
         for j in top_id:
             self.relocate_ij(i,j)
-            
+
     def relocate(self):
         # Relocate neurons in the whole model
         linears = self.get_linear_layers()
         num_linear = len(linears)
         for i in range(num_linear+1):
             self.relocate_i(i)
-            
+
     def plot(self):
         fig, ax = plt.subplots(figsize=(3,3))
         #ax = plt.gca()
@@ -292,9 +291,9 @@ class BioMLP(nn.Module):
                 else:
                     for j in range(fold_num):
                         plt.plot([1/(2*p_shp[0])+i/p_shp[0], 1/(2*fold_num)+j/fold_num], [0.1*(ii+1),0.1*ii], lw=0.5*np.abs(p[i,j].detach().numpy()), color="blue" if p[i,j]>0 else "red")
-                    
+
         ax.axis('off')
-        
+
     def thresholding(self, threshold, checkpoint = True):
         # snap too small weights (smaller than threshold) to zero. Useful for pruning.
         num = 0
@@ -305,7 +304,7 @@ class BioMLP(nn.Module):
                 num += torch.sum(torch.abs(param)>threshold)
                 param.data = param*(torch.abs(param)>threshold)
         return num
-                
+
     def intervening(self, i, pos, value, ptype="weight", checkpoint = True):
         if checkpoint:
             self.original_params = [param.clone() for param in self.parameters()]
@@ -314,7 +313,7 @@ class BioMLP(nn.Module):
                 self.linears[i].linear.weight[pos] = value
             elif ptype == "bias":
                 self.linears[i].linear.bias[pos] = value
-                
+
     def revert(self):
         with torch.no_grad():
             for param, original_param in zip(self.parameters(), self.original_params):
@@ -545,7 +544,8 @@ def get_data(
     n_t = trainX.shape[1]
     n_features = trainX.shape[2]
 
-    if train_ssX:
+    needs_training = train_ssX or 'train_ssX' in kwargs and kwargs['train_ssX']
+    if needs_training:
         ssX.fit(trainX.reshape(-1, n_features)[::1539])
 
     ttrainy = trainy
@@ -685,7 +685,7 @@ class VarModel(pl.LightningModule):
 
         else:
             assert hparams['f1_variant'] == 'mlp'
-            self.feature_nn = modules.mlp(self.n_features, hparams['latent'], hparams['hidden'], hparams['in'])
+            self.feature_nn = modules.mlp(self.n_features, hparams['latent'], hparams['hidden_dim'], hparams['in'])
         self.feature_nn = self.get_feature_nn(hparams)
 
         self.l1_reg_inputs = 'l1_reg' in hparams and hparams['l1_reg'] == 'inputs'
@@ -711,10 +711,6 @@ class VarModel(pl.LightningModule):
 
         self.regress_nn = self.get_regress_nn(hparams, summary_dim)
 
-        #self.regress_nn = mlp(hparams['latent']*2 + int(self.fix_megno)*2, 2, hparams['hidden'], hparams['out'])
-        #self.regress_nn = BioMLP(in_dim=hparams['latent']*2 + int(self.fix_megno)*2, depth=2, w=hparams['hidden'], out_dim=hparams['out'])
-        self.regress_nn = BioMLP(summary_dim, 2, hparams['hidden'], hparams['out'])
-        #self.regress_nn = modules.mlp(summary_dim, 2, hparams['hidden'], hparams['out'])
         self.input_noise_logvar = nn.Parameter(torch.zeros(self.n_features)-2)
         self.summary_noise_logvar = nn.Parameter(torch.zeros(summary_dim) - 2) # add to summaries, not direct latents
         self.lowest = 0.5
@@ -764,8 +760,6 @@ class VarModel(pl.LightningModule):
             hparams['f2_variant'] = 'mlp'
         if 'load_f2' in hparams and hparams['load_f2'] is not None:
             return eval('load(' + hparams['load_f2'] + ')').regress_nn
-        elif 'pysr_f2' in hparams and hparams['pysr_f2'] is not None:
-            return modules.PySRNet(hparams['pysr_f2'], hparams['pysr_model_selection'])
         elif hparams['f1_variant'] == 'mean_cov':
             i = self.n_features
             if 'mean_var' in hparams and hparams['mean_var']:
@@ -787,7 +781,11 @@ class VarModel(pl.LightningModule):
         elif hparams['f2_variant'] == 'linear':
             return nn.Linear(summary_dim, 2)
         elif hparams['f2_variant'] == 'bimt':
-            return bimt.BioMLP(in_dim=summary_dim, depth=2, w=hparams['hidden_dim'], out_dim=hparams['f2_depth'])
+            return BioMLP(in_dim=summary_dim, depth=hparams['f2_depth']+2, w=hparams['hidden_dim'], out_dim=2)
+        elif hparams['f2_variant'] == 'pysr':
+            return modules.PySRNet(hparams['pysr_f2'], hparams['pysr_model_selection'])
+        elif hparams['f2_variant'] == 'pysr_residual':
+            pass
         else:
             return modules.mlp(summary_dim, 2, hparams['hidden_dim'], hparams['f2_depth'])
 
@@ -1181,6 +1179,7 @@ class VarModel(pl.LightningModule):
             if self.l1_reg_f2_weights:
                 l1_cost = sum([p.abs().sum() for p in self.regress_nn.parameters()])
                 loss = loss + self.hparams['l1_coeff'] * l1_cost
+
         return loss
 
     def input_kl(self):
@@ -1322,7 +1321,7 @@ class VarModel(pl.LightningModule):
         if self.hparams['f1_variant'] == 'bimt':
             reg = self.regress_nn.get_cc(bias_penalize=False, weight_factor=weight_factor)
             total_loss += lamb*reg
-            if self.hparams['steps'] % 200 == 0: 
+            if self.hparams['steps'] % 200 == 0:
                 self.regress_nn.relocate()
 
         tensorboard_logs = {'train_loss_no_reg': loss/len(X_sample),
