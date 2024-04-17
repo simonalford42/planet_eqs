@@ -19,7 +19,7 @@ def parse():
     parser.add_argument('--f', type=str, default=None, help='scapegoat for jupyter notebook')
 
     parser.add_argument('--no_log', action='store_true', default=False, help='disable wandb logging')
-    parser.add_argument('--no_swag', action='store_true')
+    parser.add_argument('--run_swag', action='store_true')
     parser.add_argument('--slurm_id', type=int, default=-1, help='slurm job id')
     parser.add_argument('--slurm_name', type=str, default='', help='slurm job name')
     parser.add_argument('--version', type=int, help='', default=1278)
@@ -35,7 +35,7 @@ def parse():
     parser.add_argument('--pysr_model_selection', type=str, default='best', help='best, accuracy, score, or ix')
     parser.add_argument('--sr_f1', action='store_true', default=False, help='do misc. stuff with f1 and SR')
     parser.add_argument('--f1_variant', type=str, default='linear',
-                        choices=['zero', 'identity', 'pysr', 'pysr_frozen', 'random_features', 'linear', 'mean_cov', 'mlp', 'random', 'random_frozen', 'bimt', 'products', 'products2', 'pruned_products'])
+                        choices=['zero', 'identity', 'pysr', 'pysr_frozen', 'random_features', 'linear', 'mean_cov', 'mlp', 'random', 'random_frozen', 'bimt', 'biolinear', 'products', 'products2', 'pruned_products'])
     parser.add_argument('--l1_reg', type=str, choices=['inputs', 'weights', 'f2_weights', 'both_weights'], default=None)
     parser.add_argument('--l1_coeff', type=float, default=None)
     parser.add_argument('--cyborg_max_pysr_ix', default=None, type=int, help='indices up to and including the max index will be replaced with the pysr features')
@@ -66,6 +66,7 @@ def parse():
     parser.add_argument('--prune_f1_topn', type=int, default=None)
     parser.add_argument('--n_predicates', default=10, type=int)
     parser.add_argument('--freeze_f1', action='store_true')
+    parser.add_argument('--tsurv', action='store_true')
 
     args = parser.parse_args()
 

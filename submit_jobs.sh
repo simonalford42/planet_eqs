@@ -1,5 +1,32 @@
 #!/usr/bin/env bash
 
+# ------------------------- Thu Mar 21 --------------------------
+
+# sbatch -J sr_bimt6 --partition ellis --mem 200G --time 08:00:00 sr.sh --version 23219 --target f2 --time_in_hours 1
+# sbatch -J sr_bimt1 --partition ellis --mem 200G --time 08:00:00 sr.sh --version 23219 --target f2 --time_in_hours 6
+
+# sbatch -J sr_base6 --partition gpu --mem 200G --time 08:00:00 sr.sh --version 12646 --target f2 --time_in_hours 1
+# sbatch -J sr_base1 --partition gpu --mem 200G --time 08:00:00 sr.sh --version 12646 --target f2 --time_in_hours 6
+
+# sbatch -J 14res --partition gpu train.sh --load 21101 --pysr_f2 sr_results/hall_of_fame_f2_21101_0_1.pkl --pysr_model_selection 14 --f2_variant pysr_residual --l1_reg f2_weights --l1_coeff 2 --run_swag
+
+# sbatch -J 14_nores --partition gpu train.sh --load 21101 --pysr_f2 sr_results/hall_of_fame_f2_21101_0_1.pkl --pysr_model_selection 14 --run_swag --total_steps 0
+
+
+# ---------------------- Wed Mar 20 ---------------------
+
+# sbatch -J bimt --partition ellis train.sh --f1_variant linear --f2_variant bimt
+
+# ---------------------- Tue Mar 19 ---------------------
+
+# sbatch -J bimt --partition ellis train.sh --f1_variant linear --f2_variant bimt
+# sbatch -J baseline --partition ellis train.sh --f1_variant linear
+
+# sbatch -J prune2 --partition gpu prune_train.sh --prune_f1_topk 2 --prune_f1_topn 5 --latent 40
+# sbatch -J prune2 --partition gpu prune_train.sh --prune_f1_topk 2 --prune_f1_topn 10 --latent 80
+# sbatch -J prune2 --partition gpu prune_train.sh --prune_f1_topk 2 --prune_f1_topn 5 --latent 80
+# sbatch -J prune2 --partition gpu prune_train.sh --prune_f1_topk 2 --prune_f1_topn 10 --latent 160
+
 # ---------------------- Mon Mar 18 ---------------------
 
 # sbatch -J prune2 --partition gpu prune_train.sh --prune_f1_topk 2 --latent 10

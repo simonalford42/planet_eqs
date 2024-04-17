@@ -8,7 +8,7 @@ import einops
 import spock_reg_model
 import numpy as np
 import torch.nn.functional as F
-
+from petit20_survival_time import Tsurv
 
 class Products2(nn.Module):
     def __init__(self):

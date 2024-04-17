@@ -26,11 +26,14 @@ checkpoint_filename = utils.ckpt_path(parse_args.version, parse_args.seed)
 
 # Fixed hyperparams:
 TOTAL_STEPS = parse_args.total_steps
+if TOTAL_STEPS == 0:
+    import sys
+    sys.exit(0)
+
 TRAIN_LEN = 78660
 batch_size = 2000 #ilog_rand(32, 3200)
 steps_per_epoch = int(1+TRAIN_LEN/batch_size)
 epochs = int(1+TOTAL_STEPS/steps_per_epoch)
-print(f"epochs: {epochs}")
 
 command = utils.get_script_execution_command()
 print(command)

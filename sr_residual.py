@@ -46,22 +46,6 @@ for i in range(num_iters):
     # 2. choose the top_k models to try from the pareto front
     complexities = choose_topk(version=87543, top_k=top_k)
     # complexities might be [4, 8, 12]: gives the complexity of the models that we're choosing
-    # note: for loading the residual model of a certain complexity, you can look at the code at
-    # modules.py
-
-    # def load_pysr_module_list(filepath, model_selection):
-    #     if model_selection in ['best', 'accuracy', 'score']:
-    #         return nn.ModuleList(pysr.PySRRegressor.from_file(filepath, model_selection=model_selection).pytorch())
-    #     else:
-    #         reg = pysr.PySRRegressor.from_file(filepath)
-    #         # find the ixs with closest complexity equal to model_selection
-    #         ixs = []
-    #         for i in range(reg.nout_):
-    #             ix = np.argmin(np.abs(reg.equations_[i]['complexity'] - int(model_selection)))
-    #             ixs.append(ix)
-
-    #         print('PySR model selection ixs: ', ixs)
-    #         return nn.ModuleList(reg.pytorch(index=ixs))
 
     # 3. for each model, use it to calculate the residual
     for complexity in complexities:
