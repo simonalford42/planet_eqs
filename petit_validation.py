@@ -112,8 +112,8 @@ def tsurv_rmse(batch):
     return (testy - y).pow(2).sum()
 
 
-# just so we have access to the validation set
-model = load(65408)
+# to access the validation set and compute baseline
+model = load(19698)
 no_op_scaler = StandardScaler(with_mean=False, with_std=False)
 model.make_dataloaders(ssX=no_op_scaler, train_ssX=True)
 validation_set = model.val_dataloader()
@@ -122,10 +122,28 @@ validation_set = model.val_dataloader()
 # inspect closer.
 
 val_loss =  0
+model_val_loss = 0
+
 rmse = 0
+model_rmse = 0
+
+y_pred_tsurv_list = []
 for batch in validation_set:
-    val_loss = val_loss + tsurv_val_loss(batch).item()
+
+    X, y = batch
+    model_preds = model(X, noisy_val=False)
+    rmse = ((model_preds[:, 0] - y[:, 0])**2).sum().item()
+    model_rmse = model_rmse + rmse
+
+    testy = tsurv_with_std(X)
+    assert_equal(testy.shape, y.shape)
+    loss = _lossfnc(testy, y).sum()
+
+    val_loss = val_loss + loss
+
     rmse = rmse + tsurv_rmse(batch).item()
+
+    y_pred_tsurv_list += [(y, model__preds, testy)
 
 print('val loss: ', val_loss)
 print('rmse: ', rmse)

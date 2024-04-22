@@ -1167,7 +1167,6 @@ class VarModel(pl.LightningModule):
 
     def lossfnc(self, x, y, samples=1, noisy_val=True, include_reg=True):
         testy = self(x, noisy_val=noisy_val)
-        n_samp = y.shape[0]
         loss = self._lossfnc(testy, y).sum()
 
         if include_reg:
