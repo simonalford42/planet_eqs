@@ -74,11 +74,10 @@ def import_Xy(args, included_ixs):
     assert np.all(X[..., [i for i in range(len(LABELS)) if i not in included_ixs]] == 0)
 
     X = X[..., included_ixs]
-    assert_equal(X.shape, (500, len(included_ixs)))
-    assert_equal(y.shape[0], 500)
+    assert_equal(X.shape, (N, len(included_ixs)))
+    assert_equal(y.shape[0], N)
 
     return X, y
-
 
 def import_Xy_f2(args):
     N = 250
@@ -106,6 +105,74 @@ def import_Xy_f2_ifthen(args):
     X, y = X.detach().numpy(), y.detach().numpy()
 
     return X, y
+
+def import_Xy_f2_direct(args):
+    N = 250
+
+    model = spock_reg_model.load(version=args.version, seed=args.seed)
+    model.make_dataloaders()
+    model.eval()
+
+    all_inputs, all_targets = [], []
+    data_iterator = iter(model.train_dataloader())
+    while sum([len(i) for i in all_inputs]) < N:
+        # just takes a random batch of inputs and passes them through the neural network
+        batch = next(data_iterator)
+        x, y = batch
+        # inputs to f2
+        summary_stats = model.forward_to_summary_only(x)
+        all_inputs.append(summary_stats)
+        # ground truth targets
+        all_targets.append(y)
+
+    # [B, 40] and [B, 2]
+    X = rearrange(all_inputs, 'l B ... -> (l B) ...')
+    y = rearrange(all_targets, 'l B ... -> (l B) ...')
+
+    ixs = np.random.choice(X.shape[0], size=N, replace=False)
+    X, y = X[ixs], y[ixs]
+    X, y = X.detach().numpy(), y.detach().numpy()
+
+    return X, y
+
+def import_Xy_f2_residual(args, model):
+    N = 250
+
+    model = spock_reg_model.load(version=args.version, seed=args.seed)
+    model.make_dataloaders()
+    model.eval()
+
+    all_inputs, all_targets, all_preds = [], [], []
+    data_iterator = iter(model.train_dataloader())
+    while sum([len(i) for i in all_inputs]) < N:
+        # just takes a random batch of inputs and passes them through the neural network
+        batch = next(data_iterator)
+        x, y = batch
+
+        # inputs to f2
+        summary_stats = model.forward_to_summary_only(x)
+        all_inputs.append(summary_stats)
+
+        # ground truth targets
+        all_targets.append(y)
+
+        # residual target predictions
+        preds = model(x, noisy_val=False)
+        all_preds.append(model(x, noisy_val=False))
+
+    # [B, 40] and [B, 2] and [B, 2]
+    X = rearrange(all_inputs, 'l B ... -> (l B) ...')
+    y = rearrange(all_targets, 'l B ... -> (l B) ...')
+    y_preds = rearrange(all_preds, 'l B ... -> (l B) ...')
+    # calculate the residual target: whatever of the target not explained by the preds
+    y = y - y_preds
+
+    ixs = np.random.choice(X.shape[0], size=N, replace=False)
+    X, y = X[ixs], y[ixs]
+    X, y = X.detach().numpy(), y.detach().numpy()
+
+    return X, y
+
 
 def get_f2_ifthen_inputs_and_targets(args, N):
     model = spock_reg_model.load(version=args.version, seed=args.seed)
