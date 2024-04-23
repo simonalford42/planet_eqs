@@ -80,42 +80,9 @@ name = 'full_swag_pre_' + checkpoint_filename
 # logger = TensorBoardLogger("tb_logs", name=name)
 logger = WandbLogger(project='bnn-chaos-model', entity='bnn-chaos-model', name=name, mode='disabled' if args['no_log'] else 'online')
 checkpointer = ModelCheckpoint(filepath=checkpoint_filename + '/{version}')
-if args['load']:
-    model = spock_reg_model.load(args['load'])
-    # spock_reg_model.update_l1_model(model)
 
-    if 'prune_f1_topk' in args and args['prune_f1_topk'] is not None and args['f1_variant'] != 'pruned_products':
-        model.feature_nn = modules.pruned_linear(model.feature_nn, top_k=args['prune_f1_topk'], top_n=args['prune_f1_topn'])
-        model.l1_reg_weights = args['l1_reg'] == 'weights'
-
-    if args['pysr_f2']:
-        model.regress_nn = modules.PySRNet(args['pysr_f2'], args['pysr_model_selection'])
-        if args['f1_variant'] == 'pysr_frozen':
-            utils.freeze_module(model.regress_nn)
-
-    if args['f2_variant'] == 'pysr_residual':
-        pysr_net = modules.PySRNet(args['pysr_f2'], args['pysr_model_selection'])
-        utils.freeze_module(pysr_net)
-        base_net = mlp(args['latent'] * 2, 2, args['hidden_dim'], args['f2_depth'])
-        model.regress_nn = modules.SumModule(pysr_net, base_net)
-        model.l1_reg_f2_weights = args['l1_reg'] in ['f2_weights', 'both_weights']
-    elif args['f2_variant'] == 'new':
-        model.regress_nn = modules.mlp(model.regress_nn[0].in_features, 2, model.hparams['hidden_dim'], model.hparams['f2_depth'])
-        model.l1_reg_f2_weights = args['l1_reg'] in ['f2_weights', 'both_weights']
-
-    if args['eval']:
-        model.disable_optimization()
-
-    # trying to prevent nans from happening
-    model.input_noise_logvar = torch.nn.Parameter(torch.zeros(model.input_noise_logvar.shape)-2)
-    model.summary_noise_logvar = torch.nn.Parameter(torch.zeros(model.summary_noise_logvar.shape) - 2) # add to summaries, not direct latents
-
-
-else:
-    model = spock_reg_model.VarModel(args)
-    model.make_dataloaders()
-
-labels = ['time', 'e+_near', 'e-_near', 'max_strength_mmr_near', 'e+_far', 'e-_far', 'max_strength_mmr_far', 'megno', 'a1', 'e1', 'i1', 'cos_Omega1', 'sin_Omega1', 'cos_pomega1', 'sin_pomega1', 'cos_theta1', 'sin_theta1', 'a2', 'e2', 'i2', 'cos_Omega2', 'sin_Omega2', 'cos_pomega2', 'sin_pomega2', 'cos_theta2', 'sin_theta2', 'a3', 'e3', 'i3', 'cos_Omega3', 'sin_Omega3', 'cos_pomega3', 'sin_pomega3', 'cos_theta3', 'sin_theta3', 'm1', 'm2', 'm3', 'nan_mmr_near', 'nan_mmr_far', 'nan_megno']
+model = spock_reg_model.VarModel(args)
+model.make_dataloaders()
 
 max_l2_norm = args['gradient_clip']*sum(p.numel() for p in model.parameters() if p.requires_grad)
 trainer = Trainer(
@@ -130,6 +97,9 @@ trainer = Trainer(
 logger.log_hyperparams(params=args)
 
 try:
+    print(model.feature_nn)
+    print(model.regress_nn)
+    assert False
     trainer.fit(model)
 except ValueError as e:
     print('Error while training')
