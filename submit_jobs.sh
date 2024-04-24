@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+# ------------------------- Wed Apr 24 --------------------------
+
+sbatch -J linear --partition gpu train.sh --f1_variant linear --run_swag
+sbatch -J mlp --partition gpu train.sh --f1_variant mlp --run_swag
+
 # ------------------------- Thu Mar 21 --------------------------
 
 # sbatch -J sr_bimt6 --partition ellis --mem 200G --time 08:00:00 sr.sh --version 23219 --target f2 --time_in_hours 1

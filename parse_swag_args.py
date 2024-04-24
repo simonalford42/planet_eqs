@@ -72,10 +72,10 @@ def parse():
     parser.add_argument('--load_f1_f2', type=str, default=None, help='ckpt path to load f1 and f2, e.g. model.ckpt')
 
     parser.add_argument('--pysr_f1', type=str, default=None, help='PySR model to load and replace f1 with, e.g. sr_results/hall_of_fame_9723_0.pkl')
-    parser.add_argument('--pysr_f1_model_selection', type=str, default='best', help='best, accuracy, score, or ix')
+    parser.add_argument('--pysr_f1_model_selection', type=str, default='best', help='best, accuracy, score, or complexity')
 
     parser.add_argument('--pysr_f2', type=str, default=None) # PySR model to load and replace f2 with, e.g. 'sr_resuls/hall_of_fame_f2_21101_0_1.pkl'
-    parser.add_argument('--pysr_f2_model_selection', type=str, default='best', help='best, accuracy, score, or ix')
+    parser.add_argument('--pysr_f2_model_selection', type=str, default='best', help='best, accuracy, score, or complexity')
 
     parser.add_argument('--f2_residual', type=str, default=None, choices=[None, 'pysr', 'mlp'])
     parser.add_argument('--pysr_f2_residual', type=str, default=None)# PySR model to load for f2 residual , e.g. 'sr_resuls/hall_of_fame_f2_21101_0_1.pkl'

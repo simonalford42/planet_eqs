@@ -97,9 +97,6 @@ trainer = Trainer(
 logger.log_hyperparams(params=args)
 
 try:
-    print(model.feature_nn)
-    print(model.regress_nn)
-    assert False
     trainer.fit(model)
 except ValueError as e:
     print('Error while training')

@@ -9,16 +9,16 @@ LABELS = ['time', 'e+_near', 'e-_near', 'max_strength_mmr_near', 'e+_far', 'e-_f
 
 def tsurv_inputs(x):
     '''
-    X: [41] tensor of inputs
+    X: [T, 41] tensor of inputs
     returns: tuple of inputs (nu12, nu23, masses)
     '''
     # semimajor axes at each time step
     # petit paper is the average over the 10k orbits
     ixs = {'a1': 8, 'a2': 17, 'a3': 26, 'm1': 35, 'm2': 36, 'm3': 37}
-    a1, a2, a3 = x[ixs['a1']], x[ixs['a2']], x[ixs['a3']]
+    a1, a2, a3 = x[:, ixs['a1']].mean(), x[:, ixs['a2']].mean(), x[:, ixs['a3']].mean()
     nu12 = (a1 / a2) ** (3 / 2)
     nu23 = (a2 / a3) ** (3 / 2)
-    masses = [x[ixs['m1']], x[ixs['m2']], x[ixs['m3']]]
+    masses = [x[0, ixs['m1']], x[0, ixs['m2']], x[0, ixs['m3']]]
     return (nu12, nu23, masses)
 
 
@@ -27,8 +27,7 @@ def tsurv(x):
     x: [B, T, 41] batch of inputs
     returns: [B, ] prediction of instability time for each inputs
     '''
-    # we only need locations at T=0
-    x = x[:, 0, :] # [B, 41]
+    x = x[:, :] # [B, 41]
     preds = [Tsurv(*tsurv_inputs(xi)) for xi in x]
     preds = np.array(preds)
     preds = np.nan_to_num(preds, posinf=1e9, neginf=1e9, nan=1e9)
@@ -40,15 +39,7 @@ def tsurv(x):
     return torch.tensor(preds)
 
 
-def tsurv_with_std(x):
-    '''
-    x: [B, T, 41]
-    returns [B, 2] prediction of instability time for each inputs, and dummy std 0
-    '''
-    t = tsurv(x)
-    return torch.stack([t, torch.zeros_like(t)], dim=-1)
-
-
+# copied from spock_reg_model.py
 def safe_log_erf(x):
     base_mask = x < -1
     value_giving_zero = torch.zeros_like(x, device=x.device)
@@ -63,6 +54,7 @@ def safe_log_erf(x):
 
     return f_under(x_under) + f_over(x_over)
 
+# copied from spock_reg_model.py
 def _lossfnc(testy, y):
     mu = testy[:, [0]]
     std = testy[:, [1]]
@@ -97,26 +89,19 @@ def _lossfnc(testy, y):
 
     return -total_loss.sum(1)
 
-def tsurv_val_loss(batch):
-    X, y = batch
-    testy = tsurv_with_std(X)
-    assert_equal(testy.shape, y.shape)
-    loss = _lossfnc(testy, y).sum()
-    return loss
-
-def tsurv_rmse(batch):
-    X, y = batch
-    testy = tsurv(X)
-    y = y[:, 0]
-    assert_equal(testy.shape, y.shape)
-    return (testy - y).pow(2).sum()
-
 
 # to access the validation set and compute baseline
-model = load(19698)
+model = load(12646)
 no_op_scaler = StandardScaler(with_mean=False, with_std=False)
+# the no op scalar will not do anything even if we train it,
+# but we need to train it so we can use it
 model.make_dataloaders(ssX=no_op_scaler, train_ssX=True)
-validation_set = model.val_dataloader()
+tsurv_validation_set = model.val_dataloader()
+# remake the dataloaders with data of correct scaling for NN
+model = load(12646)
+model.make_dataloaders()
+model_validation_set = model.val_dataloader()
+
 
 # maybe some predictions are completely off.
 # inspect closer.
@@ -127,25 +112,54 @@ model_val_loss = 0
 rmse = 0
 model_rmse = 0
 
-y_pred_tsurv_list = []
-for batch in validation_set:
+# store a list of (x, y_actual, y_model_pred, y_tsurv_pred)
+x_store, y_store, y_model_store, y_tsurv_store = [], [], [], []
+N = 0
+n_batches = 0
+for tsurv_batch, model_batch in zip(tsurv_validation_set, model_validation_set):
+    n_batches += 1
+    N += len(model_batch[0])
+    model_X, model_y = model_batch
+    tsurv_X, tsurv_y = tsurv_batch
+    torch.testing.assert_close(model_y, tsurv_y)
 
-    X, y = batch
-    model_preds = model(X, noisy_val=False)
-    rmse = ((model_preds[:, 0] - y[:, 0])**2).sum().item()
+    model_preds = model(model_X, noisy_val=False)
+    rmse = (model_preds[:, 0] - model_y[:, 0]).pow(2).sum().item()
     model_rmse = model_rmse + rmse
+    model_val_loss += _lossfnc(model_preds, model_y).sum()
 
-    testy = tsurv_with_std(X)
-    assert_equal(testy.shape, y.shape)
-    loss = _lossfnc(testy, y).sum()
+    tsurv_pred = tsurv(tsurv_X)
+    # add dummt std 0
+    testy = torch.stack([tsurv_pred, torch.zeros_like(tsurv_pred)], dim=-1)
+    assert_equal(testy.shape, tsurv_y.shape)
+    loss = _lossfnc(testy, tsurv_y).sum()
+    print(f'loss {loss}')
 
     val_loss = val_loss + loss
 
-    rmse = rmse + tsurv_rmse(batch).item()
+    rmse = rmse + (tsurv_pred - tsurv_y[:, 0]).pow(2).sum().item()
 
-    y_pred_tsurv_list += [(y, model__preds, testy)
+    for i in range(len(model_X)):
+        x_store.append(model_X[i])
+        y_store.append(model_y[i])
+        y_model_store.append(model_preds[i])
+        y_tsurv_store.append(tsurv_pred[i])
 
-print('val loss: ', val_loss)
-print('rmse: ', rmse)
+print(f'n batches {n_batches}')
+x_store = torch.stack(x_store)
+y_store = torch.stack(y_store)
+y_model_store = torch.stack(y_model_store)
+y_tsurv_store = torch.stack(y_tsurv_store)
+
+torch.save(x_store, 'x.pt')
+torch.save(y_store, 'y.pt')
+torch.save(y_model_store, 'y_model.pt')
+torch.save(y_tsurv_store, 'y_tsurv.pt')
+
+print('val loss: ', val_loss / N)
+print('model voss: ', model_val_loss / N)
+print('rmse: ', rmse / N)
+print('model rmse: ', model_rmse / N)
+
 
 

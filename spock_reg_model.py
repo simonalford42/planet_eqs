@@ -751,7 +751,6 @@ class VarModel(pl.LightningModule):
         return regress_nn
 
     def get_feature_nn(self, hparams):
-        print(hparams)
         feature_nn = None
         load_version = None
         if 'load_f1' in hparams and hparams['load_f1']:
