@@ -1,0 +1,82 @@
+julia_worker:9667#128.84.100.166
+slurmstepd: error: *** STEP 3140744.0 ON ellis-compute-01 CANCELLED AT 2024-04-12T17:54:39 ***
+
+signal (15): Terminated
+in expression starting at none:0
+< at ./float.jl:370 [inlined]
+> at ./operators.jl:305 [inlined]
+safe_pow at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/Operators.jl:44 [inlined]
+macro expansion at /home/elg227/.julia/packages/DynamicExpressions/KRT17/src/EvaluateEquation.jl:262 [inlined]
+macro expansion at ./simdloop.jl:77 [inlined]
+macro expansion at /home/elg227/.julia/packages/DynamicExpressions/KRT17/src/Utils.jl:54 [inlined]
+deg2_l0_r0_eval at /home/elg227/.julia/packages/DynamicExpressions/KRT17/src/EvaluateEquation.jl:261
+unknown function (ip: 0x7fbb9042ec46)
+_jl_invoke at /buildworker/worker/package_linux64/build/src/gf.c:2237 [inlined]
+jl_apply_generic at /buildworker/worker/package_linux64/build/src/gf.c:2419
+_eval_tree_array at /home/elg227/.julia/packages/DynamicExpressions/KRT17/src/EvaluateEquation.jl:117
+_eval_tree_array at /home/elg227/.julia/packages/DynamicExpressions/KRT17/src/EvaluateEquation.jl:134
+_eval_tree_array at /home/elg227/.julia/packages/DynamicExpressions/KRT17/src/EvaluateEquation.jl:119
+_eval_tree_array at /home/elg227/.julia/packages/DynamicExpressions/KRT17/src/EvaluateEquation.jl:134
+unknown function (ip: 0x7fbb904274f1)
+unknown function (ip: 0x7fbb904266a6)
+unknown function (ip: 0x7fbb90426623)
+#eval_tree_array#1 at /home/elg227/.julia/packages/DynamicExpressions/KRT17/src/EvaluateEquation.jl:65 [inlined]
+eval_tree_array##kw at /home/elg227/.julia/packages/DynamicExpressions/KRT17/src/EvaluateEquation.jl:62 [inlined]
+#eval_tree_array#1 at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/InterfaceDynamicExpressions.jl:57 [inlined]
+eval_tree_array at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/InterfaceDynamicExpressions.jl:57 [inlined]
+_eval_loss at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/LossFunctions.jl:48
+unknown function (ip: 0x7fbb90426374)
+unknown function (ip: 0x7fbb90425ef6)
+unknown function (ip: 0x7fbb90425e7e)
+#eval_loss#3 at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/LossFunctions.jl:101
+eval_loss##kw at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/LossFunctions.jl:100 [inlined]
+opt_func at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/ConstantOptimization.jl:17 [inlined]
+f at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/ConstantOptimization.jl:79 [inlined]
+#finite_difference_gradient!#10 at /home/elg227/.julia/packages/FiniteDiff/grio1/src/gradients.jl:320
+finite_difference_gradient! at /home/elg227/.julia/packages/FiniteDiff/grio1/src/gradients.jl:269 [inlined]
+g! at /home/elg227/.julia/packages/NLSolversBase/kavn7/src/objective_types/oncedifferentiable.jl:57
+unknown function (ip: 0x7fbb9045c506)
+_jl_invoke at /buildworker/worker/package_linux64/build/src/gf.c:2237 [inlined]
+jl_apply_generic at /buildworker/worker/package_linux64/build/src/gf.c:2419
+gradient!! at /home/elg227/.julia/packages/NLSolversBase/kavn7/src/interface.jl:63
+value_gradient! at /home/elg227/.julia/packages/NLSolversBase/kavn7/src/interface.jl:73
+update_g! at /home/elg227/.julia/packages/Optim/dBGGV/src/multivariate/optimize/optimize.jl:4 [inlined]
+optimize at /home/elg227/.julia/packages/Optim/dBGGV/src/multivariate/optimize/optimize.jl:59
+optimize at /home/elg227/.julia/packages/Optim/dBGGV/src/multivariate/optimize/optimize.jl:36 [inlined]
+#optimize#89 at /home/elg227/.julia/packages/Optim/dBGGV/src/multivariate/optimize/interface.jl:143 [inlined]
+optimize at /home/elg227/.julia/packages/Optim/dBGGV/src/multivariate/optimize/interface.jl:142 [inlined]
+_optimize_constants at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/ConstantOptimization.jl:86
+unknown function (ip: 0x7fbb90458371)
+unknown function (ip: 0x7fbb9044aff6)
+unknown function (ip: 0x7fbb9044af6c)
+dispatch_optimize_constants at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/ConstantOptimization.jl:64
+unknown function (ip: 0x7fbb9044a8d1)
+unknown function (ip: 0x7fbb90448e56)
+unknown function (ip: 0x7fbb90448dd2)
+optimize_constants at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/ConstantOptimization.jl:37
+unknown function (ip: 0x7fbb90448b51)
+unknown function (ip: 0x7fbb90448836)
+unknown function (ip: 0x7fbb90448653)
+optimize_and_simplify_population at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/SingleIteration.jl:114
+macro expansion at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/SymbolicRegression.jl:959 [inlined]
+#51 at /buildworker/worker/package_linux64/build/usr/share/julia/stdlib/v1.6/Distributed/src/macros.jl:87
+unknown function (ip: 0x7fbb90493fec)
+_jl_invoke at /buildworker/worker/package_linux64/build/src/gf.c:2237 [inlined]
+jl_apply_generic at /buildworker/worker/package_linux64/build/src/gf.c:2419
+jl_apply at /buildworker/worker/package_linux64/build/src/julia.h:1703 [inlined]
+do_apply at /buildworker/worker/package_linux64/build/src/builtins.c:675
+#107 at /buildworker/worker/package_linux64/build/usr/share/julia/stdlib/v1.6/Distributed/src/process_messages.jl:274
+run_work_thunk at /buildworker/worker/package_linux64/build/usr/share/julia/stdlib/v1.6/Distributed/src/process_messages.jl:63
+unknown function (ip: 0x7fbb90416b78)
+_jl_invoke at /buildworker/worker/package_linux64/build/src/gf.c:2237 [inlined]
+jl_apply_generic at /buildworker/worker/package_linux64/build/src/gf.c:2419
+run_work_thunk at /buildworker/worker/package_linux64/build/usr/share/julia/stdlib/v1.6/Distributed/src/process_messages.jl:72
+#100 at ./task.jl:417
+unknown function (ip: 0x7fbb9041670c)
+_jl_invoke at /buildworker/worker/package_linux64/build/src/gf.c:2237 [inlined]
+jl_apply_generic at /buildworker/worker/package_linux64/build/src/gf.c:2419
+jl_apply at /buildworker/worker/package_linux64/build/src/julia.h:1703 [inlined]
+start_task at /buildworker/worker/package_linux64/build/src/task.c:834
+unknown function (ip: (nil))
+Allocations: 338765380798 (Pool: 335750408365; Big: 3014972433); GC: 720162
+  Activating environment at `~/.julia/environments/pysr-0.16.3/Project.toml`

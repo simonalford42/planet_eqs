@@ -1,0 +1,57 @@
+julia_worker:9779#128.84.100.166
+slurmstepd: error: *** STEP 3140743.0 ON ellis-compute-01 CANCELLED AT 2024-04-12T17:54:45 ***
+
+signal (15): Terminated
+in expression starting at none:0
+unknown function (ip: 0x7fd61176cb9a)
+unknown function (ip: 0x7fd5fbf57681)
+any at /home/elg227/.julia/packages/DynamicExpressions/KRT17/src/base.jl:114
+any at /home/elg227/.julia/packages/DynamicExpressions/KRT17/src/base.jl:118
+any at /home/elg227/.julia/packages/DynamicExpressions/KRT17/src/base.jl:118
+any at /home/elg227/.julia/packages/DynamicExpressions/KRT17/src/base.jl:118
+any at /home/elg227/.julia/packages/DynamicExpressions/KRT17/src/base.jl:118
+unknown function (ip: 0x7fd5fbf575b5)
+unknown function (ip: 0x7fd5fbf57386)
+unknown function (ip: 0x7fd5fbf57310)
+flag_bin_operator_complexity at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/CheckConstraints.jl:10 [inlined]
+check_constraints at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/CheckConstraints.jl:76
+unknown function (ip: 0x7fd5fbf56fdf)
+unknown function (ip: 0x7fd5fbf52d86)
+unknown function (ip: 0x7fd5fbf51d2f)
+check_constraints at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/CheckConstraints.jl:70 [inlined]
+#next_generation#1 at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/Mutate.jl:203
+unknown function (ip: 0x7fd5fbf515de)
+unknown function (ip: 0x7fd5fbf4ce06)
+unknown function (ip: 0x7fd5fbf4c9b8)
+next_generation##kw at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/Mutate.jl:69 [inlined]
+reg_evol_cycle at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/RegularizedEvolution.jl:38
+unknown function (ip: 0x7fd5fbf4c6ee)
+unknown function (ip: 0x7fd5fbf4b4c6)
+unknown function (ip: 0x7fd5fbf4b181)
+#s_r_cycle#1 at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/SingleIteration.jl:43
+s_r_cycle##kw at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/SingleIteration.jl:28
+unknown function (ip: 0x7fd5fbfa7e52)
+_jl_invoke at /buildworker/worker/package_linux64/build/src/gf.c:2237 [inlined]
+jl_apply_generic at /buildworker/worker/package_linux64/build/src/gf.c:2419
+macro expansion at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/SymbolicRegression.jl:948 [inlined]
+#51 at /buildworker/worker/package_linux64/build/usr/share/julia/stdlib/v1.6/Distributed/src/macros.jl:87
+unknown function (ip: 0x7fd5fbfa762c)
+_jl_invoke at /buildworker/worker/package_linux64/build/src/gf.c:2237 [inlined]
+jl_apply_generic at /buildworker/worker/package_linux64/build/src/gf.c:2419
+jl_apply at /buildworker/worker/package_linux64/build/src/julia.h:1703 [inlined]
+do_apply at /buildworker/worker/package_linux64/build/src/builtins.c:675
+#107 at /buildworker/worker/package_linux64/build/usr/share/julia/stdlib/v1.6/Distributed/src/process_messages.jl:274
+run_work_thunk at /buildworker/worker/package_linux64/build/usr/share/julia/stdlib/v1.6/Distributed/src/process_messages.jl:63
+unknown function (ip: 0x7fd5fbf29b78)
+_jl_invoke at /buildworker/worker/package_linux64/build/src/gf.c:2237 [inlined]
+jl_apply_generic at /buildworker/worker/package_linux64/build/src/gf.c:2419
+run_work_thunk at /buildworker/worker/package_linux64/build/usr/share/julia/stdlib/v1.6/Distributed/src/process_messages.jl:72
+#100 at ./task.jl:417
+unknown function (ip: 0x7fd5fbf2970c)
+_jl_invoke at /buildworker/worker/package_linux64/build/src/gf.c:2237 [inlined]
+jl_apply_generic at /buildworker/worker/package_linux64/build/src/gf.c:2419
+jl_apply at /buildworker/worker/package_linux64/build/src/julia.h:1703 [inlined]
+start_task at /buildworker/worker/package_linux64/build/src/task.c:834
+unknown function (ip: (nil))
+Allocations: 290669178066 (Pool: 287835117401; Big: 2834060665); GC: 676527
+  Activating environment at `~/.julia/environments/pysr-0.16.3/Project.toml`

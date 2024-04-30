@@ -327,6 +327,11 @@ EPSILON = 1e-5
 class VarModel(pl.LightningModule):
     """Bayesian Neural Network model for predicting instability time"""
     def __init__(self, hparams):
+        # if 'freeze_f1' in hparams and hparams['freeze_f1']:
+        #     utils.freeze_module(self.feature_nn)
+        # if 'freeze_f2' in hparams and hparams['freeze_f2']:
+        #     utils.freeze_module(self.regress_nn)
+
         # so we can load old runs before the variable names were changed
         if 'hidden_dim' not in hparams:
             hparams['hidden_dim'] = hparams['hidden']
@@ -334,7 +339,6 @@ class VarModel(pl.LightningModule):
             hparams['f2_depth'] = hparams['out']
         if 'f1_depth' not in hparams:
             hparams['f1_depth'] = hparams['in']
-
 
         super().__init__()
         if 'seed' not in hparams: hparams['seed'] = 0
@@ -420,7 +424,7 @@ class VarModel(pl.LightningModule):
 
         self.regress_nn = self.get_regress_nn(hparams, summary_dim)
 
-        self.regress_nn = modules.BioMLP(summary_dim, 2, hparams['hidden_dim'], hparams['f2_depth'])
+        #self.regress_nn = modules.BioMLP(summary_dim, 2, hparams['hidden_dim'], hparams['f2_depth'])
         #self.regress_nn = modules.mlp(summary_dim, 2, hparams['hidden'], hparams['out'])
         
         self.input_noise_logvar = nn.Parameter(torch.zeros(self.n_features)-2)
@@ -472,7 +476,8 @@ class VarModel(pl.LightningModule):
             hparams['f2_variant'] = 'mlp'
         if 'load_f2' in hparams and hparams['load_f2'] is not None:
             return eval('load(' + hparams['load_f2'] + ')').regress_nn
-        elif 'pysr_f2' in hparams and hparams['pysr_f2'] is not None:
+        #elif 'pysr_f2' in hparams and hparams['pysr_f2'] is not None:
+        elif hparams['f2_variant'] == 'pysr' and hparams['pysr_f2'] is not None:
             return modules.PySRNet(hparams['pysr_f2'], hparams['pysr_model_selection'])
         elif hparams['f1_variant'] == 'mean_cov':
             i = self.n_features
@@ -496,8 +501,6 @@ class VarModel(pl.LightningModule):
             return nn.Linear(summary_dim, 2)
         elif hparams['f2_variant'] == 'bimt':
             return modules.BioMLP(in_dim=summary_dim, depth=2, w=hparams['hidden_dim'], out_dim=hparams['f2_depth'])
-        elif hparams['f2_variant'] == 'f2_residual':
-            pass
         else:
             return modules.mlp(summary_dim, 2, hparams['hidden_dim'], hparams['f2_depth'])
 
@@ -964,6 +967,7 @@ class VarModel(pl.LightningModule):
 
         total_loss = loss + prior
 
+        # only for bimt
         lamb = 0.001
         weight_factor = 1
         if self.hparams['f1_variant'] == 'bimt':

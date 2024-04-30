@@ -1,0 +1,69 @@
+julia_worker:9590#128.84.100.166
+slurmstepd: error: *** STEP 3141924.0 ON ellis-compute-01 CANCELLED AT 2024-04-12T18:09:30 ***
+
+signal (15): Terminated
+in expression starting at none:0
+powf at /home/elg227/julia-1.6.7/bin/../lib/julia/libopenlibm.so (unknown line)
+^ at ./math.jl:906 [inlined]
+safe_pow at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/Operators.jl:47 [inlined]
+macro expansion at /home/elg227/.julia/packages/DynamicExpressions/KRT17/src/EvaluateEquation.jl:271 [inlined]
+macro expansion at ./simdloop.jl:77 [inlined]
+macro expansion at /home/elg227/.julia/packages/DynamicExpressions/KRT17/src/Utils.jl:54 [inlined]
+deg2_l0_r0_eval at /home/elg227/.julia/packages/DynamicExpressions/KRT17/src/EvaluateEquation.jl:270
+unknown function (ip: 0x7eff0335cc36)
+_jl_invoke at /buildworker/worker/package_linux64/build/src/gf.c:2237 [inlined]
+jl_apply_generic at /buildworker/worker/package_linux64/build/src/gf.c:2419
+_eval_tree_array at /home/elg227/.julia/packages/DynamicExpressions/KRT17/src/EvaluateEquation.jl:117
+_eval_tree_array at /home/elg227/.julia/packages/DynamicExpressions/KRT17/src/EvaluateEquation.jl:119
+_eval_tree_array at /home/elg227/.julia/packages/DynamicExpressions/KRT17/src/EvaluateEquation.jl:119
+unknown function (ip: 0x7eff0334f4f1)
+unknown function (ip: 0x7eff0334e6a6)
+unknown function (ip: 0x7eff0334e623)
+#eval_tree_array#1 at /home/elg227/.julia/packages/DynamicExpressions/KRT17/src/EvaluateEquation.jl:65 [inlined]
+eval_tree_array##kw at /home/elg227/.julia/packages/DynamicExpressions/KRT17/src/EvaluateEquation.jl:62 [inlined]
+#eval_tree_array#1 at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/InterfaceDynamicExpressions.jl:57 [inlined]
+eval_tree_array at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/InterfaceDynamicExpressions.jl:57 [inlined]
+_eval_loss at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/LossFunctions.jl:48
+unknown function (ip: 0x7eff0334e374)
+unknown function (ip: 0x7eff0334def6)
+unknown function (ip: 0x7eff0334de7e)
+#eval_loss#3 at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/LossFunctions.jl:101
+eval_loss at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/LossFunctions.jl:100 [inlined]
+#score_func#5 at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/LossFunctions.jl:160 [inlined]
+score_func at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/LossFunctions.jl:160 [inlined]
+#next_generation#1 at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/Mutate.jl:235
+unknown function (ip: 0x7eff03367fee)
+unknown function (ip: 0x7eff03363816)
+unknown function (ip: 0x7eff033633c8)
+next_generation##kw at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/Mutate.jl:69 [inlined]
+reg_evol_cycle at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/RegularizedEvolution.jl:38
+unknown function (ip: 0x7eff033630fe)
+unknown function (ip: 0x7eff03361ed6)
+unknown function (ip: 0x7eff03361b91)
+#s_r_cycle#1 at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/SingleIteration.jl:43
+s_r_cycle##kw at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/SingleIteration.jl:28
+unknown function (ip: 0x7eff033c01b2)
+_jl_invoke at /buildworker/worker/package_linux64/build/src/gf.c:2237 [inlined]
+jl_apply_generic at /buildworker/worker/package_linux64/build/src/gf.c:2419
+macro expansion at /home/elg227/.julia/packages/SymbolicRegression/XKtla/src/SymbolicRegression.jl:948 [inlined]
+#51 at /buildworker/worker/package_linux64/build/usr/share/julia/stdlib/v1.6/Distributed/src/macros.jl:87
+unknown function (ip: 0x7eff033bf98c)
+_jl_invoke at /buildworker/worker/package_linux64/build/src/gf.c:2237 [inlined]
+jl_apply_generic at /buildworker/worker/package_linux64/build/src/gf.c:2419
+jl_apply at /buildworker/worker/package_linux64/build/src/julia.h:1703 [inlined]
+do_apply at /buildworker/worker/package_linux64/build/src/builtins.c:675
+#107 at /buildworker/worker/package_linux64/build/usr/share/julia/stdlib/v1.6/Distributed/src/process_messages.jl:274
+run_work_thunk at /buildworker/worker/package_linux64/build/usr/share/julia/stdlib/v1.6/Distributed/src/process_messages.jl:63
+unknown function (ip: 0x7eff0333eb78)
+_jl_invoke at /buildworker/worker/package_linux64/build/src/gf.c:2237 [inlined]
+jl_apply_generic at /buildworker/worker/package_linux64/build/src/gf.c:2419
+run_work_thunk at /buildworker/worker/package_linux64/build/usr/share/julia/stdlib/v1.6/Distributed/src/process_messages.jl:72
+#100 at ./task.jl:417
+unknown function (ip: 0x7eff0333e70c)
+_jl_invoke at /buildworker/worker/package_linux64/build/src/gf.c:2237 [inlined]
+jl_apply_generic at /buildworker/worker/package_linux64/build/src/gf.c:2419
+jl_apply at /buildworker/worker/package_linux64/build/src/julia.h:1703 [inlined]
+start_task at /buildworker/worker/package_linux64/build/src/task.c:834
+unknown function (ip: (nil))
+Allocations: 1171409373 (Pool: 1144333166; Big: 27076207); GC: 5108
+  Activating environment at `~/.julia/environments/pysr-0.16.3/Project.toml`

@@ -78,5 +78,7 @@ if __name__ == '__main__':
 
     2882295 (f1: linear, f2: mlp (20 hidden dim)) (1250 epochs) --> 
     
+    3141997 (residual) --> 33796.pkl --> 3232141
+    3141996 (direct) --> 51084.pkl --> 3232142
     """
 

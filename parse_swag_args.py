@@ -68,6 +68,9 @@ def parse():
     parser.add_argument('--n_predicates', default=10, type=int)
     parser.add_argument('--pruned_debug', default=None, type=str, choices=['1','2','3','4','5','6'])
 
+    parser.add_argument('--freeze_f1', action='store_true')
+    parser.add_argument('--freeze_f2', action='store_true')
+
     args = parser.parse_args()
 
     if args.f1_variant == 'identity':

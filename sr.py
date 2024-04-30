@@ -25,7 +25,7 @@ import json
 import einops
 import torch
 import math
-
+import modules
 
 def get_f1_inputs_and_targets(args):
     model = spock_reg_model.load(version=args.version, seed=args.seed)
@@ -59,6 +59,54 @@ def get_f2_inputs_and_targets(args, N=500):
     return inputs, targets, stds
 
 
+def get_f2_inputs_and_targets_direct(args, N=500):
+    model = spock_reg_model.load(version=args.version, seed=args.seed)
+    model.make_dataloaders()
+    model.eval()
+
+    all_inputs, all_targets = [], []
+    data_iterator = iter(model.train_dataloader())
+    while sum([len(i) for i in all_inputs]) < N:
+        # just takes a random batch of inputs and passes them through the neural network
+        batch = next(data_iterator)
+        X, y = batch 
+        summary_stats, _, _ = model.generate_f2_inputs_and_targets(batch)
+        all_inputs.append(summary_stats)
+        all_targets.append(y)
+
+    inputs = rearrange(all_inputs, 'l B ... -> (l B) ...')
+    targets = rearrange(all_targets, 'l B ... -> (l B) ...')
+    return inputs, targets
+
+
+def get_f2_inputs_and_targets_residual(args, N=500):
+    model = spock_reg_model.load(version=args.version, seed=args.seed)
+    model.make_dataloaders()
+    model.eval()
+
+    all_inputs, all_targets, all_preds = [], [], []
+    data_iterator = iter(model.train_dataloader())
+    while sum([len(i) for i in all_inputs]) < N:
+        # just takes a random batch of inputs and passes them through the neural network
+        batch = next(data_iterator)
+        X, y = batch 
+        summary_stats, _, _ = model.generate_f2_inputs_and_targets(batch)
+        all_inputs.append(summary_stats)
+        all_targets.append(y)
+
+        # residual target predictions
+        y_preds = model(X, noisy_val=False)
+        all_preds.append(model(X, noisy_val=False))
+
+    # [B, 40] and [B, 2] and [B, 2]
+    X = rearrange(all_inputs, 'l B ... -> (l B) ...')
+    y = rearrange(all_targets, 'l B ... -> (l B) ...')
+    y_preds = rearrange(all_preds, 'l B ... -> (l B) ...')
+    # calculate the residual target: whatever of the target not explained by the preds
+    y = y - y_preds
+    return X, y
+
+
 def import_Xy(args, included_ixs):
     inputs, targets =  get_f1_inputs_and_targets(args)
 
@@ -83,12 +131,14 @@ def import_Xy(args, included_ixs):
 def import_Xy_f2(args):
     N = 500
     # [B, 40] and [B, 2] and [B, ]
-    X, y, stds =  get_f2_inputs_and_targets(args, N=N/args.std_percent_threshold)
+    # X, y, stds =  get_f2_inputs_and_targets(args, N=N/args.std_percent_threshold)
+    #X, y =  get_f2_inputs_and_targets_direct(args, N=N/args.std_percent_threshold) # for direct
+    X, y = get_f2_inputs_and_targets_residual(args, N=N/args.std_percent_threshold) # for residual
 
-    sorted_stds, _ = torch.sort(stds)
-    max_std = sorted_stds[math.ceil(len(sorted_stds) * args.std_percent_threshold) - 1]
-    ixs = stds <= max_std
-    X, y, stds = X[ixs], y[ixs], stds[ixs]
+    # sorted_stds, _ = torch.sort(stds)
+    # max_std = sorted_stds[math.ceil(len(sorted_stds) * args.std_percent_threshold) - 1]
+    # ixs = stds <= max_std
+    # X, y, stds = X[ixs], y[ixs], stds[ixs]
 
     ixs = np.random.choice(X.shape[0], size=N, replace=False)
     X, y = X[ixs], y[ixs]
@@ -111,7 +161,7 @@ def get_sr_included_ixs():
     return included_ixs
 
 
-def run_pysr(xx, yy, args):
+def run_pysr(args, xx=None, yy=None):
     id = random.randint(0, 100000)
     while os.path.exists(f'sr_results/{id}.pkl'):
         id = random.randint(0, 100000)
@@ -168,6 +218,8 @@ def run_pysr(xx, yy, args):
         variables = [f'm{i}' for i in range(n)] + [f's{i}' for i in range(n)]
     else:
         X, y = xx, yy
+        n = X.shape[1] // 2
+        variables = [f'm{i}' for i in range(n)] + [f's{i}' for i in range(n)]
 
     model = pysr.PySRRegressor(**pysr_config)
     model.fit(X, y, variable_names=variables)
@@ -251,12 +303,14 @@ def plot_pareto(path):
     plt.savefig('pareto.png')
 
 
+"""
+==================================================================
+==================================================================
+BOOSTED SR STARTS HERE
+==================================================================
+==================================================================
+"""
 
-
-
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 
 # can try slope of previous to current, angles, first & last, random, etc.
 def choose_topk(self, version, top_k):
@@ -274,9 +328,11 @@ def choose_topk(self, version, top_k):
     top_k_points = [(x_sorted[i+1], y_sorted[i+1]) for i in greatest_inflection_indices]
     return top_k_points
 
+#choose points along the convex hull of pareto
+
 
 def import_Xy_f2_direct(args):
-    N = 250
+    N = 500
 
     model = spock_reg_model.load(version=args.version, seed=args.seed)
     model.make_dataloaders()
@@ -289,12 +345,29 @@ def import_Xy_f2_direct(args):
         batch = next(data_iterator)
         x, y = batch
         # inputs to f2
-        summary_stats = model.forward_to_summary_only(x)
+        #summary_stats = model.forward_to_summary_only(x)
+        x, summary_stats = model.forward_to_summary_only(x)
+        print(summary_stats.size())
+        print(x.size())
+        #summary_stats, _, _ = model.generate_f2_inputs_and_targets(batch)
         all_inputs.append(summary_stats)
         # ground truth targets
         all_targets.append(y)
 
-    # [B, 40] and [B, 2]
+    # total_samples = 0
+    # for batch in model.train_dataloader():
+    #     x, y = batch
+    #     # inputs to f2
+    #     summary_stats = model.forward_to_summary_only(x)
+    #     all_inputs.append(summary_stats)
+    #     # Ground truth targets
+    #     all_targets.append(y)
+
+    #     total_samples += x.shape[0]  # Update total sample count
+    #     if total_samples >= N:
+    #         break  # Stop after collecting enough samples
+
+    #[B, 40] and [B, 2]
     X = rearrange(all_inputs, 'l B ... -> (l B) ...')
     y = rearrange(all_targets, 'l B ... -> (l B) ...')
 
@@ -305,7 +378,7 @@ def import_Xy_f2_direct(args):
     return X, y
 
 
-def import_Xy_f2_residual(args, model):
+def import_Xy_f2_residual(args):
     N = 250
 
     model = spock_reg_model.load(version=args.version, seed=args.seed)
@@ -341,24 +414,19 @@ def import_Xy_f2_residual(args, model):
     X, y = X[ixs], y[ixs]
     X, y = X.detach().numpy(), y.detach().numpy()
 
-    return X, y
+    return X, y    
+
+# def direct_pysr_run(args):
+#     X, y = import_Xy_f2_direct(args)
+#     run_pysr(X, y, args)
+
+# def residual_pysr_run(args):    
+#     X, y = import_Xy_f2_residual(args)
+#     run_pysr(X, y, args)
 
 
-def load_pysr_module_list(filepath, model_selection):
-    if model_selection in ['best', 'accuracy', 'score']:
-        return nn.ModuleList(pysr.PySRRegressor.from_file(filepath, model_selection=model_selection).pytorch())
-    else:
-        reg = pysr.PySRRegressor.from_file(filepath)
-        # find the ixs with closest complexity equal to model_selection
-        ixs = []
-        for i in range(reg.nout_):
-            ix = np.argmin(np.abs(reg.equations_[i]['complexity'] - int(model_selection)))
-            ixs.append(ix)
-
-        print('PySR model selection ixs: ', ixs)
-        return nn.ModuleList(reg.pytorch(index=ixs))
-    
 """
+0) Run find_minima.py with f1: linear and f2: mlp to get version
 for i in range(num_iters):
     1) Run PySR on data
         run_pysr(version=21101, target=direct) (this first round would use import_Xy_direct)
@@ -382,8 +450,9 @@ def boosted_regression(num_iters, top_k, args):
         else:
             complexities = choose_topk(args.version, top_k=top_k)
             for complexity in complexities:
-
-                residual_model = load_pysr_module_list(args, model_selection=complexity)
+                
+                # need to implement complexity model selection
+                residual_model = modules.PySRNet(filepath='sr_results/hall_of_fame_21101_0_1.pkl', model_selection='complexity')
                 
                 X, y = import_Xy_f2_residual(args, residual_model)
 
@@ -394,8 +463,12 @@ def boosted_regression(num_iters, top_k, args):
 
 if __name__ == '__main__':
     args = parse_args()
+
     run_pysr(args)
 
-    num_iters = 5
-    top_k = 3
-    boosted_regression(num_iters, top_k, args)
+    #direct_pysr_run(args)
+    #residual_pysr_run(args)
+
+    # num_iters = 5
+    # top_k = 3
+    # boosted_regression(num_iters, top_k, args)

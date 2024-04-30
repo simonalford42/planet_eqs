@@ -8,6 +8,7 @@ from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
 import torch
 import numpy as np
+import pickle
 from scipy.stats import truncnorm
 import sys
 from parse_swag_args import parse
@@ -95,10 +96,11 @@ if args['load']:
     if args['f2_variant'] == 'pysr_residual':
         pysr_net = modules.PySRNet(args['pysr_f2'], args['pysr_model_selection'])
         utils.freeze_module(pysr_net)
-        #base_net = mlp(args['latent'] * 2, 2, args['hidden_dim'], args['f2_depth'])
-        base_net = modules.BioMLP(args['latent'] * 2, 2, args['hidden_dim'], args['f2_depth'])
+        base_net = mlp(args['latent'] * 2, 2, args['hidden_dim'], args['f2_depth'])
+        #base_net = modules.BioMLP(args['latent'] * 2, 2, args['hidden_dim'], args['f2_depth'])
         model.regress_nn = modules.SumModule(pysr_net, base_net)
         model.l1_reg_f2_weights = args['l1_reg'] in ['f2_weights', 'both_weights']
+
     elif args['f2_variant'] == 'new':
         model.regress_nn = modules.mlp(model.regress_nn[0].in_features, 2, model.hparams['hidden_dim'], model.hparams['f2_depth'])
         model.l1_reg_f2_weights = args['l1_reg'] in ['f2_weights', 'both_weights']
