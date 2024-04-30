@@ -8,6 +8,28 @@ import einops
 import spock_reg_model
 import numpy as np
 import torch.nn.functional as F
+from petit20_survival_time import Tsurv
+
+class Products2(nn.Module):
+    def __init__(self):
+        super().__init__()
+        # [a1, e1], [a2, e2], [a3, e3]
+        self.arg1s = [[8, 9], [17, 18], [26, 27]]
+        # [sin/cos of angles for planet 1, planet 2, planet3]
+        self.arg2s = [[11, 12, 13, 14, 15, 16], [20, 21, 22, 23, 24, 25], [29, 30, 31, 32, 33, 34]]
+        self.products = []
+        for a, b in zip(self.arg1s, self.arg2s):
+            for i in a:
+                for j in b:
+                    self.products.append((i, j))
+
+        self.products = torch.tensor(self.products)
+
+    def forward(self, x):
+        # return all of the normal features, as well as the specified products
+        products = x[..., self.products[:, 0]] * x[..., self.products[:, 1]]
+        # x is [B, N, d] and products is [B, N, 36]. go to [B, N, d + 36]
+        return torch.cat([x, products], dim=-1)
 
 
 class Products(nn.Module):
@@ -54,6 +76,10 @@ class IfThenNN2(nn.Module):
         preds = self.mlp(x)
         preds = F.softmax(preds / temperature, dim=-1)
         return torch.einsum('... n, n o -> ... o', preds, self.bodies)
+
+    def preds(self, x, temperature=1):
+        preds = self.mlp(x)
+        return F.softmax(preds / temperature, dim=-1)
 
 
 def mlp(in_n, out_n, hidden, layers, act='relu'):
@@ -151,43 +177,33 @@ class MaskLayer(nn.Module):
 
 
 class MaskedLinear(nn.Module):
-    def __init__(self, linear, mask, debug='none'):
+    def __init__(self, linear, mask):
         super().__init__()
         self.linear = linear
         self.mask = nn.Parameter(mask, requires_grad=False)
-        self.debug = debug
 
     def forward(self, x):
-        if self.debug == '1':
-            assert torch.all(self.mask == 1)
-        elif self.debug == '2':
-            weight = self.linear.weight * self.mask
-            assert torch.all(weight == self.linear.weight)
-        elif self.debug == '3':
-            weight = self.linear.weight
-        elif self.debug == '4':
-            return self.linear(x)
-        else:
-            weight = self.linear.weight * self.mask
-
+        weight = self.linear.weight * self.mask
         return F.linear(x, weight, self.linear.bias)
 
 
-def pruned_linear(linear: nn.Linear, top_k=None, threshold=None, debug=None):
-    if top_k is not None:
-        mask = torch.zeros_like(linear.weight)
-        for r in range(linear.weight.shape[0]):
-            _, ixs = torch.topk(linear.weight[r].abs(), k=top_k)
-            mask[r][ixs] = 1
-    elif threshold is not None:
-        mask = torch.zeros_like(linear.weight)
-        mask[linear.weight.abs() > threshold] = 1
+def pruned_linear(linear: nn.Linear, top_k, top_n=None):
+    '''
+    top_k: for each feature, number of weights to keep
+    top_n: number of features to keep
+    '''
 
-        if debug is not None:
-            linear = nn.Linear(linear.weight.shape[1], linear.weight.shape[0])
-            mask = torch.ones_like(mask)
+    mask = torch.zeros_like(linear.weight)
+    for r in range(linear.weight.shape[0]):
+        _, ixs = torch.topk(linear.weight[r].abs(), k=top_k)
+        mask[r][ixs] = 1
 
-    return MaskedLinear(linear, mask, debug)
+    if top_n is not None:
+        # mask is (n_features, n_inputs)
+        _, ixs = torch.topk(mask.abs().sum(dim=-1), k=top_n)
+        mask[~ixs] = 0
+
+    return MaskedLinear(linear, mask)
 
 
 class Cyborg(nn.Module):

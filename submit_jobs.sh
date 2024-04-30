@@ -1,5 +1,101 @@
 #!/usr/bin/env bash
 
+# ------------------------- Wed Apr 24 --------------------------
+
+sbatch -J linear --partition gpu train.sh --f1_variant linear --run_swag
+sbatch -J mlp --partition gpu train.sh --f1_variant mlp --run_swag
+
+# ------------------------- Thu Mar 21 --------------------------
+
+# sbatch -J sr_bimt6 --partition ellis --mem 200G --time 08:00:00 sr.sh --version 23219 --target f2 --time_in_hours 1
+# sbatch -J sr_bimt1 --partition ellis --mem 200G --time 08:00:00 sr.sh --version 23219 --target f2 --time_in_hours 6
+
+# sbatch -J sr_base6 --partition gpu --mem 200G --time 08:00:00 sr.sh --version 12646 --target f2 --time_in_hours 1
+# sbatch -J sr_base1 --partition gpu --mem 200G --time 08:00:00 sr.sh --version 12646 --target f2 --time_in_hours 6
+
+# sbatch -J 14res --partition gpu train.sh --load 21101 --pysr_f2 sr_results/hall_of_fame_f2_21101_0_1.pkl --pysr_model_selection 14 --f2_variant pysr_residual --l1_reg f2_weights --l1_coeff 2 --run_swag
+
+# sbatch -J 14_nores --partition gpu train.sh --load 21101 --pysr_f2 sr_results/hall_of_fame_f2_21101_0_1.pkl --pysr_model_selection 14 --run_swag --total_steps 0
+
+
+# ---------------------- Wed Mar 20 ---------------------
+
+# sbatch -J bimt --partition ellis train.sh --f1_variant linear --f2_variant bimt
+
+# ---------------------- Tue Mar 19 ---------------------
+
+# sbatch -J bimt --partition ellis train.sh --f1_variant linear --f2_variant bimt
+# sbatch -J baseline --partition ellis train.sh --f1_variant linear
+
+# sbatch -J prune2 --partition gpu prune_train.sh --prune_f1_topk 2 --prune_f1_topn 5 --latent 40
+# sbatch -J prune2 --partition gpu prune_train.sh --prune_f1_topk 2 --prune_f1_topn 10 --latent 80
+# sbatch -J prune2 --partition gpu prune_train.sh --prune_f1_topk 2 --prune_f1_topn 5 --latent 80
+# sbatch -J prune2 --partition gpu prune_train.sh --prune_f1_topk 2 --prune_f1_topn 10 --latent 160
+
+# ---------------------- Mon Mar 18 ---------------------
+
+# sbatch -J prune2 --partition gpu prune_train.sh --prune_f1_topk 2 --latent 10
+# sbatch -J prune2 --partition gpu prune_train.sh --prune_f1_topk 2 --latent 5
+# sbatch -J prune2 --partition gpu prune_train.sh --prune_f1_topk 2 --prune_f1_topn 10 --latent 40
+# sbatch -J prune2 --partition gpu prune_train.sh --prune_f1_topk 2 --prune_f1_topn 10 --latent 20
+# sbatch -J prune2 --partition gpu prune_train.sh --prune_f1_topk 2 --prune_f1_topn 10
+# sbatch -J prune2 --partition gpu prune_train.sh --prune_f1_topk 2 --prune_f1_topn 5
+
+# ---------------------- Fri Mar 15 ---------------------
+
+# sbatch -J prune --partition gpu prune_train.sh --prune_f1_topk 1
+# sbatch -J prune --partition gpu prune_train.sh --prune_f1_topk 2
+# sbatch -J prune --partition gpu prune_train.sh --prune_f1_topk 3
+
+# ---------------------- Thu Mar 7 ----------------------
+
+# sbatch -J ifthen_pysr2 --partition ellis --mem 200G --time 08:00:00 sr.sh --version 42423 --target f2_ifthen --time_in_hours 1
+# sbatch -J ifthen_pysr2 --partition gpu --mem 200G --time 08:00:00 sr.sh --version 42423 --target f2_ifthen --time_in_hours 6
+
+# sbatch -J prod2 --partition gpu train.sh --f1_variant products2 --l1_reg weights --l1_coeff 2
+
+# sbatch -J pruneprod --partition gpu train.sh --load 95944 --prune_f1_topk 2 --f1_variant pruned_products --l1_reg weights --l1_coeff 2
+
+# sbatch -J prune --partition gpu prune_train.sh --total_steps 300000
+# sbatch -J prune --partition gpu prune_train.sh --total_steps 150000
+
+# --------------- Fri Mar 1 ------------------------
+
+# sbatch -J ifthen_pysr2 --partition ellis --mem 200G --time 08:00:00 sr.sh --version 42423 --target f2_ifthen --time_in_hours 1
+# sbatch -J ifthen_pysr2 --partition gpu --mem 200G --time 08:00:00 sr.sh --version 42423 --target f2_ifthen --time_in_hours 6
+
+# sbatch -J prod2 --partition gpu train.sh --f1_variant products2
+# sbatch -J prod2 --partition gpu train.sh --f1_variant products2 --l1_reg weights --l1_coeff 0.2
+
+# sbatch -J pruneprod --partition gpu train.sh --load 95944 --prune_f1_topk 2 --f1_variant pruned_products
+
+# sbatch -J f2l2_3 --partition ellis train.sh --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 14 --f2_variant pysr_residual --l1_reg both_weights --l1_coeff 2 --seed 2 --freeze_f1
+# sbatch -J f2l2_3 --partition ellis train.sh --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 14 --f2_variant pysr_residual --freeze_f1
+
+# ---------------- Thu Feb 22 ------------------------
+# got the same standard accuracy
+# sbatch -J f2l2_3 --partition ellis train.sh --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 14 --f2_variant pysr_residual --l1_reg both_weights --l1_coeff 2 --seed 2
+
+# sbatch -J prod_lr --partition ellis train.sh --f1_variant products --lr 1e-4
+# sbatch -J reg_lr --partition ellis train.sh --lr 1e-4
+# sbatch -J prod_lr2 --partition gpu train.sh --f1_variant products --lr 1e-5
+# sbatch -J reg_lr2 --partition gpu train.sh --lr 1e-5
+
+# sbatch -J it3 --partition gpu train.sh --f2_variant ifthen2 --f2_depth 0
+# sbatch -J it3 --partition gpu train.sh --f2_variant ifthen2 --l1_coeff 0.2
+# sbatch -J it3 --partition gpu train.sh --f2_variant ifthen2
+
+# sbatch -J it_n --partition gpu train.sh --f2_variant ifthen2 --n_predicates 1 --f2_depth 0
+# sbatch -J it_n --partition gpu train.sh --f2_variant ifthen2 --n_predicates 2 --f2_depth 0
+# sbatch -J it_n --partition gpu train.sh --f2_variant ifthen2 --n_predicates 5 --f2_depth 0
+# sbatch -J it_n --partition gpu train.sh --f2_variant ifthen2 --n_predicates 10 --f2_depth 0
+# sbatch -J it_n --partition gpu train.sh --f2_variant ifthen2 --n_predicates 20 --f2_depth 0
+# sbatch -J it_n --partition gpu train.sh --f2_variant ifthen2 --n_predicates 100 --f2_depth 0
+
+# sbatch -J it_l --partition gpu train.sh --f2_variant ifthen2 --n_predicates 25 --f2_depth -1
+# sbatch -J it_l --partition gpu train.sh --f2_variant ifthen2 --n_predicates 100 --f2_depth -1
+
+
 # --------------- Wed Feb 21 --------------------------
 
 # sbatch -J reg_h20 --partition gpu train.sh --hidden_dim 20
@@ -8,7 +104,7 @@
 # sbatch -J prod --partition ellis train.sh --f1_variant products
 # sbatch -J prod --partition ellis train.sh --f1_variant products --l1_reg weights --l1_coeff 0.2
 # sbatch -J prod --partition ellis train.sh --f1_variant products --l1_reg weights --l1_coeff 2 --seed 1
-sbatch -J prod --partition gpu train.sh --f1_variant products --l1_reg weights --l1_coeff 10
+# sbatch -J prod --partition gpu train.sh --f1_variant products --l1_reg weights --l1_coeff 10
 
 # ------------------- Mon Feb 19 -------------------------
 # sbatch -J f2l2_s2 --partition gpu train.sh --l1_reg both_weights --l1_coeff 0.2

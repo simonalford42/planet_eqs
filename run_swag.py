@@ -29,7 +29,7 @@ checkpoint_filename = utils.ckpt_path(args.version, args.seed)
 
 seed = args.seed
 
-if args.no_swag:
+if not args.run_swag:
     print('no swag, exiting')
     exit(0)
 

@@ -22,8 +22,8 @@ conda activate bnn_chaos_model
 set -e
 
 version=$((1 + RANDOM % 999999))
-version2=$((1 + RANDOM % 999999))
 
+<<<<<<< HEAD
 # python -u find_minima.py --total_steps 300000 --version $version --slurm_id $SLURM_JOB_ID "$@" --f1_variant linear --f2_variant mlp 
 # python -u sr.py --version 29766 --target f2 --seed 0
 
@@ -41,3 +41,7 @@ python -u find_minima.py --total_steps 300000 --version 29766 --slurm_id $SLURM_
 # .latex_table()
 # model.equations_
 # model.equations_.plot(“Complexity”, "Loss")
+=======
+python -u find_minima.py --version $version --slurm_id $SLURM_JOB_ID --slurm_name $SLURM_JOB_NAME "$@"
+python -u run_swag.py --version $version --slurm_id $SLURM_JOB_ID --slurm_name $SLURM_JOB_NAME "$@"
+>>>>>>> 570c6ee3d33d4ad6931b314222294c1b654b86ef

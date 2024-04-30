@@ -15,6 +15,7 @@ from parse_swag_args import parse
 import utils
 import modules
 from modules import mlp
+import torch.nn as nn
 
 rand = lambda lo, hi: np.random.rand()*(hi-lo) + lo
 irand = lambda lo, hi: int(np.random.rand()*(hi-lo) + lo)
@@ -26,11 +27,14 @@ checkpoint_filename = utils.ckpt_path(parse_args.version, parse_args.seed)
 
 # Fixed hyperparams:
 TOTAL_STEPS = parse_args.total_steps
+if TOTAL_STEPS == 0:
+    import sys
+    sys.exit(0)
+
 TRAIN_LEN = 78660
 batch_size = 2000 #ilog_rand(32, 3200)
 steps_per_epoch = int(1+TRAIN_LEN/batch_size)
 epochs = int(1+TOTAL_STEPS/steps_per_epoch)
-print(f"epochs: {epochs}")
 
 command = utils.get_script_execution_command()
 print(command)
@@ -77,6 +81,7 @@ name = 'full_swag_pre_' + checkpoint_filename
 # logger = TensorBoardLogger("tb_logs", name=name)
 logger = WandbLogger(project='bnn-chaos-model', entity='bnn-chaos-model', name=name, mode='disabled' if args['no_log'] else 'online')
 checkpointer = ModelCheckpoint(filepath=checkpoint_filename + '/{version}')
+<<<<<<< HEAD
 if args['load']:
     model = spock_reg_model.load(args['load'])
     # spock_reg_model.update_l1_model(model)
@@ -118,6 +123,11 @@ else:
     model.make_dataloaders()
 
 labels = ['time', 'e+_near', 'e-_near', 'max_strength_mmr_near', 'e+_far', 'e-_far', 'max_strength_mmr_far', 'megno', 'a1', 'e1', 'i1', 'cos_Omega1', 'sin_Omega1', 'cos_pomega1', 'sin_pomega1', 'cos_theta1', 'sin_theta1', 'a2', 'e2', 'i2', 'cos_Omega2', 'sin_Omega2', 'cos_pomega2', 'sin_pomega2', 'cos_theta2', 'sin_theta2', 'a3', 'e3', 'i3', 'cos_Omega3', 'sin_Omega3', 'cos_pomega3', 'sin_pomega3', 'cos_theta3', 'sin_theta3', 'm1', 'm2', 'm3', 'nan_mmr_near', 'nan_mmr_far', 'nan_megno']
+=======
+
+model = spock_reg_model.VarModel(args)
+model.make_dataloaders()
+>>>>>>> 570c6ee3d33d4ad6931b314222294c1b654b86ef
 
 max_l2_norm = args['gradient_clip']*sum(p.numel() for p in model.parameters() if p.requires_grad)
 trainer = Trainer(
@@ -154,8 +164,10 @@ model.load_state_dict(torch.load(checkpointer.best_model_path)['state_dict'])
 model.make_dataloaders()
 
 # loading models with pt lightning sometimes doesnt work, so lets also save the feature_nn and regress_nn directly
-torch.save(model.feature_nn, f'models/{args["version"]}_feature_nn.pt')
-torch.save(model.regress_nn, f'models/{args["version"]}_regress_nn.pt')
+if 'pysr' not in args['f1_variant']:
+    torch.save(model.feature_nn, f'models/{args["version"]}_feature_nn.pt')
+if 'pysr' not in args['f2_variant']:
+    torch.save(model.regress_nn, f'models/{args["version"]}_regress_nn.pt')
 if args['f2_variant'] == 'pysr_residual':
     torch.save(model.regress_nn.module1, f'models/{args["version"]}_pysr_nn.pt')
     torch.save(model.regress_nn.module2, f'models/{args["version"]}_base_nn.pt')

@@ -38,7 +38,7 @@ def get_f1_inputs_and_targets(args):
     return inputs, targets
 
 
-def get_f2_inputs_and_targets(args, N=500):
+def get_f2_inputs_and_targets(args, N=250):
     model = spock_reg_model.load(version=args.version, seed=args.seed)
     model.make_dataloaders()
     model.eval()
@@ -110,7 +110,7 @@ def get_f2_inputs_and_targets_residual(args, N=500):
 def import_Xy(args, included_ixs):
     inputs, targets =  get_f1_inputs_and_targets(args)
 
-    N = 500
+    N = 250
     X = rearrange(inputs, 'B T F -> (B T) F')
     y = rearrange(targets, 'B T F -> (B T) F')
     ixs = np.random.choice(X.shape[0], size=N, replace=False)
@@ -122,14 +122,13 @@ def import_Xy(args, included_ixs):
     assert np.all(X[..., [i for i in range(len(LABELS)) if i not in included_ixs]] == 0)
 
     X = X[..., included_ixs]
-    assert_equal(X.shape, (500, len(included_ixs)))
-    assert_equal(y.shape[0], 500)
+    assert_equal(X.shape, (N, len(included_ixs)))
+    assert_equal(y.shape[0], N)
 
     return X, y
 
-
 def import_Xy_f2(args):
-    N = 500
+    N = 250
     # [B, 40] and [B, 2] and [B, ]
     # X, y, stds =  get_f2_inputs_and_targets(args, N=N/args.std_percent_threshold)
     #X, y =  get_f2_inputs_and_targets_direct(args, N=N/args.std_percent_threshold) # for direct
@@ -145,6 +144,103 @@ def import_Xy_f2(args):
     X, y = X.detach().numpy(), y.detach().numpy()
 
     return X, y
+
+def import_Xy_f2_ifthen(args):
+    N = 250
+    # [B, 40] and [B, 2] and [B, ]
+    X, y = get_f2_ifthen_inputs_and_targets(args, N=N)
+
+    ixs = np.random.choice(X.shape[0], size=N, replace=False)
+    X, y = X[ixs], y[ixs]
+    X, y = X.detach().numpy(), y.detach().numpy()
+
+    return X, y
+
+def import_Xy_f2_direct(args):
+    N = 250
+
+    model = spock_reg_model.load(version=args.version, seed=args.seed)
+    model.make_dataloaders()
+    model.eval()
+
+    all_inputs, all_targets = [], []
+    data_iterator = iter(model.train_dataloader())
+    while sum([len(i) for i in all_inputs]) < N:
+        # just takes a random batch of inputs and passes them through the neural network
+        batch = next(data_iterator)
+        x, y = batch
+        # inputs to f2
+        summary_stats = model.forward_to_summary_only(x)
+        all_inputs.append(summary_stats)
+        # ground truth targets
+        all_targets.append(y)
+
+    # [B, 40] and [B, 2]
+    X = rearrange(all_inputs, 'l B ... -> (l B) ...')
+    y = rearrange(all_targets, 'l B ... -> (l B) ...')
+
+    ixs = np.random.choice(X.shape[0], size=N, replace=False)
+    X, y = X[ixs], y[ixs]
+    X, y = X.detach().numpy(), y.detach().numpy()
+
+    return X, y
+
+def import_Xy_f2_residual(args, model):
+    N = 250
+
+    model = spock_reg_model.load(version=args.version, seed=args.seed)
+    model.make_dataloaders()
+    model.eval()
+
+    all_inputs, all_targets, all_preds = [], [], []
+    data_iterator = iter(model.train_dataloader())
+    while sum([len(i) for i in all_inputs]) < N:
+        # just takes a random batch of inputs and passes them through the neural network
+        batch = next(data_iterator)
+        x, y = batch
+
+        # inputs to f2
+        summary_stats = model.forward_to_summary_only(x)
+        all_inputs.append(summary_stats)
+
+        # ground truth targets
+        all_targets.append(y)
+
+        # residual target predictions
+        preds = model(x, noisy_val=False)
+        all_preds.append(model(x, noisy_val=False))
+
+    # [B, 40] and [B, 2] and [B, 2]
+    X = rearrange(all_inputs, 'l B ... -> (l B) ...')
+    y = rearrange(all_targets, 'l B ... -> (l B) ...')
+    y_preds = rearrange(all_preds, 'l B ... -> (l B) ...')
+    # calculate the residual target: whatever of the target not explained by the preds
+    y = y - y_preds
+
+    ixs = np.random.choice(X.shape[0], size=N, replace=False)
+    X, y = X[ixs], y[ixs]
+    X, y = X.detach().numpy(), y.detach().numpy()
+
+    return X, y
+
+
+def get_f2_ifthen_inputs_and_targets(args, N):
+    model = spock_reg_model.load(version=args.version, seed=args.seed)
+    model.make_dataloaders()
+    model.eval()
+
+    all_inputs, all_targets = [], []
+    data_iterator = iter(model.train_dataloader())
+    while sum([len(i) for i in all_inputs]) < N:
+        # just takes a random batch of inputs and passes them through the neural network
+        batch = next(data_iterator)
+        inputs, targets = model.generate_f2_ifthen_inputs_and_targets(batch)
+        all_inputs.append(inputs)
+        all_targets.append(targets)
+
+    inputs = rearrange(all_inputs, 'l B ... -> (l B) ...')
+    targets = rearrange(all_targets, 'l B ... -> (l B) ...')
+    return inputs, targets
 
 
 LABELS = ['time', 'e+_near', 'e-_near', 'max_strength_mmr_near', 'e+_far', 'e-_far', 'max_strength_mmr_far', 'megno', 'a1', 'e1', 'i1', 'cos_Omega1', 'sin_Omega1', 'cos_pomega1', 'sin_pomega1', 'cos_theta1', 'sin_theta1', 'a2', 'e2', 'i2', 'cos_Omega2', 'sin_Omega2', 'cos_pomega2', 'sin_pomega2', 'cos_theta2', 'sin_theta2', 'a3', 'e3', 'i3', 'cos_Omega3', 'sin_Omega3', 'cos_pomega3', 'sin_pomega3', 'cos_theta3', 'sin_theta3', 'm1', 'm2', 'm3', 'nan_mmr_near', 'nan_mmr_far', 'nan_megno']
@@ -200,11 +296,12 @@ def run_pysr(args, xx=None, yy=None):
         'results_cmd': f'vim $(ls {path[:-4]}.csv*)',
     })
 
-    wandb.init(
-        entity='bnn-chaos-model',
-        project='planets-sr',
-        config=config,
-    )
+    if not args.no_log:
+        wandb.init(
+            entity='bnn-chaos-model',
+            project='planets-sr',
+            config=config,
+        )
 
     command = utils.get_script_execution_command()
     print(command)
@@ -216,22 +313,28 @@ def run_pysr(args, xx=None, yy=None):
         X, y = import_Xy_f2(args)
         n = X.shape[1] // 2
         variables = [f'm{i}' for i in range(n)] + [f's{i}' for i in range(n)]
-    else:
-        X, y = xx, yy
+    elif args.target == 'f2_ifthen':
+        X, y = import_Xy_f2_ifthen(args)
         n = X.shape[1] // 2
         variables = [f'm{i}' for i in range(n)] + [f's{i}' for i in range(n)]
+    else:
+        X, y = xx, yy
 
     model = pysr.PySRRegressor(**pysr_config)
     model.fit(X, y, variable_names=variables)
+    print('Done running pysr')
 
     losses = [min(eqs['loss']) for eqs in model.equation_file_contents_]
-    wandb.log({'avg_loss': sum(losses)/len(losses),
-               'losses': losses,
-               })
+    if not args.no_log:
+        wandb.log({'avg_loss': sum(losses)/len(losses),
+                   'losses': losses,
+                   })
 
-    # delete the backup files
     try:
+        # delete the backup files
         subprocess.run(f'rm {path[:-4]}.csv.out*.bkup', shell=True, check=True)
+        # delete julia files: julia-1911988-17110333239-0016.out
+        subprocess.run(f'rm julia*.out', shell=True, check=True)
     except subprocess.CalledProcessError as e:
         print(f"An error occurred while trying to delete the backup files: {e}")
 
@@ -274,12 +377,11 @@ def parse_args():
 
     parser.add_argument('--time_in_hours', type=float, default=1)
     parser.add_argument('--max_size', type=int, default=30)
-    parser.add_argument('--target', type=str, default='f1', choices=['f1', 'f2'])
+    parser.add_argument('--target', type=str, default='f1', choices=['f1', 'f2', 'f2_ifthen', 'direct'])
     # use the bottom % of stds to target sr on higher confidence predictions
     parser.add_argument('--std_percent_threshold', type=float, default=1)
 
     args = parser.parse_args()
-
     return args
 
 

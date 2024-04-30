@@ -11,7 +11,7 @@
 #SBATCH --requeue
  # total limit (hh:mm:ss)
 #SBATCH -t 02:00:00
-#SBATCH --mem=50G
+#SBATCH --mem=100G
 #SBATCH --partition=default_partition
 
 source /home/sca63/mambaforge/etc/profile.d/conda.sh
