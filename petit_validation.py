@@ -111,13 +111,13 @@ model_val_loss = 0
 
 rmse = 0
 model_rmse = 0
+const9_rmse = 0
+const9_val_loss = 0
 
 # store a list of (x, y_actual, y_model_pred, y_tsurv_pred)
 x_store, y_store, y_model_store, y_tsurv_store = [], [], [], []
 N = 0
-n_batches = 0
 for tsurv_batch, model_batch in zip(tsurv_validation_set, model_validation_set):
-    n_batches += 1
     N += len(model_batch[0])
     model_X, model_y = model_batch
     tsurv_X, tsurv_y = tsurv_batch
@@ -130,14 +130,15 @@ for tsurv_batch, model_batch in zip(tsurv_validation_set, model_validation_set):
 
     tsurv_pred = tsurv(tsurv_X)
     # add dummt std 0
-    testy = torch.stack([tsurv_pred, torch.zeros_like(tsurv_pred)], dim=-1)
+    testy = torch.stack([tsurv_pred, model_preds[:, 1].clone()], dim=-1)
     assert_equal(testy.shape, tsurv_y.shape)
     loss = _lossfnc(testy, tsurv_y).sum()
-    print(f'loss {loss}')
 
     val_loss = val_loss + loss
 
     rmse = rmse + (tsurv_pred - tsurv_y[:, 0]).pow(2).sum().item()
+    const9_rmse = const9_rmse + (9 - tsurv_y[:, 0]).pow(2).sum().item()
+    const9_val_loss = const9_val_loss + _lossfnc(torch.stack([torch.full_like(tsurv_y[:, 0], 9), model_preds[:, 1].clone()], dim=-1), tsurv_y).sum()
 
     for i in range(len(model_X)):
         x_store.append(model_X[i])
@@ -145,7 +146,6 @@ for tsurv_batch, model_batch in zip(tsurv_validation_set, model_validation_set):
         y_model_store.append(model_preds[i])
         y_tsurv_store.append(tsurv_pred[i])
 
-print(f'n batches {n_batches}')
 x_store = torch.stack(x_store)
 y_store = torch.stack(y_store)
 y_model_store = torch.stack(y_model_store)
@@ -160,6 +160,8 @@ print('val loss: ', val_loss / N)
 print('model voss: ', model_val_loss / N)
 print('rmse: ', rmse / N)
 print('model rmse: ', model_rmse / N)
+print('const9 rmse: ', const9_rmse / N)
+print('const9 val loss: ', const9_val_loss / N)
 
 
 

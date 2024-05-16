@@ -1102,6 +1102,9 @@ class VarModel(pl.LightningModule):
         std = testy[:, [1]]
 
         var = std**2
+        if 'fix_variance' in self.hparams and self.hparams['fix_variance']:
+            var = torch.ones_like(var)
+
         t_greater_9 = y >= 9
 
         regression_loss = -(y - mu)**2/(2*var)

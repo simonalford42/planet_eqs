@@ -17,4 +17,5 @@
 source /home/sca63/mambaforge/etc/profile.d/conda.sh
 conda activate bnn_chaos_model
 
-python -u sr.py --slurm_id $SLURM_JOB_ID --slurm_name $SLURM_JOB_NAME "$@"
+python -u sr.py "$@"
+# python -u pure_sr.py "$@"

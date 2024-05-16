@@ -1,9 +1,19 @@
 #!/usr/bin/env bash
 
+# ---------------- Thu May 16 ------------------
+
+sbatch -J fixvar_id_lin --partition gpu train.sh --f1_variant identity --f2_variant linear --fix_variance
+sbatch -J fixvar_lin --partition gpu train.sh --f1_variant linear --fix_variance
+sbatch -J fixvar_lin_lin --partition gpu train.sh --f1_variant linear --f2_variant linear --fix_variance
+
 # ------------------------- Wed Apr 24 --------------------------
 
-sbatch -J linear --partition gpu train.sh --f1_variant linear --run_swag
-sbatch -J mlp --partition gpu train.sh --f1_variant mlp --run_swag
+# sbatch -J pure_sr --partition gpu --mem 100G --time 00:10:00 sr.sh --time-in-hours 0.1
+
+# sbatch -J linear --partition gpu train.sh --f1_variant linear --run_swag
+# sbatch -J mlp --partition gpu train.sh --f1_variant mlp --run_swag
+# sbatch -J true_lin --partition gpu train.sh --f1_variant identity --f2_variant linear --run_swag
+
 
 # ------------------------- Thu Mar 21 --------------------------
 

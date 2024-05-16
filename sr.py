@@ -48,6 +48,9 @@ def get_f2_inputs_and_targets(args, N=250):
     while sum([len(i) for i in all_inputs]) < N:
         # just takes a random batch of inputs and passes them through the neural network
         batch = next(data_iterator)
+        X, y = batch
+        print(y.shape)
+        assert 0
         inputs, targets, stds = model.generate_f2_inputs_and_targets(batch)
         all_inputs.append(inputs)
         all_targets.append(targets)
@@ -57,6 +60,25 @@ def get_f2_inputs_and_targets(args, N=250):
     targets = rearrange(all_targets, 'l B ... -> (l B) ...')
     stds = rearrange(all_stds, 'l B ... -> (l B) ...')
     return inputs, targets, stds
+
+
+ELEMENTWISE_LOSS = """elementwise_loss(prediction, target) = begin
+    mu = prediction
+    sigma = one(prediction)
+
+    safe_log_erf(x) = x < -1 ? (
+        T = typeof(x);
+        T(0.485660082730562) * x + T(0.643278438654541) * exp(x) +
+        T(0.00200084619923262) * x^3 - T(0.643250926022749) - T(0.955350621183745) * x^2
+    ) : log(1 + erf(x))
+
+    log_like = target >= 9 ? safe_log_erf((mu - 9) / sqrt(2 * sigma^2)) : (
+        zero(prediction) - (target - mu)^2 / (2 * sigma^2) - log(sigma) - safe_log_erf((mu - 4) / sqrt(2 * sigma^2))
+    )
+
+    return -log_like
+end
+"""
 
 
 def import_Xy(args, included_ixs):
@@ -237,6 +259,7 @@ def run_pysr(args):
         constraints={'^': (-1, 1)},
         nested_constraints={"sin": {"sin": 0}},
         ncyclesperiteration=2000, # increase utilization since usually using 32-ish cores?
+        elementwise_loss=ELEMENTWISE_LOSS,
     )
 
     config = vars(args)
@@ -244,6 +267,8 @@ def run_pysr(args):
     config.update({
         'id': id,
         'results_cmd': f'vim $(ls {path[:-4]}.csv*)',
+        'slurm_id': os.environ.get('SLURM_JOB_ID', None),
+        'slurm_name': os.environ.get('SLURM_JOB_NAME', None),
     })
 
     if not args.no_log:
@@ -319,8 +344,6 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Optional app description')
     # when importing from jupyter nb, it passes an arg to --f which we should just ignore
     parser.add_argument('--no_log', action='store_true', default=False, help='disable wandb logging')
-    parser.add_argument('--slurm_id', type=int, default=-1, help='slurm job id')
-    parser.add_argument('--slurm_name', type=str, default='', help='slurm job name')
     parser.add_argument('--version', type=int, help='', default=63524)
     parser.add_argument('--seed', type=int, default=0, help='default=0')
 
