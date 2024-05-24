@@ -18,4 +18,3 @@ source /home/sca63/mambaforge/etc/profile.d/conda.sh
 conda activate bnn_chaos_model
 
 python -u sr.py "$@"
-# python -u pure_sr.py "$@"

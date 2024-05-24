@@ -2,9 +2,11 @@
 
 # ---------------- Thu May 16 ------------------
 
-sbatch -J fixvar_id_lin --partition gpu train.sh --f1_variant identity --f2_variant linear --fix_variance
-sbatch -J fixvar_lin --partition gpu train.sh --f1_variant linear --fix_variance
-sbatch -J fixvar_lin_lin --partition gpu train.sh --f1_variant linear --f2_variant linear --fix_variance
+# sbatch -J fixvar_id_lin --partition gpu train.sh --f1_variant identity --f2_variant linear --fix_variance
+# sbatch -J fixvar_lin --partition gpu train.sh --f1_variant linear --fix_variance
+# sbatch -J fixvar_lin_lin --partition gpu train.sh --f1_variant linear --f2_variant linear --fix_variance
+
+sbatch -J direct_sr --partition gpu --mem 100G --time 02:00:00 sr.sh --time-in-hours 1 --target direct --version 6364
 
 # ------------------------- Wed Apr 24 --------------------------
 

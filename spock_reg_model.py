@@ -1006,7 +1006,11 @@ class VarModel(pl.LightningModule):
 
         return torch.cat([megno_avg, megno_std], dim=1)
 
-    def forward(self, x, noisy_val=True):
+    def forward(self, x, noisy_val=True, return_intermediates=False):
+        '''
+        noisy_val: if True, add noise to the inputs and summaries
+        '''
+
         if self.fix_megno or self.fix_megno2:
             if self.fix_megno:
                 megno_avg_std = self.summarize_megno(x)
@@ -1052,33 +1056,23 @@ class VarModel(pl.LightningModule):
         mu, std = self.predict_instability(summary_stats)
         #Each is (batch,)
 
-        return torch.cat((mu, std), dim=1)
+        pred = torch.cat((mu, std), dim=1)
 
-    def forward_to_summary_only(self, x, noisy_val=False):
-        # exact same as forward, but we just return the summary stats after calculating them
-        if self.fix_megno or self.fix_megno2:
-            if self.fix_megno:
-                megno_avg_std = self.summarize_megno(x)
-            #(batch, 2)
-            x = self.zero_megno(x)
+        if return_intermediates:
+            # useful for running pysr to distill parts of the calculation
+            d = {
+                'inputs': x,
+                'f1_output': self.feature_nn(x),
+                'summary_stats': summary_stats,
+                'prediction': pred,
+                'predicted_mean': mu,
+                'predicted_std': std
+            }
+            if 'ifthen' in self.hparams['f2_variant']:
+                d['ifthen_preds'] = self.regress_nn.preds(summary_stats)
+            return d
 
-        if not self.include_mmr:
-            x = self.zero_mmr(x)
-
-        if not self.include_nan:
-            x = self.zero_nan(x)
-
-        if not self.include_eplusminus:
-            x = self.zero_eplusminus(x)
-
-        if self.random_sample:
-            x = self.augment(x)
-        #x is (batch, time, feature)
-        if noisy_val:
-            x = self.add_input_noise(x)
-
-        summary_stats = self.feature_nn(x)
-        return x, summary_stats
+        return pred
 
     def sample(self, x, samples=10):
         all_samp = []
@@ -1098,6 +1092,11 @@ class VarModel(pl.LightningModule):
         return np.average(all_samp, axis=0)
 
     def _lossfnc(self, testy, y):
+        # y: [B, 2] batch of ground truth means. each input system has two
+        #  simulations, one with a small initial perturbation, so the two means
+        #  are samples from the distribution of instability times for that
+        #  initial system
+        # so we just sum over the loss for both of them.
         mu = testy[:, [0]]
         std = testy[:, [1]]
 
@@ -1159,113 +1158,6 @@ class VarModel(pl.LightningModule):
 
     def summary_kl(self):
         return self._summary_kl.sum()
-
-    def generate_f2_ifthen_inputs_and_targets(self, batch):
-        x, _ = batch
-        noisy_val = False
-
-        if self.fix_megno or self.fix_megno2:
-            if self.fix_megno:
-                megno_avg_std = self.summarize_megno(x)
-            #(batch, 2)
-            x = self.zero_megno(x)
-
-        if not self.include_mmr:
-            x = self.zero_mmr(x)
-
-        if not self.include_nan:
-            x = self.zero_nan(x)
-
-        if not self.include_eplusminus:
-            x = self.zero_eplusminus(x)
-
-        if 'zero_theta' in self.hparams and self.hparams['zero_theta'] != 0:
-            x = self.zero_theta(x)
-
-        if self.random_sample:
-            x = self.augment(x)
-        #x is (batch, time, feature)
-        if noisy_val:
-            x = self.add_input_noise(x)
-
-        summary_stats = self.compute_summary_stats(x)
-
-        if self.fix_megno:
-            summary_stats = torch.cat([summary_stats, megno_avg_std], dim=1)
-
-        self._cur_summary = summary_stats
-
-        #summary is (batch, feature)
-        self._summary_kl = (1/2) * (
-                summary_stats**2
-                + torch.exp(self.summary_noise_logvar)[None, :]
-                - self.summary_noise_logvar[None, :]
-                - 1
-            )
-
-        if noisy_val:
-            summary_stats = self.add_summary_noise(summary_stats)
-
-        # B, n_preds
-        preds = self.regress_nn.preds(summary_stats)
-
-        return summary_stats, preds
-
-    def generate_f1_inputs_and_targets(self, batch):
-        X_sample, y_sample = batch
-        inputs, summary_stats = self.forward_to_summary_only(X_sample, noisy_val=False)
-        return inputs, summary_stats
-
-    def generate_f2_inputs_and_targets(self, batch):
-        x, _ = batch
-        noisy_val = False
-
-        if self.fix_megno or self.fix_megno2:
-            if self.fix_megno:
-                megno_avg_std = self.summarize_megno(x)
-            #(batch, 2)
-            x = self.zero_megno(x)
-
-        if not self.include_mmr:
-            x = self.zero_mmr(x)
-
-        if not self.include_nan:
-            x = self.zero_nan(x)
-
-        if not self.include_eplusminus:
-            x = self.zero_eplusminus(x)
-
-        if 'zero_theta' in self.hparams and self.hparams['zero_theta'] != 0:
-            x = self.zero_theta(x)
-
-        if self.random_sample:
-            x = self.augment(x)
-        #x is (batch, time, feature)
-        if noisy_val:
-            x = self.add_input_noise(x)
-
-        summary_stats = self.compute_summary_stats(x)
-
-        if self.fix_megno:
-            summary_stats = torch.cat([summary_stats, megno_avg_std], dim=1)
-
-        self._cur_summary = summary_stats
-
-        #summary is (batch, feature)
-        self._summary_kl = (1/2) * (
-                summary_stats**2
-                + torch.exp(self.summary_noise_logvar)[None, :]
-                - self.summary_noise_logvar[None, :]
-                - 1
-            )
-
-        if noisy_val:
-            summary_stats = self.add_summary_noise(summary_stats)
-
-        mu, std = self.predict_instability(summary_stats)
-        #Each is (batch,)
-
-        return summary_stats, torch.cat((mu, std), dim=1), std[:, 0]
 
     def training_step(self, batch, batch_idx):
         fraction = self.global_step / self.hparams['steps']

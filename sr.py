@@ -3,7 +3,6 @@ import subprocess
 import wandb
 import pysr
 from pysr import PySRRegressor
-pysr.julia_helpers.init_julia()
 import random
 
 from matplotlib import pyplot as plt
@@ -26,42 +25,6 @@ import einops
 import torch
 import math
 
-
-def get_f1_inputs_and_targets(args):
-    model = spock_reg_model.load(version=args.version, seed=args.seed)
-    model.make_dataloaders()
-    model.eval()
-
-    # just takes a random batch of inputs and passes them through the neural network
-    batch = next(iter(model.train_dataloader()))
-    inputs, targets = model.generate_f1_inputs_and_targets(batch)
-    return inputs, targets
-
-
-def get_f2_inputs_and_targets(args, N=250):
-    model = spock_reg_model.load(version=args.version, seed=args.seed)
-    model.make_dataloaders()
-    model.eval()
-
-    all_inputs, all_targets, all_stds = [], [], []
-    data_iterator = iter(model.train_dataloader())
-    while sum([len(i) for i in all_inputs]) < N:
-        # just takes a random batch of inputs and passes them through the neural network
-        batch = next(data_iterator)
-        X, y = batch
-        print(y.shape)
-        assert 0
-        inputs, targets, stds = model.generate_f2_inputs_and_targets(batch)
-        all_inputs.append(inputs)
-        all_targets.append(targets)
-        all_stds.append(stds)
-
-    inputs = rearrange(all_inputs, 'l B ... -> (l B) ...')
-    targets = rearrange(all_targets, 'l B ... -> (l B) ...')
-    stds = rearrange(all_stds, 'l B ... -> (l B) ...')
-    return inputs, targets, stds
-
-
 ELEMENTWISE_LOSS = """elementwise_loss(prediction, target) = begin
     mu = prediction
     sigma = one(prediction)
@@ -80,141 +43,6 @@ ELEMENTWISE_LOSS = """elementwise_loss(prediction, target) = begin
 end
 """
 
-
-def import_Xy(args, included_ixs):
-    inputs, targets =  get_f1_inputs_and_targets(args)
-
-    N = 250
-    X = rearrange(inputs, 'B T F -> (B T) F')
-    y = rearrange(targets, 'B T F -> (B T) F')
-    ixs = np.random.choice(X.shape[0], size=N, replace=False)
-    X, y = X[ixs], y[ixs]
-    X, y = X.detach().numpy(), y.detach().numpy()
-
-    assert_equal(len(LABELS), X.shape[1])
-    # all of the skipped ones are just set to zero.
-    assert np.all(X[..., [i for i in range(len(LABELS)) if i not in included_ixs]] == 0)
-
-    X = X[..., included_ixs]
-    assert_equal(X.shape, (N, len(included_ixs)))
-    assert_equal(y.shape[0], N)
-
-    return X, y
-
-def import_Xy_f2(args):
-    N = 250
-    # [B, 40] and [B, 2] and [B, ]
-    X, y, stds =  get_f2_inputs_and_targets(args, N=N/args.std_percent_threshold)
-
-    sorted_stds, _ = torch.sort(stds)
-    max_std = sorted_stds[math.ceil(len(sorted_stds) * args.std_percent_threshold) - 1]
-    ixs = stds <= max_std
-    X, y, stds = X[ixs], y[ixs], stds[ixs]
-
-    ixs = np.random.choice(X.shape[0], size=N, replace=False)
-    X, y = X[ixs], y[ixs]
-    X, y = X.detach().numpy(), y.detach().numpy()
-
-    return X, y
-
-def import_Xy_f2_ifthen(args):
-    N = 250
-    # [B, 40] and [B, 2] and [B, ]
-    X, y = get_f2_ifthen_inputs_and_targets(args, N=N)
-
-    ixs = np.random.choice(X.shape[0], size=N, replace=False)
-    X, y = X[ixs], y[ixs]
-    X, y = X.detach().numpy(), y.detach().numpy()
-
-    return X, y
-
-def import_Xy_f2_direct(args):
-    N = 250
-
-    model = spock_reg_model.load(version=args.version, seed=args.seed)
-    model.make_dataloaders()
-    model.eval()
-
-    all_inputs, all_targets = [], []
-    data_iterator = iter(model.train_dataloader())
-    while sum([len(i) for i in all_inputs]) < N:
-        # just takes a random batch of inputs and passes them through the neural network
-        batch = next(data_iterator)
-        x, y = batch
-        # inputs to f2
-        summary_stats = model.forward_to_summary_only(x)
-        all_inputs.append(summary_stats)
-        # ground truth targets
-        all_targets.append(y)
-
-    # [B, 40] and [B, 2]
-    X = rearrange(all_inputs, 'l B ... -> (l B) ...')
-    y = rearrange(all_targets, 'l B ... -> (l B) ...')
-
-    ixs = np.random.choice(X.shape[0], size=N, replace=False)
-    X, y = X[ixs], y[ixs]
-    X, y = X.detach().numpy(), y.detach().numpy()
-
-    return X, y
-
-def import_Xy_f2_residual(args, model):
-    N = 250
-
-    model = spock_reg_model.load(version=args.version, seed=args.seed)
-    model.make_dataloaders()
-    model.eval()
-
-    all_inputs, all_targets, all_preds = [], [], []
-    data_iterator = iter(model.train_dataloader())
-    while sum([len(i) for i in all_inputs]) < N:
-        # just takes a random batch of inputs and passes them through the neural network
-        batch = next(data_iterator)
-        x, y = batch
-
-        # inputs to f2
-        summary_stats = model.forward_to_summary_only(x)
-        all_inputs.append(summary_stats)
-
-        # ground truth targets
-        all_targets.append(y)
-
-        # residual target predictions
-        preds = model(x, noisy_val=False)
-        all_preds.append(model(x, noisy_val=False))
-
-    # [B, 40] and [B, 2] and [B, 2]
-    X = rearrange(all_inputs, 'l B ... -> (l B) ...')
-    y = rearrange(all_targets, 'l B ... -> (l B) ...')
-    y_preds = rearrange(all_preds, 'l B ... -> (l B) ...')
-    # calculate the residual target: whatever of the target not explained by the preds
-    y = y - y_preds
-
-    ixs = np.random.choice(X.shape[0], size=N, replace=False)
-    X, y = X[ixs], y[ixs]
-    X, y = X.detach().numpy(), y.detach().numpy()
-
-    return X, y
-
-
-def get_f2_ifthen_inputs_and_targets(args, N):
-    model = spock_reg_model.load(version=args.version, seed=args.seed)
-    model.make_dataloaders()
-    model.eval()
-
-    all_inputs, all_targets = [], []
-    data_iterator = iter(model.train_dataloader())
-    while sum([len(i) for i in all_inputs]) < N:
-        # just takes a random batch of inputs and passes them through the neural network
-        batch = next(data_iterator)
-        inputs, targets = model.generate_f2_ifthen_inputs_and_targets(batch)
-        all_inputs.append(inputs)
-        all_targets.append(targets)
-
-    inputs = rearrange(all_inputs, 'l B ... -> (l B) ...')
-    targets = rearrange(all_targets, 'l B ... -> (l B) ...')
-    return inputs, targets
-
-
 LABELS = ['time', 'e+_near', 'e-_near', 'max_strength_mmr_near', 'e+_far', 'e-_far', 'max_strength_mmr_far', 'megno', 'a1', 'e1', 'i1', 'cos_Omega1', 'sin_Omega1', 'cos_pomega1', 'sin_pomega1', 'cos_theta1', 'sin_theta1', 'a2', 'e2', 'i2', 'cos_Omega2', 'sin_Omega2', 'cos_pomega2', 'sin_pomega2', 'cos_theta2', 'sin_theta2', 'a3', 'e3', 'i3', 'cos_Omega3', 'sin_Omega3', 'cos_pomega3', 'sin_pomega3', 'cos_theta3', 'sin_theta3', 'm1', 'm2', 'm3', 'nan_mmr_near', 'nan_mmr_far', 'nan_megno']
 
 LABEL_TO_IX = {label: i for i, label in enumerate(LABELS)}
@@ -225,8 +53,89 @@ def get_sr_included_ixs():
     assert len(skipped) == 10
 
     included_ixs = [i for i in range(len(LABELS)) if LABELS[i] not in skipped]
-    included_labels = [LABELS[i] for i in included_ixs]
     return included_ixs
+
+
+INCLUDED_IXS = get_sr_included_ixs()
+INPUT_VARIABLE_NAMES = [LABELS[ix] for ix in INCLUDED_IXS]
+
+
+def load_inputs_and_targets(args):
+    model = spock_reg_model.load(version=args.version, seed=args.seed)
+    model.make_dataloaders()
+    model.eval()
+
+    batch = next(iter(model.train_dataloader()))
+    x, y = batch
+    # we use noisy val bc it is used during training the NN too
+    out_dict = model.forward(x, return_intermediates=True, noisy_val=True)
+
+    if args.target == 'f1':
+        # inputs to SR are the inputs to f1 neural network
+        # we use this instead of x because the model zeros the unused inputs,
+        #  which is a nice check to have
+        X = out_dict['inputs']  # [B, T, F]
+        # targets for SR are the outputs of the f1 neural network
+        y = out_dict['f1_output']  # [B, T, F]
+        # f1 acts on timesteps independently, so we can just use different
+        #  time steps as different possible samples
+        X = rearrange(X, 'B T F -> (B T) F')
+        y = rearrange(y, 'B T F -> (B T) F')
+
+        # extract just the input variables we're actually using
+        assert_equal(len(LABELS), X.shape[1])
+        X = X[..., INCLUDED_IXS]
+        in_dim = len(INCLUDED_IXS)
+        out_dim = model.hparams['latent']
+        variable_names = INPUT_VARIABLE_NAMES
+    elif args.target == 'f2':
+        # inputs to SR are the inputs to f2 neural network
+        X = out_dict['summary_stats']  # [B, 40]
+        # target for SR is the predicted mean
+        y = out_dict['predicted_mean']  # [B, 1]
+        in_dim = model.hparams['latent'] * 2
+        out_dim = 1
+        n = X.shape[1] // 2
+        variable_names = [f'm{i}' for i in range(n)] + [f's{i}' for i in range(n)]
+    elif args.target == 'f2_ifthen':
+        # inputs to SR are the inputs to f2 neural network
+        X = out_dict['summary_stats']  # [B, 40]
+        # target for SR is the predicates from the ifthen network
+        y = out_dict['ifthen_preds']  # [B, 10]
+        in_dim = model.hparams['latent'] * 2
+        out_dim = 10
+        n = X.shape[1] // 2
+        variable_names = [f'm{i}' for i in range(n)] + [f's{i}' for i in range(n)]
+    elif args.target == 'f2_direct':
+        # inputs to SR are the inputs to f2 neural network
+        X = out_dict['summary_stats']  # [B, 40]
+        # target for SR is the ground truth mean, which we already have
+        y = y  # [B, 2]
+        # there are two ground truth predictions. create a data point for each
+        X = einops.repeat(X, 'B F -> (B two) F', two=2)
+        y = einops.rearrange(y, 'B two -> (B two) 1')
+        in_dim = model.hparams['latent'] * 2
+        out_dim = 1  #
+        n = X.shape[1] // 2
+        variable_names = [f'm{i}' for i in range(n)] + [f's{i}' for i in range(n)]
+    else:
+        raise ValueError(f'Unknown target: {args.target}')
+
+    if args.residual:
+        assert args.target == 'f2_direct', 'residual requires a direct target'
+        # target is the residual error of the model's prediction from the ground truth
+        y = y - out_dict['predicted_mean']
+
+
+    # go down from having a batch of size B to just N
+    ixs = np.random.choice(X.shape[0], size=args.n, replace=False)
+    X, y = X[ixs], y[ixs]
+    X, y = X.detach().numpy(), y.detach().numpy()
+
+    assert_equal(X.shape, (args.n, in_dim))
+    assert_equal(y.shape, (args.n, out_dim))
+
+    return X, y, variable_names
 
 
 def run_pysr(args):
@@ -234,22 +143,16 @@ def run_pysr(args):
     while os.path.exists(f'sr_results/{id}.pkl'):
         id = random.randint(0, 100000)
 
-    included_ixs = get_sr_included_ixs()
-
     path = f'sr_results/{id}.pkl'
     # replace '.pkl' with '.csv'
     path = path[:-3] + 'csv'
-    # save the included ixs
-    ixs_path = path[:-4] + '_ixs.json'
-    with open(ixs_path, 'w') as f:
-        json.dump(included_ixs, f)
 
     pysr_config = dict(
         # https://stackoverflow.com/a/57474787/4383594
         procs=int(os.environ.get('SLURM_CPUS_ON_NODE')) * int(os.environ.get('SLURM_JOB_NUM_NODES')),
         cluster_manager='slurm',
         equation_file=path,
-        niterations=500000,
+        niterations=args.niterations,
         binary_operators=["+", "*", '/', '-', '^'],
         unary_operators=["log", 'sin'],
         maxsize=args.max_size,
@@ -281,20 +184,9 @@ def run_pysr(args):
     command = utils.get_script_execution_command()
     print(command)
 
-    if args.target == 'f1':
-        X, y = import_Xy(args, included_ixs)
-        variables = variable_names(included_ixs)
-    elif args.target == 'f2':
-        X, y = import_Xy_f2(args)
-        n = X.shape[1] // 2
-        variables = [f'm{i}' for i in range(n)] + [f's{i}' for i in range(n)]
-    elif args.target == 'f2_ifthen':
-        X, y = import_Xy_f2_ifthen(args)
-        n = X.shape[1] // 2
-        variables = [f'm{i}' for i in range(n)] + [f's{i}' for i in range(n)]
-
+    X, y, variable_names = load_inputs_and_targets(args)
     model = pysr.PySRRegressor(**pysr_config)
-    model.fit(X, y, variable_names=variables)
+    model.fit(X, y, variable_names=variable_names)
     print('Done running pysr')
 
     losses = [min(eqs['loss']) for eqs in model.equation_file_contents_]
@@ -314,9 +206,6 @@ def run_pysr(args):
     print(f'Saved to path: {path}')
 
 
-def variable_names(included_ixs):
-    return [LABELS[ix] for ix in included_ixs]
-
 def spock_features(X):
     features = ['a1', 'a2', 'a3']
 
@@ -333,25 +222,21 @@ def spock_features(X):
     y = einops.rearrange(y, 'n B -> B n')
     return y
 
-def test_pysr():
-    included_indices = get_sr_included_ixs()
-    X, _ = import_Xy(included_indices)
-    # X = torch.ones((500, 31))
-    y = spock_features(X)
 
 def parse_args():
     # Instantiate the parser
     parser = argparse.ArgumentParser(description='Optional app description')
     # when importing from jupyter nb, it passes an arg to --f which we should just ignore
     parser.add_argument('--no_log', action='store_true', default=False, help='disable wandb logging')
-    parser.add_argument('--version', type=int, help='', default=63524)
+    parser.add_argument('--version', type=int, help='', required=True)
     parser.add_argument('--seed', type=int, default=0, help='default=0')
 
     parser.add_argument('--time_in_hours', type=float, default=1)
+    parser.add_argument('--niterations', type=float, default=500000) # by default, use time in hours as limit
     parser.add_argument('--max_size', type=int, default=30)
-    parser.add_argument('--target', type=str, default='f1', choices=['f1', 'f2', 'f2_ifthen', 'direct'])
-    # use the bottom % of stds to target sr on higher confidence predictions
-    parser.add_argument('--std_percent_threshold', type=float, default=1)
+    parser.add_argument('--target', type=str, default='f1', choices=['f1', 'f2', 'f2_ifthen', 'f2_direct'])
+    parser.add_argument('--residual', action='store_true', help='do residual training of your target')
+    parser.add_argument('--n', type=int, default=250, help='number of data points for the SR problem')
 
     args = parser.parse_args()
     return args
