@@ -22,16 +22,18 @@ conda activate bnn_chaos_model
 set -e
 
 version=$((1 + RANDOM % 999999))
+version2=$((1 + RANDOM % 999999))
 
-<<<<<<< HEAD
-# python -u find_minima.py --total_steps 300000 --version $version --slurm_id $SLURM_JOB_ID "$@" --f1_variant linear --f2_variant mlp 
-# python -u sr.py --version 29766 --target f2 --seed 0
+# python -u find_minima.py --total_steps 300000 --version $version --slurm_id $SLURM_JOB_ID --slurm_name $SLURM_JOB_NAME --f1_variant linear --f2_variant mlp 
+# python -u sr.py --version 29170 --target f2 --seed 0
 
 #for direct pysr validation loss evaluation
-#python -u find_minima.py --total_steps 300000 --version 30590 --slurm_id $SLURM_JOB_ID "$@" --pysr_f2 sr_results/51084.pkl --load 30590 --f1_variant pysr_frozen
+# python -u find_minima.py --version $version2 --slurm_id $SLURM_JOB_ID --slurm_name $SLURM_JOB_NAME --eval --pysr_f2 sr_results/5456.pkl --pysr_f2_model_selection best --total_steps 100 --load_f1 29170
 
 #for residual pysr validation loss evaluation
-python -u find_minima.py --total_steps 300000 --version 29766 --slurm_id $SLURM_JOB_ID "$@" --f2_variant pysr_residual --pysr_f2 sr_results/33796.pkl --load 29766
+# python -u find_minima.py --version $version2 --slurm_id $SLURM_JOB_ID --slurm_name $SLURM_JOB_NAME --eval --pysr_f2 sr_results/5456.pkl --pysr_f2_residual sr_results/92071.pkl --pysr_f2_model_selection best --pysr_f2_residual_model_selection best --total_steps 100 --load_f1 29170
+python -u find_minima.py --version $version2 --slurm_id $SLURM_JOB_ID --slurm_name $SLURM_JOB_NAME --eval --pysr_f2 sr_results/5456.pkl --pysr_f2_residual sr_results/92985.pkl --pysr_f2_model_selection best --pysr_f2_residual_model_selection best --total_steps 100 --load_f1 29170
+
 
 # python -u run_swag.py --total_steps 300000 --swa_steps 50000 --version $version --slurm_id $SLURM_JOB_ID "$@" --f1_variant linear --f2_variant pysr_residual
 # python -u find_minima.py --total_steps 300000 --swa_steps 50000  --angles --no_mmr --no_nan --no_eplusminus --version $version2 --slurm_id $SLURM_JOB_ID "$@" --f1_variant bimt --pysr_model sr_results/hall_of_fame_27379_0.pkl 
@@ -41,7 +43,3 @@ python -u find_minima.py --total_steps 300000 --version 29766 --slurm_id $SLURM_
 # .latex_table()
 # model.equations_
 # model.equations_.plot(“Complexity”, "Loss")
-=======
-python -u find_minima.py --version $version --slurm_id $SLURM_JOB_ID --slurm_name $SLURM_JOB_NAME "$@"
-python -u run_swag.py --version $version --slurm_id $SLURM_JOB_ID --slurm_name $SLURM_JOB_NAME "$@"
->>>>>>> 570c6ee3d33d4ad6931b314222294c1b654b86ef

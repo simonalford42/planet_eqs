@@ -78,7 +78,7 @@ if __name__ == '__main__':
 
     2882295 (f1: linear, f2: mlp (20 hidden dim)) (1250 epochs) --> 
     
-    3141997 (residual) --> 33796.pkl --> 3232141
-    3141996 (direct) --> 51084.pkl --> 3232142
+    3414974 (direct) --> sr_results/5456.pkl (3414974) --> validation: 3417801 or 3420962
+    3416616 (residual) --> sr_results/92071.pkl (3420963) --> validation: 3454798
     """
 

@@ -70,6 +70,8 @@ def get_f2_inputs_and_targets_direct(args, N=500):
         # just takes a random batch of inputs and passes them through the neural network
         batch = next(data_iterator)
         X, y = batch 
+        print(y.shape)
+        input()
         summary_stats, _, _ = model.generate_f2_inputs_and_targets(batch)
         all_inputs.append(summary_stats)
         all_targets.append(y)
@@ -80,7 +82,99 @@ def get_f2_inputs_and_targets_direct(args, N=500):
 
 
 def get_f2_inputs_and_targets_residual(args, N=500):
-    model = spock_reg_model.load(version=args.version, seed=args.seed)
+    # model = spock_reg_model.load(version=args.version, seed=args.seed)
+    TOTAL_STEPS = 300000
+    TRAIN_LEN = 78660
+    batch_size = 2000 #ilog_rand(32, 3200)
+    steps_per_epoch = int(1+TRAIN_LEN/batch_size)
+    epochs = int(1+TOTAL_STEPS/steps_per_epoch)
+    args = {
+        'seed': args.seed,
+        'batch_size': 2000,
+        'f1_depth': 1,
+        'swa_lr': 5e-4 / 2,
+        #'f2_depth': args.f2_depth,
+        'samp': 5,
+        'swa_start': epochs//2,
+        'weight_decay': 1e-14,
+        'to_samp': 1,
+        'epochs': epochs,
+        'scheduler': True,
+        'scheduler_choice': 'swa',
+        'steps': TOTAL_STEPS,
+        'beta_in': 1e-5,
+        'beta_out': 0.001,
+        'act': 'softplus',
+        'noisy_val': False,
+        'gradient_clip': 0.1,
+        # Much of these settings turn off other parameters tried:
+        'fix_megno': False, #avg,std of megno
+        'fix_megno2': True, #Throw out megno completely
+        'include_angles': True,
+        'include_mmr': False,
+        'include_nan': False,
+        'include_eplusminus': False,
+        'power_transform': False,
+        # moving some parse args to here to clean up
+        'plot': False,
+        'plot_random': False,
+        'train_all': False,
+        'lower_std': False,
+    }
+
+    arguments = {
+        'no_log': False,
+       # 'run_swag': None,
+        'slurm_id': -1,
+        'slurm_name': '',
+        'version': 1278,
+        'seed': 0,
+        'total_steps': 300000,
+        'hidden_dim': 40,
+        'latent': 20,
+        'swa_steps': 50000,
+        'batch_size': 2000,
+        'lr': 5e-4,
+        #'eval': None,
+        'sr_f1': False,
+        'loss_ablate': 'default',
+        'zero_theta': 0,
+        'no_summary_sample': False,
+        'init_special': False,
+        #'no_std': None,
+        #'no_mean': None,
+        #'f2_ablate': None,
+        #'f2_dropout': None,
+        #'mean_var': None,
+        #'tsurv': None,
+        #'n_predicates': 10,
+        'f1_variant': 'linear',
+        'f2_variant': 'mlp',
+        #'f2_depth': 1,
+        #'l1_reg': None,
+        #'l1_coeff': None,
+        #'prune_f1_topk': None,
+        #'prune_f1_topn': None,
+        #'freeze_f1': None,
+        #'freeze_f2': None,
+        'load_f1': 29170,
+        #'load_f2': None,
+        #'load_f1_f2': None,
+        #'pysr_f1': None,
+        #'pysr_f1_model_selection': 'best',
+        'pysr_f2': 'sr_results/5456.pkl',
+        'pysr_f2_model_selection': 'best',
+        #'f2_residual': None,
+        #'pysr_f2_residual': None,
+        #'pysr_f2_residual_model_selection': None,
+        'out': None
+    }
+
+    # by default, parsed args get sent as hparams
+    for k, v in arguments.items():
+        args[k] = v
+
+    model = spock_reg_model.VarModel(args)
     model.make_dataloaders()
     model.eval()
 
@@ -188,9 +282,9 @@ def import_Xy_f2_direct(args):
 def import_Xy_f2_residual(args, model):
     N = 250
 
-    model = spock_reg_model.load(version=args.version, seed=args.seed)
-    model.make_dataloaders()
-    model.eval()
+    #model = spock_reg_model.load(version=args.version, seed=args.seed)
+    #model.make_dataloaders()
+    #model.eval()
 
     all_inputs, all_targets, all_preds = [], [], []
     data_iterator = iter(model.train_dataloader())
@@ -279,7 +373,7 @@ def run_pysr(args, xx=None, yy=None):
         equation_file=path,
         niterations=500000,
         binary_operators=["+", "*", '/', '-', '^'],
-        unary_operators=["log", 'sin'],
+        unary_operators=['sin'], # removed "log"
         maxsize=args.max_size,
         timeout_in_seconds=int(60*60*args.time_in_hours),
         # prevent ^ from using complex exponents, nesting power laws is expressive but uninterpretable
@@ -432,92 +526,6 @@ def choose_topk(self, version, top_k):
 
 #choose points along the convex hull of pareto
 
-
-def import_Xy_f2_direct(args):
-    N = 500
-
-    model = spock_reg_model.load(version=args.version, seed=args.seed)
-    model.make_dataloaders()
-    model.eval()
-
-    all_inputs, all_targets = [], []
-    data_iterator = iter(model.train_dataloader())
-    while sum([len(i) for i in all_inputs]) < N:
-        # just takes a random batch of inputs and passes them through the neural network
-        batch = next(data_iterator)
-        x, y = batch
-        # inputs to f2
-        #summary_stats = model.forward_to_summary_only(x)
-        x, summary_stats = model.forward_to_summary_only(x)
-        print(summary_stats.size())
-        print(x.size())
-        #summary_stats, _, _ = model.generate_f2_inputs_and_targets(batch)
-        all_inputs.append(summary_stats)
-        # ground truth targets
-        all_targets.append(y)
-
-    # total_samples = 0
-    # for batch in model.train_dataloader():
-    #     x, y = batch
-    #     # inputs to f2
-    #     summary_stats = model.forward_to_summary_only(x)
-    #     all_inputs.append(summary_stats)
-    #     # Ground truth targets
-    #     all_targets.append(y)
-
-    #     total_samples += x.shape[0]  # Update total sample count
-    #     if total_samples >= N:
-    #         break  # Stop after collecting enough samples
-
-    #[B, 40] and [B, 2]
-    X = rearrange(all_inputs, 'l B ... -> (l B) ...')
-    y = rearrange(all_targets, 'l B ... -> (l B) ...')
-
-    ixs = np.random.choice(X.shape[0], size=N, replace=False)
-    X, y = X[ixs], y[ixs]
-    X, y = X.detach().numpy(), y.detach().numpy()
-
-    return X, y
-
-
-def import_Xy_f2_residual(args):
-    N = 250
-
-    model = spock_reg_model.load(version=args.version, seed=args.seed)
-    model.make_dataloaders()
-    model.eval()
-
-    all_inputs, all_targets, all_preds = [], [], []
-    data_iterator = iter(model.train_dataloader())
-    while sum([len(i) for i in all_inputs]) < N:
-        # just takes a random batch of inputs and passes them through the neural network
-        batch = next(data_iterator)
-        x, y = batch
-
-        # inputs to f2
-        summary_stats = model.forward_to_summary_only(x)
-        all_inputs.append(summary_stats)
-
-        # ground truth targets
-        all_targets.append(y)
-
-        # residual target predictions
-        y_preds = model(x, noisy_val=False)
-        all_preds.append(model(x, noisy_val=False))
-
-    # [B, 40] and [B, 2] and [B, 2]
-    X = rearrange(all_inputs, 'l B ... -> (l B) ...')
-    y = rearrange(all_targets, 'l B ... -> (l B) ...')
-    y_preds = rearrange(all_preds, 'l B ... -> (l B) ...')
-    # calculate the residual target: whatever of the target not explained by the preds
-    y = y - y_preds
-
-    ixs = np.random.choice(X.shape[0], size=N, replace=False)
-    X, y = X[ixs], y[ixs]
-    X, y = X.detach().numpy(), y.detach().numpy()
-
-    return X, y    
-
 # def direct_pysr_run(args):
 #     X, y = import_Xy_f2_direct(args)
 #     run_pysr(X, y, args)
@@ -562,7 +570,7 @@ def boosted_regression(num_iters, top_k, args):
 
         args.version = model_version
 
-
+import math
 if __name__ == '__main__':
     args = parse_args()
 
@@ -574,3 +582,16 @@ if __name__ == '__main__':
     # num_iters = 5
     # top_k = 3
     # boosted_regression(num_iters, top_k, args)
+
+
+
+    # cmd = f'python test_multi_sim.py --id {ids[i]} --dir {args.dir} ' \
+    #       f'--steps {args.steps} --body-type {args.body_type} --sdf-dx {args.sdf_dx} '
+    # if not args.non_fixed: cmd += '--fixed'
+
+    version=((1 + math.random % 999999))
+    version2=((1 + math.random % 999999))
+    
+    cmd = f'python -u find_minima.py --total_steps 300000 --version $version \
+            --slurm_id $SLURM_JOB_ID --slurm_name $SLURM_JOB_NAME --f1_variant linear --f2_variant mlp '
+    os.system(cmd)

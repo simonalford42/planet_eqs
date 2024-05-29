@@ -81,9 +81,6 @@ def parse():
     parser.add_argument('--pysr_f2_residual', type=str, default=None)# PySR model to load for f2 residual , e.g. 'sr_resuls/hall_of_fame_f2_21101_0_1.pkl'
     parser.add_argument('--pysr_f2_residual_model_selection', type=str, default=None)# PySR model to load for f2 residual , e.g. 'sr_resuls/hall_of_fame_f2_21101_0_1.pkl'
 
-    parser.add_argument('--freeze_f1', action='store_true')
-    parser.add_argument('--freeze_f2', action='store_true')
-
     args = parser.parse_args()
 
     if args.f1_variant == 'identity':
