@@ -25,8 +25,8 @@ import random
 import dill
 import sys
 import pandas as pd
-import spock
-from spock import FeatureRegressor, FeatureRegressorXGB
+# import spock
+# from spock import FeatureRegressor, FeatureRegressorXGB
 from icecream import ic
 
 try:
@@ -34,7 +34,7 @@ try:
 except:
     pass
 
-spockoutfile = '../data/spockprobstesttrio.npz'
+spockoutfile = 'data/spockprobstesttrio.npz'
 version = int(sys.argv[1])
 
 from multiswag_5_planet_plot import make_plot
@@ -65,7 +65,7 @@ model = FeatureRegressor(
     #'long_zero_megno_with_angles_power_v14_*_output.pkl'
 )
 
-xgbmodel = FeatureRegressorXGB()
+# xgbmodel = FeatureRegressorXGB()
 
 
 # -
@@ -73,8 +73,8 @@ xgbmodel = FeatureRegressorXGB()
 # # read initial condition file
 
 # +
-infile_delta_2_to_10 = '../data/initial_conditions_delta_2_to_10.npz'
-infile_delta_10_to_13 = '../data/initial_conditions_delta_10_to_13.npz'
+infile_delta_2_to_10 = 'data/initial_conditions_delta_2_to_10.npz'
+infile_delta_10_to_13 = 'data/initial_conditions_delta_10_to_13.npz'
 
 ic1 = np.load(infile_delta_2_to_10)
 ic2 = np.load(infile_delta_10_to_13)
@@ -94,11 +94,11 @@ f_init = np.concatenate([ic1['f'], ic2['f']], axis=1) # array containing intial 
 # # create rebound simulation and predict stability for each system in nsim_list
 
 # +
-infile_delta_2_to_10 = '../data/initial_conditions_delta_2_to_10.npz'
-infile_delta_10_to_13 = '../data/initial_conditions_delta_10_to_13.npz'
+infile_delta_2_to_10 = 'data/initial_conditions_delta_2_to_10.npz'
+infile_delta_10_to_13 = 'data/initial_conditions_delta_10_to_13.npz'
 
-outfile_nbody_delta_2_to_10 = '../data/merged_output_files_delta_2_to_10.npz'
-outfile_nbody_delta_10_to_13 = '../data/merged_output_files_delta_10_to_13.npz'
+outfile_nbody_delta_2_to_10 = 'data/merged_output_files_delta_2_to_10.npz'
+outfile_nbody_delta_10_to_13 = 'data/merged_output_files_delta_10_to_13.npz'
 
 ## load hill spacing
 
@@ -146,7 +146,7 @@ for nsim in nsim_list:
     init_sim_parameters(sim)
     sims.append(sim)
     sims_for_xgb.append(sim.copy())
-    
+
 # +
 
 
@@ -186,8 +186,8 @@ def data_setup_kernel(mass_array, cur_tseries):
 
 from collections import OrderedDict
 import sys
-sys.path.append('spock')
-from tseries_feature_functions import get_extended_tseries
+# sys.path.append('spock')
+# from tseries_feature_functions import get_extended_tseries
 
 
 # +
@@ -195,7 +195,7 @@ from tseries_feature_functions import get_extended_tseries
 def get_features_for_sim(sim_i, indices=None):
     sim = sims[sim_i]
     if sim.N_real < 4:
-        raise AttributeError("SPOCK Error: SPOCK only works for systems with 3 or more planets") 
+        raise AttributeError("SPOCK Error: SPOCK only works for systems with 3 or more planets")
     if indices:
         if len(indices) != 3:
             raise AttributeError("SPOCK Error: indices must be a list of 3 particle indices")
@@ -225,12 +225,12 @@ def get_features_for_sim(sim_i, indices=None):
         mass_array = np.array([sim.particles[j].m/sim.particles[0].m for j in trio])
         X = data_setup_kernel(mass_array, cur_tseries)
         Xs.append(X)
-        
+
     return Xs
 
-def get_xgb_prediction(sim_i):
-    sim = sims_for_xgb[sim_i].copy()
-    return xgbmodel.predict(sim)
+# def get_xgb_prediction(sim_i):
+#     sim = sims_for_xgb[sim_i].copy()
+#     return xgbmodel.predict(sim)
 
 # +
 
@@ -240,21 +240,21 @@ from multiprocessing import Pool
 
 pool = Pool(7)
 
-xgb_predictions = np.array(pool.map(
-    get_xgb_prediction,
-    range(len(sims))
-))
+# xgb_predictions = np.array(pool.map(
+#     get_xgb_prediction,
+#     range(len(sims))
+# ))
 
 
-X = np.array(pool.map(
-    get_features_for_sim,
-    range(len(sims))
-))[:, :, 0, :, :]
+# X = np.array(pool.map(
+#     get_features_for_sim,
+#     range(len(sims))
+# ))[:, :, 0, :, :]
 #(sim, trio, time, feature)
 
 # -
 
-allmeg = X[..., model.swag_ensemble[0].megno_location].ravel()
+# allmeg = X[..., model.swag_ensemble[0].megno_location].ravel()
 
 # +
 # from plotnine import *
@@ -307,7 +307,7 @@ def fast_truncnorm(
         loc, scale, left=jnp.inf, right=jnp.inf,
         d=10000, nsamp=50, seed=0):
     """Fast truncnorm sampling.
-    
+
     Assumes scale and loc have the desired shape of output.
     length is number of elements.
     Select nsamp based on expecting at minimum one sample of a Gaussian
@@ -317,7 +317,7 @@ def fast_truncnorm(
     """
     oldscale = scale
     oldloc = loc
-    
+
     scale = scale.reshape(-1)
     loc = loc.reshape(-1)
     samples = jnp.zeros_like(scale)
@@ -326,13 +326,13 @@ def fast_truncnorm(
         rng = PRNGKey(seed)
     except:
         rng = 0
-        
+
     for start in range(0, scale.shape[0], d):
 
         end = start + d
         if end > scale.shape[0]:
             end = scale.shape[0]
-        
+
         cd = end-start
         try:
             rand_out = normal(
@@ -347,7 +347,7 @@ def fast_truncnorm(
             rand_out * scale[None, start:end]
             + loc[None, start:end]
         )
-        
+
         #rand_out is (nsamp, cd)
         if right == jnp.inf:
             mask = (rand_out > left)
@@ -355,18 +355,18 @@ def fast_truncnorm(
             mask = (rand_out < right)
         else:
             mask = (rand_out > left) & (rand_out < right)
-            
+
         first_good_val = rand_out[
             mask.argmax(0), jnp.arange(cd)
         ]
-        
+
         try:
             samples = jax.ops.index_update(
                 samples, np.s_[start:end], first_good_val
             )
         except:
             samples[start:end] = first_good_val
-        
+
     return samples.reshape(*oldscale.shape)
 
 from time import time as ttime
@@ -471,8 +471,8 @@ for i in range(len(outs)):
     cleaned['m1'].append(m1)
     cleaned['m2'].append(m2)
     cleaned['m3'].append(m3)
-    cleaned['xgb'].append(xgb_predictions[i])
-    
+    # cleaned['xgb'].append(xgb_predictions[i])
+
     if log_t_exit[i] <= 4.0:
         cleaned['average'].append(log_t_exit[i])
         cleaned['median'].append(log_t_exit[i])
@@ -500,7 +500,7 @@ cleaned = pd.DataFrame(cleaned)
 for key in 'average median l u ll uu'.split(' '):
     cleaned.loc[cleaned['true']<=4.0, key] = cleaned.loc[cleaned['true']<=4.0, 'true']
 
-    
+
 import glob
 
 from matplotlib import ticker

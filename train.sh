@@ -23,5 +23,5 @@ set -e
 
 version=$((1 + RANDOM % 999999))
 
-python -u find_minima.py --version $version --slurm_id $SLURM_JOB_ID --slurm_name $SLURM_JOB_NAME "$@"
-python -u run_swag.py --version $version --slurm_id $SLURM_JOB_ID --slurm_name $SLURM_JOB_NAME "$@"
+python -u find_minima.py --version $version "$@"
+python -u run_swag.py --version $version "$@"

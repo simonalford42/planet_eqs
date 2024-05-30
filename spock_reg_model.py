@@ -642,19 +642,20 @@ class VarModel(pl.LightningModule):
         self.l1_reg_weights = 'l1_reg' in hparams and hparams['l1_reg'] in ['weights', 'both_weights']
         self.l1_reg_f2_weights = 'l1_reg' in hparams and hparams['l1_reg'] in ['f2_weights', 'both_weights']
 
-        self.feature_nn = self.get_feature_nn(hparams)
+        # self.feature_nn_out_dim is usually hparams['latent'], unless we're using a weird f1 variant (such as taking products of input features)
+        self.feature_nn, self.feature_nn_out_dim = self.get_feature_nn(hparams)
+
+        summary_dim = self.feature_nn_out_dim * 2
 
         if (('no_std' in hparams and hparams['no_std'])
             or ('no_mean' in hparams and hparams['no_mean'])):
-            c = 1
-        else:
-            c = 2
-        summary_dim = hparams['latent'] * c + int(self.fix_megno) * 2
+            summary_dim = self.feature_nn_out_dim
 
-        if hparams['f1_variant'] == 'pruned_products':
-            summary_dim = hparams['lantent'] * hparams['latent'] * c + int(self.fix_megno) * 2
+        if self.fix_megno:
+            summary_dim += 2
 
-        self.regress_nn = self.get_regress_nn(hparams, summary_dim)
+        # sometimes the f2 config changes the summary dim
+        self.regress_nn, self.summary_dim = self.get_regress_nn(hparams, summary_dim)
 
         self.input_noise_logvar = nn.Parameter(torch.zeros(self.n_features)-2)
         self.summary_noise_logvar = nn.Parameter(torch.zeros(summary_dim) - 2) # add to summaries, not direct latents
@@ -704,12 +705,24 @@ class VarModel(pl.LightningModule):
 
 
     def get_regress_nn(self, hparams, summary_dim):
+        '''
+        summary dim is
+            - the input dim of the regress nn
+            - the dimension of the summary statistics
+            - typically two times the output dim of the f1 network
+        '''
         if 'f2_variant' not in hparams:
             hparams['f2_variant'] = 'mlp'
+
+        load_version = None
         if 'load_f2' in hparams and hparams['load_f2']:
-            regress_nn = load(hparams['load_f2']).regress_nn
+            load_version = hparams['load_f2']
         elif 'load_f1_f2' in hparams and hparams['load_f1_f2']:
-            regress_nn = load(hparams['load_f1_f2']).regress_nn
+            load_version = hparams['load_f1_f2']
+        if load_version is not None:
+            model = load(load_version)
+            regress_nn = model.regress_nn
+            summary_dim = model.summary_dim
         elif hparams['f1_variant'] == 'mean_cov':
             i = self.n_features
             if 'mean_var' in hparams and hparams['mean_var']:
@@ -722,8 +735,8 @@ class VarModel(pl.LightningModule):
                                                        init=hparams['init_special'])
                 utils.freeze_module(special_linear)
                 regress_nn = nn.Sequential(special_linear,
-                                     nn.BatchNorm1d(2 * hparams['latent']),
-                                     modules.mlp(2 * hparams['latent'], 2, hparams['hidden_dim'], hparams['f2_depth']))
+                                     nn.BatchNorm1d(summary_dim),
+                                     modules.mlp(summary_dim, 2, hparams['hidden_dim'], hparams['f2_depth']))
         elif hparams['f2_variant'] == 'ifthen':
             regress_nn = modules.IfThenNN(hparams['n_predicates'], summary_dim, 2, hparams['hidden_dim'], hparams['f2_depth'])
         elif hparams['f2_variant'] == 'ifthen2':
@@ -739,7 +752,7 @@ class VarModel(pl.LightningModule):
 
         if 'f2_residual' in hparams and hparams['f2_residual'] or 'pysr_f2_residual' in hparams and hparams['pysr_f2_residual']:
             if hparams['f2_residual'] == 'mlp':
-                residual_net = modules.mlp(hparams['latent'] * 2, 2, hparams['hidden_dim'], hparams['f2_depth'])
+                residual_net = modules.mlp(summary_dim, 2, hparams['hidden_dim'], hparams['f2_depth'])
             else:
                 # assert hparams['f2_residual'] == 'pysr'
                 residual_net = modules.PySRNet(hparams['pysr_f2_residual'], hparams['pysr_f2_residual_model_selection'])
@@ -748,26 +761,37 @@ class VarModel(pl.LightningModule):
         if 'freeze_f2' in hparams and hparams['freeze_f2']:
             utils.freeze_module(regress_nn)
 
-        return regress_nn
+        return regress_nn, summary_dim
 
     def get_feature_nn(self, hparams):
         feature_nn = None
+        out_dim = hparams['latent'] # certain f1 variants might change this
+
         load_version = None
         if 'load_f1' in hparams and hparams['load_f1']:
             load_version = hparams['load_f1']
         elif 'load_f1_f2' in hparams and hparams['load_f1_f2']:
             load_version = hparams['load_f1_f2']
         if load_version:
-            feature_nn = load(load_version).feature_nn
-            if 'prune_f1_topk' in hparams and hparams['prune_f1_topk'] is not None and hparams['f1_variant'] != 'pruned_products':
-                feature_nn = modules.pruned_linear(feature_nn, top_k=hparams['prune_f1_topk'], top_n=hparams['prune_f1_topn'])
+            model = load(load_version)
+            feature_nn = model.feature_nn
+            out_dim = model.feature_nn_out_dim
+            if 'prune_f1_topk' in hparams and hparams['prune_f1_topk'] is not None:
+                # hack in case f1 was a weird variant, like products2
+                if isinstance(feature_nn, nn.Sequential):
+                    assert isinstance(feature_nn[1], nn.Linear)
+                    feature_nn[1] = modules.pruned_linear(feature_nn[1], top_k=hparams['prune_f1_topk'], top_n=hparams['prune_f1_topn'])
+                else:
+                    feature_nn = modules.pruned_linear(feature_nn, top_k=hparams['prune_f1_topk'], top_n=hparams['prune_f1_topn'])
         elif 'pysr_f1' in hparams and hparams['pysr_f1']:
             # constants can still be optimized with SGD
             feature_nn = modules.PySRFeatureNN(hparams['pysr_f1'], model_selection=hparams['pysr_f1_model_selection'])
+            out_dim = len(feature_nn.module_list)
         elif hparams['f1_variant'] == 'random_features':
             feature_nn = modules.RandomFeatureNN(in_n=self.n_features, out_n=hparams['latent'])
         elif hparams['f1_variant'] == 'identity':
             feature_nn = torch.nn.Identity()
+            out_dim = self.n_features
         elif hparams['f1_variant'] == 'zero':
             feature_nn = modules.ZeroNN(in_n=self.n_features, out_n=hparams['latent'])
         elif hparams['f1_variant'] == 'linear':
@@ -786,7 +810,7 @@ class VarModel(pl.LightningModule):
             linear = nn.Linear(self.n_features + 36, hparams['latent'],
                                bias='no_bias' not in hparams or not hparams['no_bias'])
             feature_nn = nn.Sequential(modules.Products2(), linear)
-        elif hparams['f1_variant'] in ['random', 'random_frozen']:
+        elif hparams['f1_variant'] == 'random':
             feature_nn = nn.Linear(self.n_features, hparams['latent'], bias='no_bias' not in hparams or not hparams['no_bias'])
             # make the linear projection random combinations of two input variables, with coefficients from U[-1, 1]
             weight = torch.zeros_like(feature_nn.weight)
@@ -794,16 +818,7 @@ class VarModel(pl.LightningModule):
                 weight[i, np.random.choice(self.n_features, 2, replace=False)] = torch.rand(2) * 2 - 1
 
             feature_nn.weight = torch.nn.Parameter(weight)
-            if hparams['f1_variant'] == 'random_frozen':
-                utils.freeze_module(feature_nn)
-            else:
-                feature_nn = modules.pruned_linear(feature_nn, k=2)
-        elif hparams['f1_variant'] == 'pruned_products':
-            model = load(hparams['load'])
-            linear = model.feature_nn
-            feature_nn = nn.Sequential(
-                modules.pruned_linear(linear, top_k=hparams['prune_f1_topk']),
-                modules.Products())
+            feature_nn = modules.pruned_linear(feature_nn, k=2)
         else:
             assert hparams['f1_variant'] == 'mlp'
             feature_nn = modules.mlp(self.n_features, hparams['latent'], hparams['hidden_dim'], hparams['f1_depth'])
@@ -816,7 +831,7 @@ class VarModel(pl.LightningModule):
         if 'freeze_f1' in hparams and hparams['freeze_f1']:
             utils.freeze_module(feature_nn)
 
-        return feature_nn
+        return feature_nn, out_dim
 
     def do_nothing_optimizer_step(
         self,
@@ -1041,6 +1056,8 @@ class VarModel(pl.LightningModule):
             summary_stats = torch.cat([summary_stats, megno_avg_std], dim=1)
 
         self._cur_summary = summary_stats
+
+        assert_equal(self.summary_noise_logvar.shape[0], summary_stats.shape[1])
 
         #summary is (batch, feature)
         self._summary_kl = (1/2) * (

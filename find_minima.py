@@ -8,13 +8,11 @@ from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
 import torch
 import numpy as np
-from scipy.stats import truncnorm
 import sys
 from parse_swag_args import parse
 import utils
-import modules
 from modules import mlp
-import torch.nn as nn
+import os
 
 rand = lambda lo, hi: np.random.rand()*(hi-lo) + lo
 irand = lambda lo, hi: int(np.random.rand()*(hi-lo) + lo)
@@ -70,6 +68,8 @@ args = {
     'plot_random': False,
     'train_all': False,
     'lower_std': False,
+    'slurm_id': os.environ.get('SLURM_JOB_ID', None),
+    'slurm_name': os.environ.get('SLURM_JOB_NAME', None),
 }
 
 # by default, parsed args get sent as hparams

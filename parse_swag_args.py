@@ -22,8 +22,6 @@ def parse():
     ########## logging, etc ##########
     parser.add_argument('--no_log', action='store_true', default=False, help='disable wandb logging')
     parser.add_argument('--run_swag', action='store_true')
-    parser.add_argument('--slurm_id', type=int, default=-1, help='slurm job id')
-    parser.add_argument('--slurm_name', type=str, default='', help='slurm job name')
     parser.add_argument('--version', type=int, help='', default=1278)
     parser.add_argument('--seed', type=int, default=0, help='default=0')
 
@@ -54,7 +52,7 @@ def parse():
 
     ########## architecture variant args ##########
     parser.add_argument('--f1_variant', type=str, default='linear',
-                        choices=['zero', 'identity', 'random_features', 'linear', 'mean_cov', 'mlp', 'random', 'random_frozen', 'bimt', 'biolinear', 'products', 'products2', 'pruned_products']) # to do pysr, use --pysr_f1 arg
+                        choices=['zero', 'identity', 'random_features', 'linear', 'mean_cov', 'mlp', 'random', 'bimt', 'biolinear', 'products', 'products2']) # to do pysr, use --pysr_f1 arg
     parser.add_argument('--f2_variant', type=str, default='mlp', choices=['ifthen', 'mlp', 'linear', 'bimt', 'ifthen2', 'new']) # to do pysr, use --pysr_f2 arg
 
     parser.add_argument('--f2_depth', type=int,  default=1, help='regress nn number of hidden layers')
@@ -62,8 +60,8 @@ def parse():
     parser.add_argument('--l1_reg', type=str, choices=['inputs', 'weights', 'f2_weights', 'both_weights'], default=None)
     parser.add_argument('--l1_coeff', type=float, default=None)
 
-    parser.add_argument('--prune_f1_topk', type=int, default=None)
-    parser.add_argument('--prune_f1_topn', type=int, default=None)
+    parser.add_argument('--prune_f1_topk', type=int, default=None, help='number of input features per latent feature')
+    parser.add_argument('--prune_f1_topn', type=int, default=None, help='number of latent features to prune to')
 
     parser.add_argument('--freeze_f1', action='store_true')
     parser.add_argument('--freeze_f2', action='store_true')
