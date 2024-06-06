@@ -25,17 +25,22 @@ import random
 import dill
 import sys
 import pandas as pd
-# import spock
-# from spock import FeatureRegressor, FeatureRegressorXGB
+import spock
+from spock import FeatureRegressor, FeatureRegressorXGB
 from icecream import ic
+import utils
 
 try:
     plt.style.use('paper')
 except:
     pass
 
-spockoutfile = 'data/spockprobstesttrio.npz'
+spockoutfile = '../data/spockprobstesttrio.npz'
 version = int(sys.argv[1])
+# Paper-ready is 5000:
+N = int(sys.argv[2]) if len(sys.argv) > 2 else 50
+# Paper-ready is 10000
+samples = int(sys.argv[3]) if len(sys.argv) > 3 else 100
 
 from multiswag_5_planet_plot import make_plot
 
@@ -50,9 +55,9 @@ except FileNotFoundError:
 stride = 1
 nsim_list = np.arange(0, 17500)
 # Paper-ready is 5000:
-N = 50
+# N = 50
 # Paper-ready is 10000
-samples = 100
+# samples = 100
 used_axes = np.linspace(0, 17500-1, N).astype(np.int32)#np.arange(17500//3, 17500, 1750//3)
 
 nsim_list = nsim_list[used_axes]
@@ -60,12 +65,12 @@ nsim_list = nsim_list[used_axes]
 
 model = FeatureRegressor(
     cuda=True,
-    filebase='../pretrained/*' + f'v{version:d}' + '*output.pkl'
+    filebase='../' + utils.ckpt_path(version, glob=True) +  '*output.pkl'
     # filebase='*' + 'v30' + '*output.pkl'
     #'long_zero_megno_with_angles_power_v14_*_output.pkl'
 )
 
-# xgbmodel = FeatureRegressorXGB()
+xgbmodel = FeatureRegressorXGB()
 
 
 # -
@@ -73,8 +78,8 @@ model = FeatureRegressor(
 # # read initial condition file
 
 # +
-infile_delta_2_to_10 = 'data/initial_conditions_delta_2_to_10.npz'
-infile_delta_10_to_13 = 'data/initial_conditions_delta_10_to_13.npz'
+infile_delta_2_to_10 = '../data/initial_conditions_delta_2_to_10.npz'
+infile_delta_10_to_13 = '../data/initial_conditions_delta_10_to_13.npz'
 
 ic1 = np.load(infile_delta_2_to_10)
 ic2 = np.load(infile_delta_10_to_13)
@@ -94,11 +99,11 @@ f_init = np.concatenate([ic1['f'], ic2['f']], axis=1) # array containing intial 
 # # create rebound simulation and predict stability for each system in nsim_list
 
 # +
-infile_delta_2_to_10 = 'data/initial_conditions_delta_2_to_10.npz'
-infile_delta_10_to_13 = 'data/initial_conditions_delta_10_to_13.npz'
+infile_delta_2_to_10 = '../data/initial_conditions_delta_2_to_10.npz'
+infile_delta_10_to_13 = '../data/initial_conditions_delta_10_to_13.npz'
 
-outfile_nbody_delta_2_to_10 = 'data/merged_output_files_delta_2_to_10.npz'
-outfile_nbody_delta_10_to_13 = 'data/merged_output_files_delta_10_to_13.npz'
+outfile_nbody_delta_2_to_10 = '../data/merged_output_files_delta_2_to_10.npz'
+outfile_nbody_delta_10_to_13 = '../data/merged_output_files_delta_10_to_13.npz'
 
 ## load hill spacing
 
@@ -157,9 +162,9 @@ def data_setup_kernel(mass_array, cur_tseries):
 
     isnotfinite = lambda _x: ~np.isfinite(_x)
 
-    old_X = np.concatenate((old_X, isnotfinite(old_X[:, :, [3]]).astype(np.float)), axis=2)
-    old_X = np.concatenate((old_X, isnotfinite(old_X[:, :, [6]]).astype(np.float)), axis=2)
-    old_X = np.concatenate((old_X, isnotfinite(old_X[:, :, [7]]).astype(np.float)), axis=2)
+    old_X = np.concatenate((old_X, isnotfinite(old_X[:, :, [3]]).astype(float)), axis=2)
+    old_X = np.concatenate((old_X, isnotfinite(old_X[:, :, [6]]).astype(float)), axis=2)
+    old_X = np.concatenate((old_X, isnotfinite(old_X[:, :, [7]]).astype(float)), axis=2)
 
     old_X[..., :] = np.nan_to_num(old_X[..., :], posinf=0.0, neginf=0.0)
 
@@ -186,8 +191,8 @@ def data_setup_kernel(mass_array, cur_tseries):
 
 from collections import OrderedDict
 import sys
-# sys.path.append('spock')
-# from tseries_feature_functions import get_extended_tseries
+sys.path.append('spock')
+from tseries_feature_functions import get_extended_tseries
 
 
 # +
@@ -228,9 +233,9 @@ def get_features_for_sim(sim_i, indices=None):
 
     return Xs
 
-# def get_xgb_prediction(sim_i):
-#     sim = sims_for_xgb[sim_i].copy()
-#     return xgbmodel.predict(sim)
+def get_xgb_prediction(sim_i):
+    sim = sims_for_xgb[sim_i].copy()
+    return xgbmodel.predict(sim)
 
 # +
 
@@ -240,21 +245,21 @@ from multiprocessing import Pool
 
 pool = Pool(7)
 
-# xgb_predictions = np.array(pool.map(
-#     get_xgb_prediction,
-#     range(len(sims))
-# ))
+xgb_predictions = np.array(pool.map(
+    get_xgb_prediction,
+    range(len(sims))
+))
 
 
-# X = np.array(pool.map(
-#     get_features_for_sim,
-#     range(len(sims))
-# ))[:, :, 0, :, :]
+X = np.array(pool.map(
+    get_features_for_sim,
+    range(len(sims))
+))[:, :, 0, :, :]
 #(sim, trio, time, feature)
 
 # -
 
-# allmeg = X[..., model.swag_ensemble[0].megno_location].ravel()
+allmeg = X[..., model.swag_ensemble[0].megno_location].ravel()
 
 # +
 # from plotnine import *
@@ -471,7 +476,7 @@ for i in range(len(outs)):
     cleaned['m1'].append(m1)
     cleaned['m2'].append(m2)
     cleaned['m3'].append(m3)
-    # cleaned['xgb'].append(xgb_predictions[i])
+    cleaned['xgb'].append(xgb_predictions[i])
 
     if log_t_exit[i] <= 4.0:
         cleaned['average'].append(log_t_exit[i])
@@ -504,6 +509,7 @@ for key in 'average median l u ll uu'.split(' '):
 import glob
 
 from matplotlib import ticker
+
 
 
 # +
@@ -542,3 +548,4 @@ cleaned['petitf'] = np.log10(pd.Series([Tsurv(
 import time
 cleaned.to_csv(f'cur_plot_dataset_{time.time()}.csv')
 make_plot(cleaned, version)
+print('made plot')

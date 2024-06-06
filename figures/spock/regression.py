@@ -18,7 +18,10 @@ from icecream import ic
 import glob
 import seaborn as sns
 from matplotlib import pyplot as plt
-plt.style.use('science')
+try:
+    plt.style.use('science')
+except OSError:
+    pass
 import spock_reg_model
 import torch
 import numpy as np
@@ -74,7 +77,7 @@ class FeatureRegressor(object):
     def sample_full_swag(self, X_sample):
         """Pick a random model from the ensemble and sample from it
             within each model, it samples from its weights."""
-        
+
         swag_i = np.random.randint(0, len(self.swag_ensemble))
         swag_model = self.swag_ensemble[swag_i]
         swag_model.eval()
@@ -110,7 +113,7 @@ class FeatureRegressor(object):
     @profile
     def sample(self, sim, indices=None, samples=1000):
         if sim.N_real < 4:
-            raise AttributeError("SPOCK Error: SPOCK only works for systems with 3 or more planets") 
+            raise AttributeError("SPOCK Error: SPOCK only works for systems with 3 or more planets")
         if indices:
             if len(indices) != 3:
                 raise AttributeError("SPOCK Error: indices must be a list of 3 particle indices")
@@ -228,8 +231,8 @@ class FeatureRegressorXGB():
 
     def check_errors(self, sim):
         if sim.N_real < 4:
-            raise AttributeError("SPOCK Error: SPOCK only applicable to systems with 3 or more planets") 
-        
+            raise AttributeError("SPOCK Error: SPOCK only applicable to systems with 3 or more planets")
+
     def predict(self, sim):
         """
         Predict instability time (log10(T)) of passed simulation
@@ -241,19 +244,19 @@ class FeatureRegressorXGB():
         Returns:
 
         float:  Estimated instability log10(time)
-                
+
 
         """
         triofeatures, stable = self.generate_features(sim)
         if stable == False:
             return 4.0
-       
+
         triovals = self.predict_from_features(triofeatures)
         return triovals.min()          # minimum time among all trios tested
 
     def generate_features(self, sim):
         """
-        Generates the set of summary features used by the feature classifier for prediction. 
+        Generates the set of summary features used by the feature classifier for prediction.
 
         Parameters:
 
@@ -263,19 +266,19 @@ class FeatureRegressorXGB():
 
         List of OrderedDicts:   A list of sets of features for each adjacent trio of planets in system.
                                 Each set of features is an ordered dictionary of 10 summary features. See paper.
-       
-        stable (int):           An integer for whether the N-body integration survived the 10^4 orbits (1) or 
+
+        stable (int):           An integer for whether the N-body integration survived the 10^4 orbits (1) or
                                 went unstable (0).
         """
         sim = sim.copy()
         init_sim_parameters(sim)
         self.check_errors(sim)
-        
-        trios = [[i,i+1,i+2] for i in range(1,sim.N_real-2)] # list of adjacent trios   
+
+        trios = [[i,i+1,i+2] for i in range(1,sim.N_real-2)] # list of adjacent trios
         featureargs = [10000, 80, trios]
         triofeatures, stable = features(sim, featureargs)    # stable will be 0 if an orbit is hyperbolic
                                                              # sim.dt = nan in init_sim_parameters
-        
+
         return triofeatures, stable
 
     def predict_from_features(self, triofeatures):

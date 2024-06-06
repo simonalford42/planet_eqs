@@ -2,16 +2,14 @@
 # coding: utf-8
 import glob
 import seaborn as sns
-# import scienceplots
 from matplotlib import pyplot as plt
 import pandas as pd
-# plt.style.use('science')
+plt.style.use('science')
 
 import spock_reg_model
 from pytorch_lightning import Trainer
-# from pytorch_lightning.loggers import TensorBoardLogger
-# from pytorch_lightning.callbacks import LearningRateLogger, ModelCheckpoint
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.callbacks import LearningRateLogger, ModelCheckpoint
 
 import torch
 import numpy as np
@@ -26,10 +24,6 @@ import fit_trunc_dist
 from custom_cmap import custom_cmap
 
 import sys
-import utils
-
-command = utils.get_script_execution_command()
-print(command)
 
 # +
 # manual_argv = "--version 50 --total_steps 300000 --swa_steps 50000 --angles --no_mmr --no_nan --no_eplusminus --seed -1 --plot".split(' ')
@@ -42,15 +36,10 @@ print(command)
 from parse_swag_args import parse
 args, checkpoint_filename = parse(glob=True)
 
-s = checkpoint_filename + "*output.pkl"
 swag_ensemble = [
     spock_reg_model.load_swag(fname).cuda()
-    for fname in glob.glob(s) #
+    for fname in glob.glob('*' + checkpoint_filename + '*output.pkl') #
 ]
-
-if len(swag_ensemble) == 0:
-    raise ValueError(s + " not found!")
-
 
 if args.plot_random:
     checkpoint_filename += '_random'
@@ -101,14 +90,17 @@ for l in colorstr.replace(' ', '').split('\n'):
     if shade == 0:
         new_color = []
     rgb = lambda x, y, z: np.array([x, y, z]).astype(np.float32)
-
+    
     new_color.append(eval(elem[2]))
-
+    
     shade += 1
     if shade == 5:
         colors.append(np.array(new_color))
         shade = 0
 colors = np.array(colors)/255.0
+
+if len(swag_ensemble) == 0:
+    raise ValueError(checkpoint_filename + " not found!")
 
 swag_ensemble[0].make_dataloaders()
 if args.plot_random:
@@ -132,11 +124,10 @@ if args.plot_random:
 
 val_dataloader = swag_ensemble[0]._val_dataloader
 
-
 def sample_full_swag(X_sample):
     """Pick a random model from the ensemble and sample from it
     within each model, it samples from its weights."""
-
+    
     swag_i = np.random.randint(0, len(swag_ensemble))
     swag_model = swag_ensemble[swag_i]
     swag_model.eval()
@@ -150,10 +141,6 @@ def sample_full_swag(X_sample):
 truths = []
 preds = []
 raw_preds = []
-
-# print('warning: using train dataloader')
-# dataloader = swag_ensemble[0]._dataloader
-# for X_sample, y_sample in tqdm(dataloader):
 
 nc = 0
 losses = 0.0
@@ -181,7 +168,7 @@ def fast_truncnorm(
         loc, scale, left=np.inf, right=np.inf,
         d=10000, nsamp=50, seed=0):
     """Fast truncnorm sampling.
-
+    
     Assumes scale and loc have the desired shape of output.
     length is number of elements.
     Select nsamp based on expecting at last one sample
@@ -191,7 +178,7 @@ def fast_truncnorm(
     """
     oldscale = scale
     oldloc = loc
-
+    
     scale = scale.reshape(-1)
     loc = loc.reshape(-1)
     samples = np.zeros_like(scale)
@@ -202,7 +189,7 @@ def fast_truncnorm(
         end = start + d
         if end > scale.shape[0]:
             end = scale.shape[0]
-
+        
         cd = end-start
         rand_out = np.random.randn(
             nsamp, cd
@@ -212,7 +199,7 @@ def fast_truncnorm(
             rand_out * scale[None, start:end]
             + loc[None, start:end]
         )
-
+        
         #rand_out is (nsamp, cd)
         if right == np.inf:
             mask = (rand_out > left)
@@ -220,13 +207,13 @@ def fast_truncnorm(
             mask = (rand_out < right)
         else:
             mask = (rand_out > left) & (rand_out < right)
-
+            
         first_good_val = rand_out[
             mask.argmax(0), np.arange(cd)
         ]
-
+        
         samples[start:end] = first_good_val
-
+        
     return samples.reshape(*oldscale.shape)
 
 std = _preds[..., 1]
@@ -292,7 +279,7 @@ stds = np.median(_preds[..., 1], 0)
 
 # # fit a truncated dist using avg, var
 # tmp = fit_trunc_dist.find_mu_sig(sample_preds.T)
-# preds = tmp[:, 0]
+# preds = tmp[:, 0] 
 # stds = tmp[:, 1]
 
 # # with likelihood (slow)
@@ -306,7 +293,7 @@ stds = np.median(_preds[..., 1], 0)
 # preds = np.average(_preds[:, :, 0], 0, weights=w_i)
 # stds = np.average(_preds[:, :, 1]**2, 0)**0.5
 
-# Check that confidence intervals are satisifed. Calculate mean and std of samples. Take abs(truths - mean)/std = sigma. The CDF of this distrubtion should match that of a Gaussian. Otherwise, rescale "scale".
+# Check that confidence intervals are satisifed. Calculate mean and std of samples. Take abs(truths - mean)/std = sigma. The CDF of this distrubtion should match that of a Gaussian. Otherwise, rescale "scale". 
 
 tmp_mask = (truths > 6) & (truths < 7) #Take this portion since its far away from truncated parts
 averages = preds#np.average(sample_preds, 0)
@@ -332,7 +319,7 @@ plt.legend()
 fig.savefig(checkpoint_filename + 'error_dist.pdf')
 
 
-# Looks great! We didn't even need to tune it. Just use the same scale as the paper (0.5). Perhaps, however, with epistemic uncertainty, we will need to tune.
+# Looks great! We didn't even need to tune it. Just use the same scale as the paper (0.5). Perhaps, however, with epistemic uncertainty, we will need to tune. 
 
 from matplotlib.colors import LogNorm
 
@@ -391,7 +378,7 @@ for confidence in confidences_to_plot:
     py = preds
     py = np.clip(py, 4, 9)
     px = np.average(truths, 1)
-
+        
     from scipy.stats import gaussian_kde
 
     import seaborn as sns
@@ -427,7 +414,7 @@ for confidence in confidences_to_plot:
         extra += ' percentile confidence'
     title = 'Our model'+extra
 
-    fig = plt.figure(figsize=(4, 4),
+    fig = plt.figure(figsize=(4, 4), 
                      dpi=300,
                      constrained_layout=True)
     # if args.plot_random:
@@ -437,13 +424,12 @@ for confidence in confidences_to_plot:
     # else:
         # ic('not random')
         # ic(len(ppx))
-
+        
 #     alpha = min([0.05 * 8740 / len(ppx), 1.0])
 #     ic(alpha, args.plot_random, len(ppx))
     alpha = 1.0
 
     #colors[2, 3]
-    main_color = main_color.tolist()
     g = sns.jointplot(ppx, ppy,
                     alpha=alpha,# ax=ax,
                       color=main_color,
@@ -461,10 +447,6 @@ for confidence in confidences_to_plot:
 
     print(f'{confidence} confidence gets RMSE of {np.average(np.square(ppx[ppx < 8.99] - ppy[ppx < 8.99]))**0.5:.2f}')
     print(f'Weighted by SNR, this is: {np.average(np.square(ppx[ppx < 8.99] - ppy[ppx < 8.99]), weights=snr[ppx<8.99])**0.5:.2f}')
-    # np.save(checkpoint_filename + '_ppx.npy', ppx)
-    # np.save(checkpoint_filename + '_ppy.npy', ppy)
-    # np.save(checkpoint_filename + '_snr.npy', snr)
-    # assert False
 
     ######################################################
     # Bias scores:
@@ -475,7 +457,7 @@ for confidence in confidences_to_plot:
         print(f"Between {lo} and {hi}, the bias is {np.average(considered['pred'] - considered['true']):.3f}",
                 f"and the weighted bias is {np.average(considered['pred'] - considered['true'], weights=considered['w']):.3f}")
     ######################################################
-
+    
     #Transparency:
     if show_transparency:
         if args.plot_random:
@@ -489,9 +471,9 @@ for confidence in confidences_to_plot:
     else:
         point_color = np.einsum('r,i->ir', main_color, point_color) +\
             np.einsum('r,i->ir', off_color, 1-point_color)
-
-
-
+         
+    
+    
     im = ax.scatter(
                 ppx,
                ppy, marker='o',
@@ -504,12 +486,12 @@ for confidence in confidences_to_plot:
     ax.plot([4-3, 9+3], [4-0.61-3, 9-0.61+3], color='k', ls='--')
     ax.set_xlim(3+0.9, 10-0.9)
     ax.set_ylim(3+0.9, 10-0.9)
-    ax.set_xlabel('Truth')
+    ax.set_xlabel('Truth') 
     ax.set_ylabel('Predicted')
     plt.suptitle(title, y=1.0)
     plt.tight_layout()
-
-
+    
+    
     if confidence == 'low':
         plt.savefig(checkpoint_filename + 'comparison.png', dpi=300)
     else:
@@ -540,7 +522,7 @@ plt.savefig(checkpoint_filename + 'colorbar.png', dpi=300)
 # -
 
 plt.style.use('default')
-# plt.style.use('science')
+plt.style.use('science')
 
 
 
@@ -582,7 +564,7 @@ truths.shape#.reshape(-1)
 
 from sklearn.metrics import roc_curve, roc_auc_score
 plt.style.use('default')
-# plt.style.use('science')
+plt.style.use('science')
 fpr, tpr, _ = roc_curve(y_true=(truths>=9).reshape(-1),
                         y_score=np.average(np.tile(sample_preds, (2, 1, 1))>9, 1).transpose(1, 0).reshape(-1))
 fig = plt.figure(figsize=(4, 4))

@@ -95,9 +95,9 @@ for l in colorstr.replace(' ', '').split('\n'):
     if shade == 0:
         new_color = []
     rgb = lambda x, y, z: np.array([x, y, z]).astype(np.float32)
-
+    
     new_color.append(eval(elem[2]))
-
+    
     shade += 1
     if shade == 5:
         colors.append(np.array(new_color))
@@ -160,14 +160,13 @@ for dataset in datasets:
         data.append(cdata)
     except:
         print(f"Skipping {dataset}")
-
+    
 if random:
     data = pd.concat([cdata[columns] for cdata in data])
 else:
     data = pd.concat(data)
 
 # +
-
 data['perturbed'] = np.average(
     np.log10(data[['instability_time', 'shadow_instability_time']]),
     1)
@@ -183,14 +182,13 @@ data['petit'] = petit_result
 
 data['petit'] = np.nan_to_num(data['petit'], posinf=1e9, neginf=1e9, nan=1e9)
 data['petit'] = np.log10(data['petit'])
-
 # -
 
 #Obertas results:
 data['obertas_delta'] = (
     (data[['avg_beta12', 'avg_beta23']]).min(1)
 )
-b = 0.951
+b = 0.951 
 c = -1.202
 data['obertas'] = b * data['obertas_delta'] + c
 
@@ -232,10 +230,10 @@ spock_xgb_params = {'base_score': 0.5,
 class SimpleSKLearn(object):
     def __init__(self):
         super().__init__()
-
+    
     def fit(self, *args):
         return self
-
+    
     def predict(self, X):
         return X[:, 0]
 
@@ -248,7 +246,7 @@ models = {
     },
     'XGBoost': {
         'model': XGBRegressor(**spock_xgb_params),
-        'features':
+        'features': 
 "EMcrossnear MMRstrengthnear MMRstrengthfar EPstdnear".split(' ')
 + "EMfracstdfar EMfracstdnear EMcrossfar EPstdfar MEGNOstd".split(' ')
 + "MEGNO".split(' '),
@@ -256,7 +254,7 @@ models = {
     },
     'XGBoost_classifier': {
         'model': XGBClassifier(**spock_xgb_params),
-        'features':
+        'features': 
 "EMcrossnear MMRstrengthnear MMRstrengthfar EPstdnear".split(' ')
 + "EMfracstdfar EMfracstdnear EMcrossfar EPstdfar MEGNOstd".split(' ')
 + "MEGNO".split(' '),
@@ -334,7 +332,7 @@ else:
 
 # +
 # %matplotlib inline
-
+    
 for cmodelstr in ['Obertas+17', 'Petit+20', 'XGBoost', 'XGBoost_classifier', 'Ideal']:
 
     cfeat = models[cmodelstr]['features']
@@ -443,7 +441,7 @@ for cmodelstr in ['Obertas+17', 'Petit+20', 'XGBoost', 'XGBoost_classifier', 'Id
                 np.random.randint(0, len(sigmas_to_sample), size=shape)
             ].reshape(*shape)
         py = (
-            (px <= 8.99) * (px + np.random.randn(*shape) * sampled_sigmas) +
+            (px <= 8.99) * (px + np.random.randn(*shape) * sampled_sigmas) + 
             (px >  8.99) * (10.0 + np.random.randn(*shape) * sampled_sigmas)
         )
 
@@ -457,7 +455,7 @@ for cmodelstr in ['Obertas+17', 'Petit+20', 'XGBoost', 'XGBoost_classifier', 'Id
     ppx = px.copy()
     ppy = py.copy()
 
-    fig = plt.figure(figsize=(4, 4),
+    fig = plt.figure(figsize=(4, 4), 
                      dpi=300,
                      constrained_layout=True)
 
@@ -482,7 +480,7 @@ for cmodelstr in ['Obertas+17', 'Petit+20', 'XGBoost', 'XGBoost_classifier', 'Id
                 np.random.randint(0, len(sigmas_to_sample), size=shape)
             ].reshape(*shape)
         shadow = (
-            (nominal <= 8.99) * (nominal + np.random.randn(*shape) * sampled_sigmas) +
+            (nominal <= 8.99) * (nominal + np.random.randn(*shape) * sampled_sigmas) + 
             (nominal >  8.99) * (10.00 + np.random.randn(*shape) * sampled_sigmas)
         )
         # shadow = np.copy(shadow)
@@ -526,11 +524,11 @@ for cmodelstr in ['Obertas+17', 'Petit+20', 'XGBoost', 'XGBoost_classifier', 'Id
                    )
 
     ax = g.ax_joint
-
+    
     #Transparency:
     transparency_adjuster = 0.5 * 0.2
     point_color = list(main_color) + [transparency_adjuster]
-
+         
 
     print(models[cmodelstr]['title'], f'has length {len(ppx)}')
     im = ax.scatter(
@@ -546,7 +544,7 @@ for cmodelstr in ['Obertas+17', 'Petit+20', 'XGBoost', 'XGBoost_classifier', 'Id
     ax.set_xlim(3+0.9, 10-0.9)
     ax.set_ylim(3+0.9, 10-0.9)
 
-    ax.set_xlabel('Truth')
+    ax.set_xlabel('Truth') 
     ax.set_ylabel('Predicted')
     plt.suptitle(models[cmodelstr]['title'], y=1.0)
     plt.tight_layout()

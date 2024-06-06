@@ -45,9 +45,9 @@ for l in colorstr.replace(' ', '').split('\n'):
     if shade == 0:
         new_color = []
     rgb = lambda x, y, z: np.array([x, y, z]).astype(np.float32)
-    
+
     new_color.append(eval(elem[2]))
-    
+
     shade += 1
     if shade == 5:
         colors.append(np.array(new_color))
@@ -58,7 +58,7 @@ colors = np.array(colors)/255.0
 def make_plot(cleaned, version, t20=True):
 # +
 # %matplotlib inline
-    plt.style.use('science')
+    # plt.style.use('science')
     fig, axarr = plt.subplots(1, 1, figsize=(16/2,4/2), dpi=400, sharex=True)
     plt.subplots_adjust(hspace=0, wspace=0)
     ax = plt.gca()
@@ -74,32 +74,32 @@ def make_plot(cleaned, version, t20=True):
 
     tmp.plot(
         'delta', 'true', ax=ax,
-        label='True', 
+        label='True',
         c='k'
     )
     if t20:
         tmp.plot(
             'delta', 'xgb', ax=ax,
-            label='Modified T20', 
+            label='Modified T20',
             c=colors[1, 3]
         )
     # tmp.plot(
         # 'delta', 'petit', ax=ax,
-        # label='Petit+20, no tuning', 
+        # label='Petit+20, no tuning',
 # #     style='o',
 # #     ms=5./4*0.3,
         # c=colors[3, 3]
     # )
     tmp.plot(
         'delta', 'petitf', ax=ax,
-        label='Petit+20', 
+        label='Petit+20',
 #     style='o',
-#     ms=5./4*0.3, 
+#     ms=5./4*0.3,
         c=colors[0, 3]
     )
     tmp.plot(
         'delta', 'median', ax=ax,
-        label='Ours', 
+        label='Ours',
 #     style='o',ms=5./4*0.3, color=colors[2, 3]
         c=colors[2, 3]
     )
@@ -142,7 +142,7 @@ def make_plot(cleaned, version, t20=True):
         ppy = py[mask]
         # bw = 0.2
 
-        fig = plt.figure(figsize=(4, 4), 
+        fig = plt.figure(figsize=(4, 4),
                          dpi=300,
                          constrained_layout=True)
 
@@ -160,7 +160,7 @@ def make_plot(cleaned, version, t20=True):
 
         ## Errorbars:
         # if key == 'median':
-            # upper = tmp['u'] 
+            # upper = tmp['u']
             # lower = tmp['l']
             # upper = np.clip(upper[mask], 4, 9)
             # lower = np.clip(lower[mask], 4, 9)
@@ -183,7 +183,7 @@ def make_plot(cleaned, version, t20=True):
         #Stack all contours on the same axis. Have horizontal lines to help compare residuals.
 
         title = 'Ours' if key == 'median' else 'Petit+20'
-        ax.set_xlabel('Truth') 
+        ax.set_xlabel('Truth')
         ax.set_ylabel('Predicted')
         plt.suptitle(title, y=1.0)
         plt.tight_layout()
