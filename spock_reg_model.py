@@ -19,6 +19,7 @@ import einops
 from utils import assert_equal
 import utils
 import modules
+import glob
 
 
 def load(version, seed=0):
@@ -679,7 +680,7 @@ class VarModel(pl.LightningModule):
         hparams['weight_decay'] = 1e-4 if 'weight_decay' not in hparams else hparams['weight_decay']
         hparams['noisy_val'] = True if 'noisy_val' not in hparams else hparams['noisy_val']
 
-        self.hparams = hparams
+        # self.hparams = hparams # this should be automatically done by the next line
         self.save_hyperparameters(hparams)
         self.steps = hparams['steps']
         self.batch_size = hparams['batch_size']
@@ -720,7 +721,7 @@ class VarModel(pl.LightningModule):
         elif 'load_f1_f2' in hparams and hparams['load_f1_f2']:
             load_version = hparams['load_f1_f2']
         if load_version is not None:
-            model = load(load_version)
+            model = load(load_version, seed=hparams['seed'])
             regress_nn = model.regress_nn
             summary_dim = model.summary_dim
         elif hparams['f1_variant'] == 'mean_cov':
@@ -773,7 +774,7 @@ class VarModel(pl.LightningModule):
         elif 'load_f1_f2' in hparams and hparams['load_f1_f2']:
             load_version = hparams['load_f1_f2']
         if load_version:
-            model = load(load_version)
+            model = load(load_version, seed=hparams['seed'])
             feature_nn = model.feature_nn
             out_dim = model.feature_nn_out_dim
             if 'prune_f1_topk' in hparams and hparams['prune_f1_topk'] is not None:

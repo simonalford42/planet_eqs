@@ -1,17 +1,55 @@
 #!/usr/bin/env bash
 
+# ------------------------------- Thu June 6 -----------------------------------
+
+# sbatch -J sr --partition gpu --time 09:00:00 sr.sh --time_in_hours 8 --version 24880
+# sbatch -J sr2 --partition gpu --time 09:00:00 sr.sh --time_in_hours 2 --version 24880
+# sbatch -J sr1 --partition gpu --time 09:00:00 sr.sh --time_in_hours 1 --version 24880
+
+# sbatch -J s1test --partition gpu prune_train.sh --latent 10 --seed 1 --total_steps 1000
+# sbatch -J pr10s1 --partition gpu prune_train.sh --latent 10 --seed 1
+# sbatch -J pr10s2 --partition gpu prune_train.sh --latent 10 --seed 2
+# sbatch -J prod10 --partition gpu prune_train.sh --latent 10 --f1_variant products2
+# sbatch -J prod10s1 --partition gpu prune_train.sh --latent 10 --f1_variant products2 --seed 1
+# sbatch -J ifthen10 --partition gpu prune_train.sh --latent 10 --f2_variant ifthen2
+# sbatch -J ifthen10s1 --partition gpu prune_train.sh --latent 10 --f2_variant ifthen2 --seed 1
+
+# ------------------------------- Wed June 5 -----------------------------------
+
+# sbatch -J sr --partition gpu sr.sh --time_in_hours 8 --version 24880
+
+# sbatch -J pr10s1 --partition gpu prune_train.sh --latent 10 --seed 1
+# sbatch -J pr10s2 --partition gpu prune_train.sh --latent 10 --seed 2
+# sbatch -J ifthen10 --partition gpu prune_train.sh --latent 10 --f1_variant products2
+# sbatch -J ifthen10s1 --partition gpu prune_train.sh --latent 10 --f1_variant products2 --seed 1
+# sbatch -J prod10 --partition gpu prune_train.sh --latent 10 --f2_variant ifthen2
+# sbatch -J prod10s1 --partition gpu prune_train.sh --latent 10 --f2_variant ifthen2 --seed 1
+
+# ------------------------------- Fri May 31 -----------------------------------
+
+# sbatch -J pr80_5 --partition gpu prune_train.sh --latent 80 --prune_f1_topn 5
+# sbatch -J pr80_10 --partition gpu prune_train.sh --latent 80 --prune_f1_topn 10
+# sbatch -J pr80_20 --partition gpu prune_train.sh --latent 80 --prune_f1_topn 20
+# sbatch -J pr20_5 --partition gpu prune_train.sh --latent 20 --prune_f1_topn 5
+# sbatch -J pr20_10 --partition gpu prune_train.sh --latent 20 --prune_f1_topn 10
+# sbatch -J pr20 --partition gpu prune_train.sh --latent 20
+# sbatch -J pr10 --partition gpu prune_train.sh --latent 10
+# sbatch -J pr5 --partition gpu prune_train.sh --latent 5
+# sbatch -J prod20 --partition gpu prune_train.sh --f1_variant products2 --latent 20
+# sbatch -J ifthen2 --partition gpu prune_train.sh --f2_variant ifthen2 --latent 20
+
 # ------------------------------- Thu May 30 -----------------------------------
 
-sbatch -J pr80_5 --partition gpu prune_train.sh --latent 80 --prune_f1_topn 5
-sbatch -J pr80_10 --partition gpu prune_train.sh --latent 80 --prune_f1_topn 10
-sbatch -J pr80_20 --partition gpu prune_train.sh --latent 80 --prune_f1_topn 20
-sbatch -J pr20_5 --partition gpu prune_train.sh --latent 20 --prune_f1_topn 5
-sbatch -J pr20_10 --partition gpu prune_train.sh --latent 20 --prune_f1_topn 10
-sbatch -J pr20 --partition gpu prune_train.sh --latent 20
-sbatch -J pr10 --partition gpu prune_train.sh --latent 10
-sbatch -J pr5 --partition gpu prune_train.sh --latent 5
-sbatch -J prod20 --partition gpu prune_train.sh --f1_variant products2 --latent 20
-sbatch -J ifthen2 --partition gpu prune_train.sh --f2_variant ifthen2 --latent 20
+# sbatch -J pr80_5 --partition gpu prune_train.sh --latent 80 --prune_f1_topn 5
+# sbatch -J pr80_10 --partition gpu prune_train.sh --latent 80 --prune_f1_topn 10
+# sbatch -J pr80_20 --partition gpu prune_train.sh --latent 80 --prune_f1_topn 20
+# sbatch -J pr20_5 --partition gpu prune_train.sh --latent 20 --prune_f1_topn 5
+# sbatch -J pr20_10 --partition gpu prune_train.sh --latent 20 --prune_f1_topn 10
+# sbatch -J pr20 --partition gpu prune_train.sh --latent 20
+# sbatch -J pr10 --partition gpu prune_train.sh --latent 10
+# sbatch -J pr5 --partition gpu prune_train.sh --latent 5
+# sbatch -J prod20 --partition gpu prune_train.sh --f1_variant products2 --latent 20
+# sbatch -J ifthen2 --partition gpu prune_train.sh --f2_variant ifthen2 --latent 20
 
 # ------------------------------- Wed May 29 -----------------------------------
 

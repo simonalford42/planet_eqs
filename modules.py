@@ -1,8 +1,8 @@
+# import pysr
 import torch
 import torch.nn as nn
 from utils import assert_equal
 import os
-import pysr
 import json
 import einops
 import spock_reg_model
@@ -183,8 +183,11 @@ class MaskedLinear(nn.Module):
         self.mask = nn.Parameter(mask, requires_grad=False)
 
     def forward(self, x):
-        weight = self.linear.weight * self.mask
-        return F.linear(x, weight, self.linear.bias)
+        return F.linear(x, self.masked_weight, self.linear.bias)
+
+    @property
+    def masked_weight(self):
+        return self.linear.weight * self.mask
 
 
 def pruned_linear(linear, top_k, top_n=None):

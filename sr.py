@@ -20,6 +20,17 @@ import torch
 
 ELEMENTWISE_LOSS = """
 function elementwise_loss(prediction, target)
+
+    function safe_log_erf(x)
+        if x < -1
+            0.485660082730562*x + 0.643278438654541*exp(x)
+            + 0.00200084619923262*x^3 - 0.643250926022749
+            - 0.955350621183745*x^2
+        else
+            log(1 + erf(x))
+        end
+    end
+
     mu = prediction
 
     if mu < 1 || mu > 14
@@ -155,9 +166,12 @@ def get_config(args):
     # replace '.pkl' with '.csv'
     path = path[:-3] + 'csv'
 
+    # https://stackoverflow.com/a/57474787/4383594
+    num_cpus = int(os.environ.get('SLURM_CPUS_ON_NODE')) * int(os.environ.get('SLURM_JOB_NUM_NODES'))
     pysr_config = dict(
-        # https://stackoverflow.com/a/57474787/4383594
-        procs=int(os.environ.get('SLURM_CPUS_ON_NODE')) * int(os.environ.get('SLURM_JOB_NUM_NODES')),
+        procs=num_cpus,
+        populations=3*num_cpus,
+        batching=True,
         # cluster_manager='slurm',
         equation_file=path,
         niterations=args.niterations,
@@ -170,7 +184,7 @@ def get_config(args):
         # base can have any complexity, exponent can have max 1 complexity
         constraints={'^': (-1, 1)},
         nested_constraints={"sin": {"sin": 0}},
-        ncyclesperiteration=2000, # increase utilization since usually using 32-ish cores?
+        ncyclesperiteration=1000, # increase utilization since usually using 32-ish cores?
     )
 
     if args.target == 'f2_direct':
