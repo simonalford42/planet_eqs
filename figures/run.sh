@@ -21,8 +21,4 @@ conda activate bnn_chaos_model
 # Enable errexit (exit on error)
 set -e
 
-# gets the next available version number
-version=$(python versions.py)
-python -u find_minima.py --version $version --total_steps 150000 --latent 20 --l1_reg weights --l1_coeff 2 "$@"
-version2=$(python versions.py)
-python -u find_minima.py --version $version2 --total_steps 150000 --load_f1_f2 $version --prune_f1_topk 2 "$@"
+python multiswag_5_planet.py 4157

@@ -25,10 +25,12 @@ def get_versions_and_seeds():
 
 def next_version():
     versions, seeds = get_versions_and_seeds()
-    while True:
-        i = random.randint(0, 100000)
-        if i not in versions:
-            return i
+    available_versions = [i for i in range(100000) if i not in versions]
+    if not available_versions:
+        raise ValueError('No available versions. increase the max version number.')
+    else:
+        # this way, we can mostly ignore concurrent requests
+        return random.choice(available_versions)
 
 # this way, we can call it as a bash script, and it will "return" this value
 print(next_version())

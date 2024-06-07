@@ -28,6 +28,7 @@ import pandas as pd
 import spock
 from spock import FeatureRegressor, FeatureRegressorXGB
 from icecream import ic
+import utils
 
 try:
     plt.style.use('paper')
@@ -36,6 +37,10 @@ except:
 
 spockoutfile = '../data/spockprobstesttrio.npz'
 version = int(sys.argv[1])
+# Paper-ready is 5000:
+N = int(sys.argv[2]) if len(sys.argv) > 2 else 50
+# Paper-ready is 10000
+samples = int(sys.argv[3]) if len(sys.argv) > 3 else 100
 
 from multiswag_5_planet_plot import make_plot
 
@@ -50,9 +55,9 @@ except FileNotFoundError:
 stride = 1
 nsim_list = np.arange(0, 17500)
 # Paper-ready is 5000:
-N = 50
+# N = 50
 # Paper-ready is 10000
-samples = 100
+# samples = 100
 used_axes = np.linspace(0, 17500-1, N).astype(np.int32)#np.arange(17500//3, 17500, 1750//3)
 
 nsim_list = nsim_list[used_axes]
@@ -60,7 +65,7 @@ nsim_list = nsim_list[used_axes]
 
 model = FeatureRegressor(
     cuda=True,
-    filebase='../pretrained/*' + f'v{version:d}' + '*output.pkl'
+    filebase='../' + utils.ckpt_path(version, glob=True) +  '*output.pkl'
     # filebase='*' + 'v30' + '*output.pkl'
     #'long_zero_megno_with_angles_power_v14_*_output.pkl'
 )
@@ -146,7 +151,7 @@ for nsim in nsim_list:
     init_sim_parameters(sim)
     sims.append(sim)
     sims_for_xgb.append(sim.copy())
-    
+
 # +
 
 
@@ -157,9 +162,9 @@ def data_setup_kernel(mass_array, cur_tseries):
 
     isnotfinite = lambda _x: ~np.isfinite(_x)
 
-    old_X = np.concatenate((old_X, isnotfinite(old_X[:, :, [3]]).astype(np.float)), axis=2)
-    old_X = np.concatenate((old_X, isnotfinite(old_X[:, :, [6]]).astype(np.float)), axis=2)
-    old_X = np.concatenate((old_X, isnotfinite(old_X[:, :, [7]]).astype(np.float)), axis=2)
+    old_X = np.concatenate((old_X, isnotfinite(old_X[:, :, [3]]).astype(float)), axis=2)
+    old_X = np.concatenate((old_X, isnotfinite(old_X[:, :, [6]]).astype(float)), axis=2)
+    old_X = np.concatenate((old_X, isnotfinite(old_X[:, :, [7]]).astype(float)), axis=2)
 
     old_X[..., :] = np.nan_to_num(old_X[..., :], posinf=0.0, neginf=0.0)
 
@@ -195,7 +200,7 @@ from tseries_feature_functions import get_extended_tseries
 def get_features_for_sim(sim_i, indices=None):
     sim = sims[sim_i]
     if sim.N_real < 4:
-        raise AttributeError("SPOCK Error: SPOCK only works for systems with 3 or more planets") 
+        raise AttributeError("SPOCK Error: SPOCK only works for systems with 3 or more planets")
     if indices:
         if len(indices) != 3:
             raise AttributeError("SPOCK Error: indices must be a list of 3 particle indices")
@@ -225,7 +230,7 @@ def get_features_for_sim(sim_i, indices=None):
         mass_array = np.array([sim.particles[j].m/sim.particles[0].m for j in trio])
         X = data_setup_kernel(mass_array, cur_tseries)
         Xs.append(X)
-        
+
     return Xs
 
 def get_xgb_prediction(sim_i):
@@ -307,7 +312,7 @@ def fast_truncnorm(
         loc, scale, left=jnp.inf, right=jnp.inf,
         d=10000, nsamp=50, seed=0):
     """Fast truncnorm sampling.
-    
+
     Assumes scale and loc have the desired shape of output.
     length is number of elements.
     Select nsamp based on expecting at minimum one sample of a Gaussian
@@ -317,7 +322,7 @@ def fast_truncnorm(
     """
     oldscale = scale
     oldloc = loc
-    
+
     scale = scale.reshape(-1)
     loc = loc.reshape(-1)
     samples = jnp.zeros_like(scale)
@@ -326,13 +331,13 @@ def fast_truncnorm(
         rng = PRNGKey(seed)
     except:
         rng = 0
-        
+
     for start in range(0, scale.shape[0], d):
 
         end = start + d
         if end > scale.shape[0]:
             end = scale.shape[0]
-        
+
         cd = end-start
         try:
             rand_out = normal(
@@ -347,7 +352,7 @@ def fast_truncnorm(
             rand_out * scale[None, start:end]
             + loc[None, start:end]
         )
-        
+
         #rand_out is (nsamp, cd)
         if right == jnp.inf:
             mask = (rand_out > left)
@@ -355,18 +360,18 @@ def fast_truncnorm(
             mask = (rand_out < right)
         else:
             mask = (rand_out > left) & (rand_out < right)
-            
+
         first_good_val = rand_out[
             mask.argmax(0), jnp.arange(cd)
         ]
-        
+
         try:
             samples = jax.ops.index_update(
                 samples, np.s_[start:end], first_good_val
             )
         except:
             samples[start:end] = first_good_val
-        
+
     return samples.reshape(*oldscale.shape)
 
 from time import time as ttime
@@ -472,7 +477,7 @@ for i in range(len(outs)):
     cleaned['m2'].append(m2)
     cleaned['m3'].append(m3)
     cleaned['xgb'].append(xgb_predictions[i])
-    
+
     if log_t_exit[i] <= 4.0:
         cleaned['average'].append(log_t_exit[i])
         cleaned['median'].append(log_t_exit[i])
@@ -500,10 +505,11 @@ cleaned = pd.DataFrame(cleaned)
 for key in 'average median l u ll uu'.split(' '):
     cleaned.loc[cleaned['true']<=4.0, key] = cleaned.loc[cleaned['true']<=4.0, 'true']
 
-    
+
 import glob
 
 from matplotlib import ticker
+
 
 
 # +
@@ -542,3 +548,4 @@ cleaned['petitf'] = np.log10(pd.Series([Tsurv(
 import time
 cleaned.to_csv(f'cur_plot_dataset_{time.time()}.csv')
 make_plot(cleaned, version)
+print('made plot')

@@ -1,12 +1,105 @@
 #!/usr/bin/env bash
 
+# ------------------------------- Thu June 6 -----------------------------------
+
+# sbatch -J sr --partition gpu --time 09:00:00 sr.sh --time_in_hours 8 --version 24880
+# sbatch -J sr2 --partition gpu --time 09:00:00 sr.sh --time_in_hours 2 --version 24880
+# sbatch -J sr1 --partition gpu --time 09:00:00 sr.sh --time_in_hours 1 --version 24880
+
+# sbatch -J s1test --partition gpu prune_train.sh --latent 10 --seed 1 --total_steps 1000
+# sbatch -J pr10s1 --partition gpu prune_train.sh --latent 10 --seed 1
+# sbatch -J pr10s2 --partition gpu prune_train.sh --latent 10 --seed 2
+# sbatch -J prod10 --partition gpu prune_train.sh --latent 10 --f1_variant products2
+# sbatch -J prod10s1 --partition gpu prune_train.sh --latent 10 --f1_variant products2 --seed 1
+# sbatch -J ifthen10 --partition gpu prune_train.sh --latent 10 --f2_variant ifthen2
+# sbatch -J ifthen10s1 --partition gpu prune_train.sh --latent 10 --f2_variant ifthen2 --seed 1
+
+# ------------------------------- Wed June 5 -----------------------------------
+
+# sbatch -J sr --partition gpu sr.sh --time_in_hours 8 --version 24880
+
+# sbatch -J pr10s1 --partition gpu prune_train.sh --latent 10 --seed 1
+# sbatch -J pr10s2 --partition gpu prune_train.sh --latent 10 --seed 2
+# sbatch -J ifthen10 --partition gpu prune_train.sh --latent 10 --f1_variant products2
+# sbatch -J ifthen10s1 --partition gpu prune_train.sh --latent 10 --f1_variant products2 --seed 1
+# sbatch -J prod10 --partition gpu prune_train.sh --latent 10 --f2_variant ifthen2
+# sbatch -J prod10s1 --partition gpu prune_train.sh --latent 10 --f2_variant ifthen2 --seed 1
+
+# ------------------------------- Fri May 31 -----------------------------------
+
+# sbatch -J pr80_5 --partition gpu prune_train.sh --latent 80 --prune_f1_topn 5
+# sbatch -J pr80_10 --partition gpu prune_train.sh --latent 80 --prune_f1_topn 10
+# sbatch -J pr80_20 --partition gpu prune_train.sh --latent 80 --prune_f1_topn 20
+# sbatch -J pr20_5 --partition gpu prune_train.sh --latent 20 --prune_f1_topn 5
+# sbatch -J pr20_10 --partition gpu prune_train.sh --latent 20 --prune_f1_topn 10
+# sbatch -J pr20 --partition gpu prune_train.sh --latent 20
+# sbatch -J pr10 --partition gpu prune_train.sh --latent 10
+# sbatch -J pr5 --partition gpu prune_train.sh --latent 5
+# sbatch -J prod20 --partition gpu prune_train.sh --f1_variant products2 --latent 20
+# sbatch -J ifthen2 --partition gpu prune_train.sh --f2_variant ifthen2 --latent 20
+
+# ------------------------------- Thu May 30 -----------------------------------
+
+# sbatch -J pr80_5 --partition gpu prune_train.sh --latent 80 --prune_f1_topn 5
+# sbatch -J pr80_10 --partition gpu prune_train.sh --latent 80 --prune_f1_topn 10
+# sbatch -J pr80_20 --partition gpu prune_train.sh --latent 80 --prune_f1_topn 20
+# sbatch -J pr20_5 --partition gpu prune_train.sh --latent 20 --prune_f1_topn 5
+# sbatch -J pr20_10 --partition gpu prune_train.sh --latent 20 --prune_f1_topn 10
+# sbatch -J pr20 --partition gpu prune_train.sh --latent 20
+# sbatch -J pr10 --partition gpu prune_train.sh --latent 10
+# sbatch -J pr5 --partition gpu prune_train.sh --latent 5
+# sbatch -J prod20 --partition gpu prune_train.sh --f1_variant products2 --latent 20
+# sbatch -J ifthen2 --partition gpu prune_train.sh --f2_variant ifthen2 --latent 20
+
+# ------------------------------- Wed May 29 -----------------------------------
+
+# sbatch -J ifthen2 --partition gpu prune_train.sh --f2_variant ifthen2
+
+# sbatch -J pr80_5 --partition gpu prune_train.sh --latent 80 --prune_f1_topn 5
+# sbatch -J pr80_10 --partition gpu prune_train.sh --latent 80 --prune_f1_topn 10
+# sbatch -J pr80_20 --partition gpu prune_train.sh --latent 80 --prune_f1_topn 20
+# sbatch -J pr20_5 --partition gpu prune_train.sh --latent 20 --prune_f1_topn 5
+# sbatch -J pr20_10 --partition gpu prune_train.sh --latent 20 --prune_f1_topn 10
+# sbatch -J pr20 --partition gpu prune_train.sh --latent 20
+# sbatch -J pr10 --partition gpu prune_train.sh --latent 10
+# sbatch -J pr5 --partition gpu prune_train.sh --latent 5
+# sbatch -J prod20 --partition gpu prune_train.sh --f1_variant products2 --latent 20
+
+# ------------------------------- Tue May 28 -----------------------------------
+
+# sbatch -J pr80_5 --partition gpu prune_train.sh --latent 80 --prune_f1_topn 5
+# sbatch -J pr80_10 --partition gpu prune_train.sh --latent 80 --prune_f1_topn 10
+# sbatch -J pr80_20 --partition gpu prune_train.sh --latent 80 --prune_f1_topn 20
+# sbatch -J pr20_5 --partition gpu prune_train.sh --latent 20 --prune_f1_topn 5
+# sbatch -J pr20_10 --partition gpu prune_train.sh --latent 20 --prune_f1_topn 10
+# sbatch -J pr20 --partition gpu prune_train.sh --latent 20
+# sbatch -J pr10 --partition gpu prune_train.sh --latent 10
+# sbatch -J pr5 --partition gpu prune_train.sh --latent 5
+# sbatch -J prod20 --partition gpu prune_train.sh --f1_variant products2 --latent 20
+
+# ------------------------------- Mon May 27 -----------------------------------
+
+# sbatch -J pruned --partition gpu prune_train.sh
+# sbatch -J pr_prod --partition gpu prune_train.sh --f1_variant products2
+
+# debugging TypeError: non-boolean (Float32) used in boolean context
+# parser.add_argument('--target', type=str, default='f1', choices=['f1', 'f2', 'f2_ifthen', 'f2_direct'])
+# sbatch -J direct_sr --partition gpu --mem 100G --time 00:30:00 sr.sh --time_in_hours 0.1 --target f2_direct --version 6364
+
+# ---------------- Fri May 24 ------------------
+
+# sbatch -J direct_sr --partition gpu --mem 100G --time 02:00:00 sr.sh --time_in_hours 1 --target f2_direct --version 6364
+
+# sbatch -J pruned --partition gpu prune_train.sh
+# sbatch -J pruned_prod --partition gpu prune_train.sh --f1_variant products2
+
 # ---------------- Thu May 16 ------------------
 
 # sbatch -J fixvar_id_lin --partition gpu train.sh --f1_variant identity --f2_variant linear --fix_variance
 # sbatch -J fixvar_lin --partition gpu train.sh --f1_variant linear --fix_variance
 # sbatch -J fixvar_lin_lin --partition gpu train.sh --f1_variant linear --f2_variant linear --fix_variance
 
-sbatch -J direct_sr --partition gpu --mem 100G --time 02:00:00 sr.sh --time-in-hours 1 --target direct --version 6364
+# sbatch -J direct_sr --partition ellis --mem 100G --time 02:00:00 sr.sh --time-in-hours 1 --target direct --version 6364
 
 # ------------------------- Wed Apr 24 --------------------------
 

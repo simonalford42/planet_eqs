@@ -1,8 +1,8 @@
+# import pysr
 import torch
 import torch.nn as nn
 from utils import assert_equal
 import os
-import pysr
 import json
 import einops
 import spock_reg_model
@@ -183,14 +183,17 @@ class MaskedLinear(nn.Module):
         self.mask = nn.Parameter(mask, requires_grad=False)
 
     def forward(self, x):
-        weight = self.linear.weight * self.mask
-        return F.linear(x, weight, self.linear.bias)
+        return F.linear(x, self.masked_weight, self.linear.bias)
+
+    @property
+    def masked_weight(self):
+        return self.linear.weight * self.mask
 
 
-def pruned_linear(linear: nn.Linear, top_k, top_n=None):
+def pruned_linear(linear, top_k, top_n=None):
     '''
-    top_k: for each feature, number of weights to keep
-    top_n: number of features to keep
+    top_k: prune so that each output feature uses top_k input feature in its combination
+    top_n: prune so that only top_n output features are nonzero.
     '''
 
     mask = torch.zeros_like(linear.weight)
@@ -199,9 +202,13 @@ def pruned_linear(linear: nn.Linear, top_k, top_n=None):
         mask[r][ixs] = 1
 
     if top_n is not None:
+        # take the top_n output features based on their already pruned input features
         # mask is (n_features, n_inputs)
-        _, ixs = torch.topk(mask.abs().sum(dim=-1), k=top_n)
-        mask[~ixs] = 0
+        # ixs is the top_n spots to keep
+        _, ixs = torch.topk((mask * linear.weight).abs().sum(dim=-1), k=top_n)
+        # these are the spots to zero out - those not in the top n
+        ixs2 = torch.tensor([i for i in range(mask.shape[0]) if i not in ixs])
+        mask[ixs2] = 0
 
     return MaskedLinear(linear, mask)
 
