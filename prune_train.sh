@@ -26,3 +26,4 @@ version=$(python versions.py)
 python -u find_minima.py --version $version --total_steps 150000 --latent 20 --l1_reg weights --l1_coeff 2 "$@"
 version2=$(python versions.py)
 python -u find_minima.py --version $version2 --total_steps 150000 --load_f1_f2 $version --prune_f1_topk 2 "$@"
+python -u run_swag.py --version $version2 --total_steps 150000 --run_swag "$@"

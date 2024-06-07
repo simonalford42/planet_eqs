@@ -187,10 +187,12 @@ def get_config(args):
         ncyclesperiteration=1000, # increase utilization since usually using 32-ish cores?
     )
 
-    if args.target == 'f2_direct':
+    if args.target == 'f2_direct' and not args.loss_fn == 'mse':
+        print('Using custom loss function')
         # use custom loss function when predicting directly
         pysr_config['elementwise_loss'] = ELEMENTWISE_LOSS
-        pass
+    else:
+        print('Using default MSE loss')
 
     config = vars(args)
     config.update(pysr_config)
@@ -269,6 +271,8 @@ def parse_args():
     parser.add_argument('--max_size', type=int, default=30)
     parser.add_argument('--target', type=str, default='f2_direct', choices=['f1', 'f2', 'f2_ifthen', 'f2_direct'])
     parser.add_argument('--residual', action='store_true', help='do residual training of your target')
+    # default will use custom when the targets are instability predictions, mse otherwise
+    parser.add_argument('--loss_fn', choices=['mse', 'custom'], default=None)
     parser.add_argument('--n', type=int, default=5000, help='number of data points for the SR problem')
 
     args = parser.parse_args()
