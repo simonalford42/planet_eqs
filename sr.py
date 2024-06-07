@@ -69,8 +69,6 @@ def get_f2_inputs_and_targets_direct(args, N=500):
         # just takes a random batch of inputs and passes them through the neural network
         batch = next(data_iterator)
         X, y = batch 
-        print(y.shape)
-        input()
         summary_stats, _, _ = model.generate_f2_inputs_and_targets(batch)
         all_inputs.append(summary_stats)
         all_targets.append(y)
@@ -321,23 +319,59 @@ def load_inputs_and_targets(args):
         # there are two ground truth predictions. create a data point for each
         X = einops.repeat(X, 'B F -> (B two) F', two=2)
         y = einops.rearrange(y, 'B two -> (B two) 1')
-        in_dim = model.hparams['latent'] * 2
+        in_dim = model.hparams['latent'] * 2 + 49
         out_dim = 1  #
         n = X.shape[1] // 2
         variable_names = [f'm{i}' for i in range(n)] + [f's{i}' for i in range(n)]
+
+        if args.residual:
+            # Ensure y and predicted_mean have the same shape
+            predicted_mean = out_dict['predicted_mean']
+            predicted_mean = einops.repeat(predicted_mean, 'B F -> (B two) F', two=2)
+            predicted_mean = einops.rearrange(predicted_mean, 'B two -> (B two) 1')
+            if y.shape[0] != predicted_mean.shape[0]:
+                raise ValueError(f"Shape mismatch: y has shape {y.shape}, but predicted_mean has shape {predicted_mean.shape}")
+            # target is the residual error of the model's prediction from the ground truth
+            y = y - predicted_mean
+
+            # Load the PySR equations from the previous round
+            with open(args.previous_sr_path, 'rb') as f:
+                previous_sr_model = pickle.load(f)
+            
+            # Evaluate the previous PySR equations on the inputs
+            additional_features = []
+            summary_stats_np = out_dict['summary_stats'].detach().numpy()
+            for equation_set in previous_sr_model.equations_:
+                for index, equation in equation_set.iterrows():
+                    lambda_func = equation['lambda_format']
+                    evaluated_result = lambda_func(summary_stats_np)
+                    # Ensure the result is reshaped to match the batch size
+                    evaluated_result = evaluated_result.reshape(-1, 1)
+                    additional_features.append(evaluated_result)
+
+            # Convert list of arrays to a single numpy array
+            additional_features = np.hstack(additional_features)
+            # Concatenate the original summary stats with the evaluated results
+            # summary_stats_np: [1, 2000, 40]
+            # additional_features: (2000, 49)
+            # (args.n, in_dim) = (250, 2*20+49)
+            X = np.concatenate([summary_stats_np, additional_features], axis=1)             
     else:
         raise ValueError(f'Unknown target: {args.target}')
-
-    if args.residual:
-        assert args.target == 'f2_direct', 'residual requires a direct target'
-        # target is the residual error of the model's prediction from the ground truth
-        y = y - out_dict['predicted_mean']
-
+    
+    # Update variable_names to include names for additional features
+    additional_variable_names = [f'additional_{i}' for i in range(additional_features.shape[1])]
+    variable_names += additional_variable_names
 
     # go down from having a batch of size B to just N
     ixs = np.random.choice(X.shape[0], size=args.n, replace=False)
     X, y = X[ixs], y[ixs]
-    X, y = X.detach().numpy(), y.detach().numpy()
+
+    # Ensure X and y are NumPy arrays
+    if isinstance(X, torch.Tensor):
+        X = X.detach().numpy()
+    if isinstance(y, torch.Tensor):
+        y = y.detach().numpy()
 
     assert_equal(X.shape, (args.n, in_dim))
     assert_equal(y.shape, (args.n, out_dim))
@@ -369,7 +403,7 @@ def run_pysr(args, xx=None, yy=None):
         constraints={'^': (-1, 1)},
         nested_constraints={"sin": {"sin": 0}},
         ncyclesperiteration=2000, # increase utilization since usually using 32-ish cores?
-        elementwise_loss=ELEMENTWISE_LOSS,
+        #elementwise_loss=ELEMENTWISE_LOSS,
     )
 
     config = vars(args)
@@ -444,6 +478,7 @@ def parse_args():
     parser.add_argument('--target', type=str, default='f1', choices=['f1', 'f2', 'f2_ifthen', 'f2_direct'])
     parser.add_argument('--residual', action='store_true', help='do residual training of your target')
     parser.add_argument('--n', type=int, default=250, help='number of data points for the SR problem')
+    parser.add_argument('--previous_sr_path', type=str, default='sr_results/92985.pkl')
 
     args = parser.parse_args()
     return args

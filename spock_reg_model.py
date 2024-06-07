@@ -454,7 +454,7 @@ class VarModel(pl.LightningModule):
         elif hparams['f2_variant'] == 'linear':
             regress_nn = nn.Linear(summary_dim, 2)
         elif hparams['f2_variant'] == 'bimt':
-            regress_nn = BioMLP(in_dim=summary_dim, depth=hparams['f2_depth']+2, w=hparams['hidden_dim'], out_dim=2)
+            regress_nn = modules.BioMLP(in_dim=summary_dim, depth=hparams['f2_depth']+2, w=hparams['hidden_dim'], out_dim=2)
         elif 'pysr_f2' in hparams and hparams['pysr_f2']:
             regress_nn = modules.PySRNet(hparams['pysr_f2'], hparams['pysr_f2_model_selection'])
         else:
@@ -496,9 +496,9 @@ class VarModel(pl.LightningModule):
         elif hparams['f1_variant'] == 'linear':
             feature_nn = nn.Linear(self.n_features, hparams['latent'], bias=False)
         elif hparams['f1_variant'] == 'bimt':
-            feature_nn = BioMLP(in_dim=self.n_features, out_dim=hparams['latent'])
+            feature_nn = modules.BioMLP(in_dim=self.n_features, out_dim=hparams['latent'])
         elif hparams['f1_variant'] == 'biolinear':
-            feature_nn = BioLinear(in_dim=self.n_features, out_dim=hparams['latent'])
+            feature_nn = modules.BioLinear(in_dim=self.n_features, out_dim=hparams['latent'])
         elif hparams['f1_variant'] == 'mean_cov':
             feature_nn = None  # calc handled without feature nn
         elif hparams['f1_variant'] == 'products':

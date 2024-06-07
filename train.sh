@@ -25,20 +25,23 @@ version=$((1 + RANDOM % 999999))
 version2=$((1 + RANDOM % 999999))
 
 # python -u find_minima.py --total_steps 300000 --version $version --slurm_id $SLURM_JOB_ID --slurm_name $SLURM_JOB_NAME --f1_variant linear --f2_variant mlp 
-# python -u sr.py --version 29170 --target f2 --seed 0
+# first run of pysr on f2 (direct)
+# python -u sr.py --version 29170 --target f2_direct --seed 0
+# second run of pysr on f2 (residual)
+# python -u sr.py --version 29170 --target f2_direct --residual --seed 0
+# third run of pysr on f2 (input is summary stats + equations)
+# python -u sr.py --version 29170 --target f2_direct --residual --previous_sr_path sr_results/92985.pkl --seed 0
 
-#for direct pysr validation loss evaluation
+# for direct pysr validation loss evaluation
 # python -u find_minima.py --version $version2 --slurm_id $SLURM_JOB_ID --slurm_name $SLURM_JOB_NAME --eval --pysr_f2 sr_results/5456.pkl --pysr_f2_model_selection best --total_steps 100 --load_f1 29170
 
-#for residual pysr validation loss evaluation
+# for residual pysr validation loss evaluation
 # python -u find_minima.py --version $version2 --slurm_id $SLURM_JOB_ID --slurm_name $SLURM_JOB_NAME --eval --pysr_f2 sr_results/5456.pkl --pysr_f2_residual sr_results/92071.pkl --pysr_f2_model_selection best --pysr_f2_residual_model_selection best --total_steps 100 --load_f1 29170
-python -u find_minima.py --version $version2 --slurm_id $SLURM_JOB_ID --slurm_name $SLURM_JOB_NAME --eval --pysr_f2 sr_results/5456.pkl --pysr_f2_residual sr_results/92985.pkl --pysr_f2_model_selection best --pysr_f2_residual_model_selection best --total_steps 100 --load_f1 29170
 
+# for residual (equations) pysr validation loss
+# python -u find_minima.py --version $version2 --slurm_id $SLURM_JOB_ID --slurm_name $SLURM_JOB_NAME --eval --pysr_f2 sr_results/5456.pkl --pysr_f2_residual sr_results/92985.pkl --pysr_f2_model_selection best --pysr_f2_residual_model_selection best --total_steps 100 --load_f1 29170
+python -u find_minima.py --version $version2 --slurm_id $SLURM_JOB_ID --slurm_name $SLURM_JOB_NAME --eval --pysr_f2 sr_results/5456.pkl --pysr_f2_residual sr_results/52420.pkl --pysr_f2_model_selection best --pysr_f2_residual_model_selection best --total_steps 100 --load_f1 29170
 
-# python -u run_swag.py --total_steps 300000 --swa_steps 50000 --version $version --slurm_id $SLURM_JOB_ID "$@" --f1_variant linear --f2_variant pysr_residual
-# python -u find_minima.py --total_steps 300000 --swa_steps 50000  --angles --no_mmr --no_nan --no_eplusminus --version $version2 --slurm_id $SLURM_JOB_ID "$@" --f1_variant bimt --pysr_model sr_results/hall_of_fame_27379_0.pkl 
-# python -u run_swag.py --total_steps 300000 --swa_steps 50000 --angles --no_mmr --no_nan --no_eplusminus --version $version2 --slurm_id $SLURM_JOB_ID "$@" --f1_variant bimt --pysr_model sr_results/hall_of_fame_27379_0.pkl 
-# python -u sr.py --version $version --target f2 --seed 0 #--time_in_hours 0.1 --max_size 60
 
 # .latex_table()
 # model.equations_
