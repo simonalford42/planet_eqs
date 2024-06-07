@@ -1,4 +1,5 @@
 """This file trains a model to minima, then saves it for run_swag.py"""
+import pysr
 import seaborn as sns
 sns.set_style('darkgrid')
 import spock_reg_model

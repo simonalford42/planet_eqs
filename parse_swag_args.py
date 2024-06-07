@@ -74,7 +74,7 @@ def parse():
     parser.add_argument('--pysr_f1_model_selection', type=str, default='best', help='best, accuracy, score, or complexity')
 
     parser.add_argument('--pysr_f2', type=str, default=None) # PySR model to load and replace f2 with, e.g. 'sr_resuls/hall_of_fame_f2_21101_0_1.pkl'
-    parser.add_argument('--pysr_f2_model_selection', type=str, default='best', help='best, accuracy, score, or complexity')
+    parser.add_argument('--pysr_f2_model_selection', type=str, default='best', help='"best", "accuracy", "score", or an integer of the "complexity"')
 
     parser.add_argument('--f2_residual', type=str, default=None, choices=[None, 'pysr', 'mlp'])
     parser.add_argument('--pysr_f2_residual', type=str, default=None)# PySR model to load for f2 residual , e.g. 'sr_resuls/hall_of_fame_f2_21101_0_1.pkl'
