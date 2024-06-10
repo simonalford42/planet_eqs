@@ -275,8 +275,7 @@ def load_pysr_module_list(filepath, model_selection):
 
 class PySRRegressNN(nn.Module):
     '''
-    Loads pysr equation module for predicting the mean, and possibly the std.
-    If the pysr module only predicts the mean, loads neural network to predict std.
+    Loads pysr equation module for predicting the mean, and uses base_f2_module to predict the std.
     '''
     def __init__(self, pysr_net, base_f2_module):
         super().__init__()
