@@ -769,16 +769,17 @@ class VarModel(pl.LightningModule):
                 residual_net = modules.PySRNet(hparams['pysr_f2_residual'], hparams['pysr_f2_residual_model_selection'])
                 regress_nn = modules.PySRRegressNN(regress_nn, base_f2)
 
+                if len(regress_nn.module_list) == 1:
+                    # pysr only predicts mean. predict std using NN loaded for f1, or a new network
+                    print('PySR only predicts mean. Adding a new network to predict std.')
+                    if 'load_f1' in hparams and hparams['load_f1']:
+                        print('Using --load_f1 network regress_nn to predict std')
+                        base_f2 = load(hparams['load_f1'], seed=hparams['seed']).regress_nn
+                    else:
+                        print('Initializing new network to predict std')
+                        base_f2 = modules.mlp(summary_dim, 2, hparams['hidden_dim'], hparams['f2_depth'])
+
             regress_nn = modules.SumModule(regress_nn, residual_net)
-            if len(regress_nn.module_list) == 1:
-                # pysr only predicts mean. predict std using NN loaded for f1, or a new network
-                print('PySR only predicts mean. Adding a new network to predict std.')
-                if 'load_f1' in hparams and hparams['load_f1']:
-                    print('Using --load_f1 network regress_nn to predict std')
-                    base_f2 = load(hparams['load_f1'], seed=hparams['seed']).regress_nn
-                else:
-                    print('Initializing new network to predict std')
-                    base_f2 = modules.mlp(summary_dim, 2, hparams['hidden_dim'], hparams['f2_depth'])
 
         if 'freeze_f2' in hparams and hparams['freeze_f2']:
             utils.freeze_module(regress_nn)
