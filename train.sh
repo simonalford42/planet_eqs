@@ -39,8 +39,8 @@ version2=$((1 + RANDOM % 999999))
 # python -u find_minima.py --version $version2 --slurm_id $SLURM_JOB_ID --slurm_name $SLURM_JOB_NAME --eval --pysr_f2 sr_results/5456.pkl --pysr_f2_residual sr_results/92071.pkl --pysr_f2_model_selection best --pysr_f2_residual_model_selection best --total_steps 100 --load_f1 29170
 
 # for residual (equations) pysr validation loss
-# python -u find_minima.py --version $version2 --slurm_id $SLURM_JOB_ID --slurm_name $SLURM_JOB_NAME --eval --pysr_f2 sr_results/5456.pkl --pysr_f2_residual sr_results/92985.pkl --pysr_f2_model_selection best --pysr_f2_residual_model_selection best --total_steps 100 --load_f1 29170
-python -u find_minima.py --version $version2 --slurm_id $SLURM_JOB_ID --slurm_name $SLURM_JOB_NAME --eval --pysr_f2 sr_results/5456.pkl --pysr_f2_residual sr_results/52420.pkl --pysr_f2_model_selection best --pysr_f2_residual_model_selection best --total_steps 100 --load_f1 29170
+#python -u find_minima.py --version $version2 --eval --pysr_f2 sr_results/5456.pkl --pysr_f2_residual sr_results/92985.pkl --pysr_f2_model_selection best --pysr_f2_residual_model_selection best --total_steps 100 --load_f1 29170
+python -u find_minima.py --version $version2 --eval --pysr_f2 sr_results/5456.pkl --pysr_f2_residual sr_results/52420.pkl --pysr_f2_model_selection best --pysr_f2_residual_model_selection best --total_steps 100 --load_f1 29170
 
 
 # .latex_table()
