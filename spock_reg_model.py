@@ -20,6 +20,7 @@ from utils import assert_equal
 import utils
 import modules
 import glob
+from matplotlib import pyplot as plt
 
 
 def load(version, seed=0):
@@ -748,6 +749,16 @@ class VarModel(pl.LightningModule):
             regress_nn = BioMLP(in_dim=summary_dim, depth=hparams['f2_depth']+2, w=hparams['hidden_dim'], out_dim=2)
         elif 'pysr_f2' in hparams and hparams['pysr_f2']:
             regress_nn = modules.PySRNet(hparams['pysr_f2'], hparams['pysr_f2_model_selection'])
+            if len(regress_nn.module_list) == 1:
+                # pysr only predicts mean. predict std using NN loaded for f1, or a new network
+                print('PySR only predicts mean. Adding a new network to predict std.')
+                if 'load_f1' in hparams and hparams['load_f1']:
+                    print('Using --load_f1 network regress_nn to predict std')
+                    base_f2 = load(hparams['load_f1'], seed=hparams['seed']).regress_nn
+                else:
+                    print('Initializing new network to predict std')
+                    base_f2 = modules.mlp(summary_dim, 2, hparams['hidden_dim'], hparams['f2_depth'])
+                regress_nn = modules.PySRRegressNN(regress_nn, base_f2)
         else:
             regress_nn = modules.mlp(summary_dim, 2, hparams['hidden_dim'], hparams['f2_depth'])
 
@@ -757,6 +768,17 @@ class VarModel(pl.LightningModule):
             else:
                 # assert hparams['f2_residual'] == 'pysr'
                 residual_net = modules.PySRNet(hparams['pysr_f2_residual'], hparams['pysr_f2_residual_model_selection'])
+                if len(regress_nn.module_list) == 1:
+                    # pysr only predicts mean. predict std using NN loaded for f1, or a new network
+                    print('PySR only predicts mean. Adding a new network to predict std.')
+                    if 'load_f1' in hparams and hparams['load_f1']:
+                        print('Using --load_f1 network regress_nn to predict std')
+                        base_f2 = load(hparams['load_f1'], seed=hparams['seed']).regress_nn
+                    else:
+                        print('Initializing new network to predict std')
+                        base_f2 = modules.mlp(summary_dim, 2, hparams['hidden_dim'], hparams['f2_depth'])
+                    residual_net = modules.PySRRegressNN(regress_nn, base_f2)
+
             regress_nn = modules.SumModule(regress_nn, residual_net)
 
         if 'freeze_f2' in hparams and hparams['freeze_f2']:

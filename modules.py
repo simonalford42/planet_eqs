@@ -1,4 +1,4 @@
-# import pysr
+import pysr
 import torch
 import torch.nn as nn
 from utils import assert_equal
@@ -251,17 +251,49 @@ class SumModule(nn.Module):
 
 def load_pysr_module_list(filepath, model_selection):
     if model_selection in ['best', 'accuracy', 'score']:
-        return nn.ModuleList(pysr.PySRRegressor.from_file(filepath, model_selection=model_selection).pytorch())
+        reg = pysr.PySRRegressor.from_file(filepath, model_selection=model_selection)
+        if reg.nout_ > 1:
+            return nn.ModuleList(reg.pytorch())
+        else:
+            return nn.ModuleList([reg.pytorch()])
     else:
         reg = pysr.PySRRegressor.from_file(filepath)
         # find the ixs with closest complexity equal to model_selection
-        ixs = []
-        for i in range(reg.nout_):
-            ix = np.argmin(np.abs(reg.equations_[i]['complexity'] - int(model_selection)))
-            ixs.append(ix)
 
-        print('PySR model selection ixs: ', ixs)
+        if reg.nout_ > 1:
+            ixs = []
+            for i in range(reg.nout_):
+                ix = np.argmin(np.abs(reg.equations_[i]['complexity'] - int(model_selection)))
+                ixs.append(ix)
+        else:
+            ix = np.argmin(np.abs(reg.equations_['complexity'] - int(model_selection)))
+            ixs = [ix]
+
+        print('PySR model selection ixs:', ixs)
         return nn.ModuleList(reg.pytorch(index=ixs))
+
+
+class PySRRegressNN(nn.Module):
+    '''
+    Loads pysr equation module for predicting the mean, and uses base_f2_module to predict the std.
+    '''
+    def __init__(self, pysr_net, base_f2_module):
+        super().__init__()
+        self.pysr_net = pysr_net
+        self.base_f2_module = base_f2_module
+
+    def forward(self, x):
+        B = x.shape[0]
+        out = self.pysr_net(x)
+        if out.shape[-1] == 1:
+            mean = out  # [B, 1]
+            base = self.base_f2_module(x)  # [B, 2]
+            assert_equal(mean.shape, (B, 1))
+            assert_equal(base.shape, (B, 2))
+            out = einops.rearrange([mean[:, 0], base[:, 1]], 'two B -> B two')
+
+        assert_equal(out.shape, (B, 2))
+        return out
 
 
 class PySRNet(nn.Module):
