@@ -1,4 +1,4 @@
-import pysr
+# # import pysr
 import torch
 import torch.nn as nn
 from utils import assert_equal
