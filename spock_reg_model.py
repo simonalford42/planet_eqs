@@ -20,6 +20,7 @@ from utils import assert_equal
 import utils
 import modules
 import glob
+from matplotlib import pyplot as plt
 
 
 def load(version, seed=0):
