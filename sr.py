@@ -612,7 +612,7 @@ for i in range(num_iters):
 
 #         args.version = model_version
 
-import math
+
 if __name__ == '__main__':
     args = parse_args()
 

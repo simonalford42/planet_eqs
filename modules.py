@@ -10,6 +10,19 @@ import numpy as np
 import torch.nn.functional as F
 from petit20_survival_time import Tsurv
 
+
+class Products(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x):
+        # x: [..., d]
+        # returns: [..., d * d]
+        x = torch.einsum('... i, ... j -> ... ij', x, x)
+        x = einops.rearrange(x, '... i j -> ... (i j)')
+        return x
+
+
 class Products2(nn.Module):
     def __init__(self):
         super().__init__()
@@ -32,16 +45,45 @@ class Products2(nn.Module):
         return torch.cat([x, products], dim=-1)
 
 
-class Products(nn.Module):
+class Products3(nn.Module):
     def __init__(self):
         super().__init__()
+        # Indices for each feature for the three planets
+        self.planet_features = {
+            'e': [8, 17, 26],
+            'i': [10, 19, 28],
+            'a': [9, 18, 27],
+            'Omega': [11, 20, 29],
+            'pomega': [13, 22, 31],
+            'theta': [15, 24, 33],
+            'sin_Omega': [12, 21, 30],
+            'cos_Omega': [11, 20, 29],
+            'sin_pomega': [14, 23, 32],
+            'cos_pomega': [13, 22, 31],
+            'sin_theta': [16, 25, 34],
+            'cos_theta': [15, 24, 33],
+        }
+        
+        # Generate the products list
+        self.products = []
+        for i in range(3):  # For each planet
+            # e and pomega
+            self.products.append((self.planet_features['e'][i], self.planet_features['sin_pomega'][i]))
+            self.products.append((self.planet_features['e'][i], self.planet_features['cos_pomega'][i]))
+            # i and Omega
+            self.products.append((self.planet_features['i'][i], self.planet_features['sin_Omega'][i]))
+            self.products.append((self.planet_features['i'][i], self.planet_features['cos_Omega'][i]))
+            # a and theta
+            self.products.append((self.planet_features['a'][i], self.planet_features['sin_theta'][i]))
+            self.products.append((self.planet_features['a'][i], self.planet_features['cos_theta'][i]))
+
+        self.products = torch.tensor(self.products)
 
     def forward(self, x):
-        # x: [..., d]
-        # returns: [..., d * d]
-        x = torch.einsum('... i, ... j -> ... ij', x, x)
-        x = einops.rearrange(x, '... i j -> ... (i j)')
-        return x
+        # Calculate the product features
+        products = x[..., self.products[:, 0]] * x[..., self.products[:, 1]]
+        # Concatenate the original features with the product features
+        return torch.cat([x, products], dim=-1)
 
 # instead of sigmoid and sum, use a softmax.
 # sum over predicates is 1, decrease temperature over training so it specializes
