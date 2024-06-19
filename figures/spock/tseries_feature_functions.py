@@ -7,7 +7,7 @@ import warnings
 import pandas as pd
 warnings.filterwarnings("error")
 # sorts out which pair of planets has a smaller EMcross, labels that pair inner, other adjacent pair outer
-# returns a list of two lists, with [label (near or far), i1, i2], where i1 and i2 are the indices, with i1 
+# returns a list of two lists, with [label (near or far), i1, i2], where i1 and i2 are the indices, with i1
 # having the smaller semimajor axis
 profile = lambda _: _
 
@@ -38,7 +38,7 @@ def resonant_period_ratios(min_per_ratio,max_per_ratio,order):
 ##########################
 
 # sorts out which pair of planets has a smaller EMcross, labels that pair inner, other adjacent pair outer
-# returns a list of two lists, with [label (near or far), i1, i2], where i1 and i2 are the indices, with i1 
+# returns a list of two lists, with [label (near or far), i1, i2], where i1 and i2 are the indices, with i1
 # having the smaller semimajor axis
 def get_pairs(sim, indices):
     ps = sim.particles
@@ -74,7 +74,7 @@ def find_strongest_MMR(sim, i1, i2):
     EM = np.sqrt((ps[i1].e*np.cos(ps[i1].pomega) - ps[i2].e*np.cos(ps[i2].pomega))**2 + (ps[i1].e*np.sin(ps[i1].pomega) - ps[i2].e*np.sin(ps[i2].pomega))**2)
     EMcross = (ps[i2].a-ps[i1].a)/ps[i1].a
 
-    j, k, maxstrength = np.nan, np.nan, 0 
+    j, k, maxstrength = np.nan, np.nan, 0
     for a, b in res:
         nres = (b*n2 - a*n1)/n1
         if nres == 0:
@@ -101,7 +101,7 @@ def populate_extended_trio(sim, trio, pairs, tseries, i, a10, axis_labels=None):
         e2x, e2y = ps[i2].e*np.cos(ps[i2].pomega), ps[i2].e*np.sin(ps[i2].pomega)
         tseries[i,Ns*q+1] = np.sqrt((e2x-e1x)**2 + (e2y-e1y)**2)
         tseries[i,Ns*q+2] = np.sqrt((m1*e1x + m2*e2x)**2 + (m1*e1y + m2*e2y)**2)/(m1+m2)
-        j, k, tseries[i,Ns*q+3] = find_strongest_MMR(sim, i1, i2) 
+        j, k, tseries[i,Ns*q+3] = find_strongest_MMR(sim, i1, i2)
 
         if axis_labels is not None:
             axis_labels[Ns*q+1] = 'e+_' + label
@@ -136,7 +136,7 @@ def get_extended_tseries(sim, args):
     Norbits = args[0]
     Nout = args[1]
     trios = args[2]
-   
+
     a10s = [sim.particles[trio[0]].a for trio in trios]
     minP = np.min([p.P for p in sim.particles[1:sim.N_real]])
 
@@ -145,13 +145,13 @@ def get_extended_tseries(sim, args):
     triopairs, triotseries = [], []
     # axis_labels = ['']*26
     # axis_labels[0] = 'time'
-    #7 are same as used for SPOCK (equivalent of old res_tseries), and following 18 are the 6 orbital elements for each of the 3 planets. 
+    #7 are same as used for SPOCK (equivalent of old res_tseries), and following 18 are the 6 orbital elements for each of the 3 planets.
     axis_labels = ['time', 'e+_near', 'e-_near', 'max_strength_mmr_near', 'e+_far', 'e-_far', 'max_strength_mmr_far', 'megno', 'a1', 'e1', 'i1', 'Omega1', 'pomega1', 'theta1', 'a2', 'e2', 'i2', 'Omega2', 'pomega2', 'theta2', 'a3', 'e3', 'i3', 'Omega3', 'pomega3', 'theta3']
 
-    for tr, trio in enumerate(trios): # For each trio there are two adjacent pairs 
+    for tr, trio in enumerate(trios): # For each trio there are two adjacent pairs
         triopairs.append(get_pairs(sim, trio))
         triotseries.append(np.zeros((Nout, 26))*np.nan)
-  
+
     for i, time in enumerate(times):
         try:
             sim.integrate(time, exact_finish_time=0)
@@ -164,13 +164,13 @@ def get_extended_tseries(sim, args):
 
         for tr, trio in enumerate(trios):
             pairs = triopairs[tr]
-            tseries = triotseries[tr] 
+            tseries = triotseries[tr]
             populate_extended_trio(sim, trio, pairs, tseries, i, a10s[tr])
             # if i == 0 and tr == 0:
                 # populate_extended_trio(sim, trio, pairs, tseries, i, a10s[tr], axis_labels)
             # else:
                 # populate_extended_trio(sim, trio, pairs, tseries, i, a10s[tr])
-    
+
     # print(axis_labels)
     #triotseries = pd.DataFrame(data=triotseries, columns=axis_labels)
     stable = True
@@ -186,7 +186,7 @@ def populate_trio(sim, trio, pairs, tseries, i):
         e2x, e2y = ps[i2].e*np.cos(ps[i2].pomega), ps[i2].e*np.sin(ps[i2].pomega)
         tseries[i,Ns*q+1] = np.sqrt((e2x-e1x)**2 + (e2y-e1y)**2)
         tseries[i,Ns*q+2] = np.sqrt((m1*e1x + m2*e2x)**2 + (m1*e1y + m2*e2y)**2)/(m1+m2)
-        j, k, tseries[i,Ns*q+3] = find_strongest_MMR(sim, i1, i2) 
+        j, k, tseries[i,Ns*q+3] = find_strongest_MMR(sim, i1, i2)
 
     tseries[i,7] = sim.calculate_megno() # megno
 
@@ -194,18 +194,18 @@ def get_tseries(sim, args):
     Norbits = args[0]
     Nout = args[1]
     trios = args[2]
-    
+
     minP = np.min([p.P for p in sim.particles[1:sim.N_real]])
 
     # want hyperbolic case to run so it raises exception
     times = np.linspace(0, Norbits*np.abs(minP), Nout)
-    
+
     triopairs, triotseries = [], []
 
-    for tr, trio in enumerate(trios): # For each trio there are two adjacent pairs 
+    for tr, trio in enumerate(trios): # For each trio there are two adjacent pairs
         triopairs.append(get_pairs(sim, trio))
         triotseries.append(np.zeros((Nout, 8))*np.nan)
-  
+
     for i, time in enumerate(times):
         try:
             sim.integrate(time, exact_finish_time=0)
@@ -218,17 +218,17 @@ def get_tseries(sim, args):
 
         for tr, trio in enumerate(trios):
             pairs = triopairs[tr]
-            tseries = triotseries[tr] 
+            tseries = triotseries[tr]
             populate_trio(sim, trio, pairs, tseries, i)
-    
+
     stable = True
     return triotseries, stable
-    
+
 def features(sim, args):
     Norbits = args[0]
     Nout = args[1]
     trios = args[2]
-    
+
     ps  = sim.particles
     triofeatures = []
     for tr, trio in enumerate(trios):
@@ -243,7 +243,7 @@ def features(sim, args):
         features['MEGNO'] = np.nan
         features['MEGNOstd'] = np.nan
         triofeatures.append(features)
-    
+
     triotseries, stable = get_tseries(sim, args)
     if stable == False:
         return triofeatures, stable
@@ -266,7 +266,7 @@ def features(sim, args):
         features['MMRstrengthfar'] = np.median(MMRstrengthfar)
         features['EMfracstdnear'] = EMnear.std() / features['EMcrossnear']
         features['EMfracstdfar'] = EMfar.std() / features['EMcrossfar']
-        features['EPstdnear'] = EPnear.std() 
-        features['EPstdfar'] = EPfar.std() 
-    
+        features['EPstdnear'] = EPnear.std()
+        features['EPstdfar'] = EPfar.std()
+
     return triofeatures, stable

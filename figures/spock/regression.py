@@ -183,7 +183,9 @@ class FeatureRegressor(object):
 
 
 
-@jit
+# @jit
+# attempt to disable numba due to error, simon
+# @numba.njit(inline='never')
 def data_setup_kernel(mass_array, cur_tseries):
     mass_array = np.tile(mass_array[None], (100, 1))[None]
 
@@ -191,9 +193,9 @@ def data_setup_kernel(mass_array, cur_tseries):
 
     isnotfinite = lambda _x: ~np.isfinite(_x)
 
-    old_X = np.concatenate((old_X, isnotfinite(old_X[:, :, [3]]).astype(np.float)), axis=2)
-    old_X = np.concatenate((old_X, isnotfinite(old_X[:, :, [6]]).astype(np.float)), axis=2)
-    old_X = np.concatenate((old_X, isnotfinite(old_X[:, :, [7]]).astype(np.float)), axis=2)
+    old_X = np.concatenate((old_X, isnotfinite(old_X[:, :, [3]]).astype(float)), axis=2)
+    old_X = np.concatenate((old_X, isnotfinite(old_X[:, :, [6]]).astype(float)), axis=2)
+    old_X = np.concatenate((old_X, isnotfinite(old_X[:, :, [7]]).astype(float)), axis=2)
 
     old_X[..., :] = np.nan_to_num(old_X[..., :], posinf=0.0, neginf=0.0)
 
