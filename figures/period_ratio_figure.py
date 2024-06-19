@@ -6,9 +6,7 @@ import rebound
 import numpy as np
 import matplotlib.pyplot as plt
 import utils
-print('hi')
 from spock import FeatureRegressor
-print('hi')
 
 version = 4157
 model = FeatureRegressor(

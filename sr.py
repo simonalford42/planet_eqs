@@ -18,6 +18,7 @@ from utils import assert_equal
 import einops
 import torch
 
+
 ELEMENTWISE_LOSS = """
 function elementwise_loss(prediction, target)
 
@@ -138,6 +139,31 @@ def load_inputs_and_targets(config):
         out_dim = 1
         n = X.shape[1] // 2
         variable_names = [f'm{i}' for i in range(n)] + [f's{i}' for i in range(n)]
+
+        if config['sr_residual']:
+            # Load the PySR equations from the previous round
+            with open(config['previous_sr_path'], 'rb') as f:
+                previous_sr_model = pickle.load(f)
+
+            # Evaluate the previous PySR equations on the inputs
+            additional_features = []
+            summary_stats_np = out_dict['summary_stats'].detach().numpy()
+            for equation_set in previous_sr_model.equations_:
+                for index, equation in equation_set.iterrows():
+                    lambda_func = equation['lambda_format']
+                    evaluated_result = lambda_func(summary_stats_np)
+                    # Ensure the result is reshaped to match the batch size
+                    evaluated_result = evaluated_result.reshape(-1, 1)
+                    additional_features.append(evaluated_result)
+
+            # Convert list of arrays to a single numpy array
+            additional_features = np.hstack(additional_features)
+            # Concatenate the original summary stats with the evaluated results
+            # summary_stats_np: [1, 2000, 40]
+            # additional_features: (2000, 49)
+            # (args.n, in_dim) = (250, 2*20+49)
+            X = np.concatenate([summary_stats_np, additional_features], axis=1)
+
     else:
         raise ValueError(f"Unknown target: {config['target']}")
 
@@ -149,7 +175,10 @@ def load_inputs_and_targets(config):
     # go down from having a batch of size B to just N
     ixs = np.random.choice(X.shape[0], size=config['n'], replace=False)
     X, y = X[ixs], y[ixs]
-    X, y = X.detach().numpy(), y.detach().numpy()
+
+    # Ensure X and y are NumPy arrays
+    if isinstance(X, torch.Tensor):
+        X, y = X.detach().numpy(), y.detach().numpy()
 
     assert_equal(X.shape, (config['n'], in_dim))
     assert_equal(y.shape, (config['n'], out_dim))
@@ -177,7 +206,7 @@ def get_config(args):
         niterations=args.niterations,
         # multithreading=False,
         binary_operators=["+", "*", '/', '-', '^'],
-        unary_operators=["log", 'sin'],
+        unary_operators=['sin'],  # removed "log"
         maxsize=args.max_size,
         timeout_in_seconds=int(60*60*args.time_in_hours),
         # prevent ^ from using complex exponents, nesting power laws is expressive but uninterpretable
@@ -270,6 +299,8 @@ def parse_args():
     parser.add_argument('--target', type=str, default='f2_direct', choices=['f1', 'f2', 'f2_ifthen', 'f2_direct'])
     parser.add_argument('--residual', action='store_true', help='do residual training of your target')
     parser.add_argument('--n', type=int, default=5000, help='number of data points for the SR problem')
+    parser.add_argument('--sr_residual', action='store_true', help='do residual training of your target with previous sr run as base')
+    parser.add_argument('--previous_sr_path', type=str, default='sr_results/92985.pkl')
 
     args = parser.parse_args()
     return args
