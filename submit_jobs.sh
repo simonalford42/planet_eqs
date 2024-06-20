@@ -8,6 +8,8 @@ sbatch -J sr --partition ellis --time 00:15:00 sr.sh --time_in_hours 0.01 --vers
 
 # ------------------------------- Thu June 6 -----------------------------------
 
+# sbatch -J pr10swag prune_train.sh --latent 10 --version 24880
+
 # sbatch -J sr --partition gpu --time 09:00:00 sr.sh --time_in_hours 8 --version 24880
 # sbatch -J sr2 --partition gpu --time 09:00:00 sr.sh --time_in_hours 2 --version 24880
 # sbatch -J sr1 --partition gpu --time 09:00:00 sr.sh --time_in_hours 1 --version 24880

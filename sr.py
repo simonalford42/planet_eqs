@@ -135,7 +135,7 @@ def load_inputs_and_targets(config):
         # there are two ground truth predictions. create a data point for each
         X = einops.repeat(X, 'B F -> (B two) F', two=2)
         y = einops.rearrange(y, 'B two -> (B two) 1')
-        in_dim = model.summary_dim
+        in_dim = model.summary_dim + 49
         out_dim = 1
         n = X.shape[1] // 2
         variable_names = [f'm{i}' for i in range(n)] + [f's{i}' for i in range(n)]
@@ -168,9 +168,12 @@ def load_inputs_and_targets(config):
         raise ValueError(f"Unknown target: {config['target']}")
 
     if config['residual']:
-        assert config['target'] == 'f2_direct', 'residual requires a direct target'
-        # target is the residual error of the model's prediction from the ground truth
-        y = y - out_dict['predicted_mean']
+        predicted_mean = out_dict['predicted_mean']
+        predicted_mean = einops.repeat(predicted_mean, 'B F -> (B two) F', two=2)
+        predicted_mean = einops.rearrange(predicted_mean, 'B two -> (B two) 1')
+        if y.shape[0] != predicted_mean.shape[0]:
+            raise ValueError(f"Shape mismatch: y has shape {y.shape}, but predicted_mean has shape {predicted_mean.shape}")
+        y = y - predicted_mean
 
     # go down from having a batch of size B to just N
     ixs = np.random.choice(X.shape[0], size=config['n'], replace=False)
@@ -218,7 +221,7 @@ def get_config(args):
 
     if args.target == 'f2_direct':
         # use custom loss function when predicting directly
-        pysr_config['elementwise_loss'] = ELEMENTWISE_LOSS
+        # pysr_config['elementwise_loss'] = ELEMENTWISE_LOSS
         pass
 
     config = vars(args)

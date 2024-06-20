@@ -47,6 +47,7 @@ class FeatureRegressor(object):
             spock_reg_model.load_swag(fname).cpu()
             for i, fname in enumerate(glob.glob(pwd + '/../' + filebase)) #0.78, 0.970
         ]
+        import pdb; pdb.set_trace()
         # Assume fixed scale:
         ssX = StandardScaler()
         ssX.scale_ = np.array([2.88976974e+03, 6.10019661e-02, 4.03849732e-02, 4.81638693e+01,

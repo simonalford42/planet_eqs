@@ -1,4 +1,5 @@
 """This file trains a model to minima, then saves it for run_swag.py"""
+import pysr
 import seaborn as sns
 sns.set_style('darkgrid')
 import spock_reg_model
@@ -8,6 +9,8 @@ from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
 import torch
 import numpy as np
+import pickle
+from scipy.stats import truncnorm
 import sys
 from parse_swag_args import parse
 import utils
