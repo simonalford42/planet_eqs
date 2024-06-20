@@ -761,6 +761,27 @@ class VarModel(pl.LightningModule):
         else:
             regress_nn = modules.mlp(summary_dim, 2, hparams['hidden_dim'], hparams['f2_depth'])
 
+        def calculate_additional_features(summary_stats, previous_sr_model_path):
+            # Move the tensor to CPU before converting to numpy
+            summary_stats_np = summary_stats.cpu().detach().numpy()
+
+            with open(previous_sr_model_path, 'rb') as f:
+                previous_sr_model = pkl.load(f)
+
+            additional_features = []
+
+            for equation_set in previous_sr_model.equations_:
+                for index, equation in equation_set.iterrows():
+                    lambda_func = equation['lambda_format']
+                    evaluated_result = lambda_func(summary_stats_np)
+                    # Ensure the result is reshaped to match the batch size
+                    evaluated_result = evaluated_result.reshape(-1, 1)
+                    additional_features.append(evaluated_result)
+
+            additional_features = np.hstack(additional_features)
+            additional_features_tensor = torch.tensor(additional_features, dtype=summary_stats.dtype, device=summary_stats.device)
+            return torch.cat([summary_stats, additional_features_tensor], dim=-1)
+        
         if 'f2_residual' in hparams and hparams['f2_residual'] or 'pysr_f2_residual' in hparams and hparams['pysr_f2_residual']:
             if hparams['f2_residual'] == 'mlp':
                 residual_net = modules.mlp(summary_dim, 2, hparams['hidden_dim'], hparams['f2_depth'])
@@ -777,38 +798,13 @@ class VarModel(pl.LightningModule):
                     else:
                         print('Initializing new network to predict std')
                         base_f2 = modules.mlp(summary_dim, 2, hparams['hidden_dim'], hparams['f2_depth'])
-
                     residual_net = modules.PySRRegressNN(residual_net, base_f2)
 
             if 'pysr_f2_residual' in hparams and hparams['pysr_f2_residual']:
-                # Calculate the previous round features
-                previous_sr_model_path = hparams['pysr_f2_residual']
-                previous_sr_model_selection = hparams['pysr_f2_residual_model_selection']
-                
-                def calculate_additional_features(summary_stats):
-                    # Move the tensor to CPU before converting to numpy
-                    summary_stats_np = summary_stats.cpu().detach().numpy()
-
-                    with open(previous_sr_model_path, 'rb') as f:
-                        previous_sr_model = pkl.load(f)
-
-                    additional_features = []
-
-                    for equation_set in previous_sr_model.equations_:
-                        for index, equation in equation_set.iterrows():
-                            lambda_func = equation['lambda_format']
-                            evaluated_result = lambda_func(summary_stats_np)
-                            evaluated_result = evaluated_result.reshape(-1, 1)
-                            additional_features.append(evaluated_result)
-
-                    additional_features = np.hstack(additional_features)
-                    additional_features_tensor = torch.tensor(additional_features, dtype=summary_stats.dtype, device=summary_stats.device)
-                    return torch.cat([summary_stats, additional_features_tensor], dim=-1)
-
                 def combined_predict_instability(summary_stats):
-                    summary_stats_with_additional = calculate_additional_features(summary_stats)
+                    summary_stats_with_additional = calculate_additional_features(summary_stats, hparams['pysr_f2_residual'])
                     return residual_net(summary_stats_with_additional)
-
+                
                 regress_nn = modules.SumModule(regress_nn, combined_predict_instability)
             else:
                 regress_nn = modules.SumModule(regress_nn, residual_net)
@@ -868,9 +864,25 @@ class VarModel(pl.LightningModule):
                                bias='no_bias' not in hparams or not hparams['no_bias'])
             feature_nn = nn.Sequential(modules.Products2(), linear)
         elif hparams['f1_variant'] == 'products3':
-            linear = nn.Linear(self.n_features + 18, hparams['latent'],
+            # Pass through Products3 module
+            feature_nn = modules.Products3()
+            
+            # Dummy input to infer shape
+            dummy_input = torch.randn(1, self.n_features)  # Adjust this according to the actual input shape
+            dummy_output = feature_nn(dummy_input)
+            
+            # Print the output shape to verify
+            print(f"Products3 dummy output shape: {dummy_output.shape}")
+            
+            # Adjust the input dimension of the linear layer based on the dummy output shape
+            input_dim_for_linear = dummy_output.shape[1]
+            
+            linear = nn.Linear(input_dim_for_linear, hparams['latent'],
                             bias='no_bias' not in hparams or not hparams['no_bias'])
+            
+            # Combine into a sequential model
             feature_nn = nn.Sequential(modules.Products3(), linear)
+
         elif hparams['f1_variant'] == 'random':
             feature_nn = nn.Linear(self.n_features, hparams['latent'], bias='no_bias' not in hparams or not hparams['no_bias'])
             # make the linear projection random combinations of two input variables, with coefficients from U[-1, 1]
