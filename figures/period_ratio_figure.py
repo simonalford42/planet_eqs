@@ -5,8 +5,8 @@ sys.path.append('../')
 import rebound
 import numpy as np
 import matplotlib.pyplot as plt
-from spock import FeatureRegressor, FeatureRegressorXGB
 import utils
+from spock import FeatureRegressor
 
 version = 4157
 model = FeatureRegressor(
@@ -108,3 +108,4 @@ cb.set_label("log(MEGNO-2) (red = chaotic)")
 ax.set_xlabel("P1/P2")
 ax.set_ylabel("P2/P3")
 plt.savefig("period_ratio_figure.png", dpi=200)
+print('done')

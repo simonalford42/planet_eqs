@@ -1,25 +1,10 @@
 #!/usr/bin/env bash
 
-# ------------------------------- Mon June 10 -----------------------------------
+# ------------------------------- Tue June 18 -----------------------------------
 
-sbatch -J eval --partition ellis train.sh --eval --pysr_f2 sr_results/5456.pkl --pysr_f2_residual sr_results/52420.pkl --pysr_f2_model_selection best --pysr_f2_residual_model_selection best --total_steps 100 --load_f1 29170
+# sbatch -J sr --partition ellis --time 00:15:00 sr.sh --time_in_hours 0.01 --version 24880
+sbatch -J sr --partition ellis --time 00:15:00 sr.sh --time_in_hours 0.01 --version 24880 --sr_residual --previous_sr_path 'sr_results/8092.pkl'
 
-# ------------------------------- Fri June 7 -----------------------------------
-
-# sbatch -J it --partition gpu --time 09:00:00 sr.sh --time_in_hours 8 --version 15505 --loss_fn mse f2_ifthen
-# sbatch -J it --partition gpu --time 09:00:00 sr.sh --time_in_hours 2 --version 15505 --loss_fn mse --target f2_ifthen
-
-# sbatch -J sr_val train.sh --load_f1 24880 --pysr_f2 sr_results/41010.pkl --eval --pysr_f2_model_selection 7 --total_steps 100
-# sbatch -J sr_val train.sh --load_f1 24880 --pysr_f2 sr_results/41010.pkl --eval --pysr_f2_model_selection 14 --total_steps 100
-# sbatch -J sr_val train.sh --load_f1 24880 --pysr_f2 sr_results/41010.pkl --eval --pysr_f2_model_selection 30 --total_steps 100
-
-# sbatch -J sr --partition gpu --time 09:00:00 sr.sh --time_in_hours 8 --version 24880 --loss_fn mse
-# sbatch -J sr2 --partition gpu --time 09:00:00 sr.sh --time_in_hours 2 --version 24880 --loss_fn mse
-
-# sbatch -J ml20 train.sh --f1_variant mlp --f2_variant linear --latent 20
-# sbatch -J ml10 train.sh --f1_variant mlp --f2_variant linear --latent 10
-# sbatch -J ll20 train.sh --f1_variant linear --f2_variant linear --latent 20
-# sbatch -J ll10 train.sh --f1_variant linear --f2_variant linear --latent 10
 
 # ------------------------------- Thu June 6 -----------------------------------
 

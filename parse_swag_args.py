@@ -52,7 +52,7 @@ def parse():
 
     ########## architecture variant args ##########
     parser.add_argument('--f1_variant', type=str, default='linear',
-                        choices=['zero', 'identity', 'random_features', 'linear', 'mean_cov', 'mlp', 'random', 'bimt', 'biolinear', 'products', 'products2']) # to do pysr, use --pysr_f1 arg
+                        choices=['zero', 'identity', 'random_features', 'linear', 'mean_cov', 'mlp', 'random', 'bimt', 'biolinear', 'products', 'products2', 'products3']) # to do pysr, use --pysr_f1 arg
     parser.add_argument('--f2_variant', type=str, default='mlp', choices=['ifthen', 'mlp', 'linear', 'bimt', 'ifthen2', 'new']) # to do pysr, use --pysr_f2 arg
 
     parser.add_argument('--f2_depth', type=int,  default=1, help='regress nn number of hidden layers')

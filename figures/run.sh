@@ -21,4 +21,5 @@ conda activate bnn_chaos_model
 # Enable errexit (exit on error)
 set -e
 
-python multiswag_5_planet.py 4157
+# python multiswag_5_planet.py 4157
+python period_ratio_figure.py
