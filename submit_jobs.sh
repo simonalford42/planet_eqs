@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 
+# ------------------------------- Wed June 18 -----------------------------------
+
+sbatch -J sr --partition gpu --time 00:01:00 sr.sh --time_in_hours 0.01 --version 24880
+# sbatch -J sr --partition ellis --time 00:01:00 sr.sh --time_in_hours 0.001 --version 24880 --sr_residual --previous_sr_path 'sr_results/8092.pkl'
+
 # ------------------------------- Tue June 18 -----------------------------------
 
 # sbatch -J sr --partition ellis --time 00:15:00 sr.sh --time_in_hours 0.01 --version 24880
-sbatch -J sr --partition ellis --time 00:15:00 sr.sh --time_in_hours 0.01 --version 24880 --sr_residual --previous_sr_path 'sr_results/8092.pkl'
-
+# sbatch -J sr --partition ellis --time 00:15:00 sr.sh --time_in_hours 0.01 --version 24880 --sr_residual --previous_sr_path 'sr_results/8092.pkl'
 
 # ------------------------------- Thu June 6 -----------------------------------
 

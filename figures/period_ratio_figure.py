@@ -10,18 +10,23 @@ import pytorch_lightning as pl
 import rebound
 import numpy as np
 import matplotlib.pyplot as plt
+
 import utils2
 from spock import FeatureRegressor
 
 from multiprocess import Pool
+import argparse
+
 
 def get_args():
     print(utils2.get_script_execution_command())
-    use_model = bool(int(sys.argv[1]))
-    Ngrid = int(sys.argv[2])
-    print('Using model:', use_model)
-    print('Ngrid:', Ngrid)
-    return Ngrid, use_model
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--use_megno', action='store_true')
+    parser.add_argument('--Ngrid', type=int, default=80)
+    parser.add_argument('--ix', type=int, default=None)
+    parser.add_argument('--total', type=int, default=None)
+    args = parser.parse_args()
+    return args.Ngrid, not args.use_megno, args.ix, args.total
 
 
 def load_model():
@@ -113,44 +118,79 @@ def get_period_ratios(Ngrid):
     return P12s, P23s
 
 
-def compute_results(Ngrid=80, use_model=False):
+def get_parameters(P12s, P23s):
+    parameters = []
+    for P12 in P12s:
+        for P23 in P23s:
+            parameters.append((P12,P23))
+
+    return parameters
+
+
+def compute_results_for_parameters(parameters, use_model=False):
     if use_model:
         model = load_model()
 
-    with Pool() as pool:
-        P12s, P23s = get_period_ratios(Ngrid)
-        parameters = []
-        for P12 in P12s:
-            for P23 in P23s:
-                parameters.append((P12,P23))
+    simulations = [get_simulation(par) for par in parameters]
+    if use_model:
+        f = lambda sim: get_model_prediction(sim, model)
+    else:
+        f = get_megno_prediction
 
-        simulations = [get_simulation(par) for par in parameters]
-        if use_model:
-            f = lambda sim: get_model_prediction(sim, model)
-        else:
-            f = get_megno_prediction
-
-        # results = pool.map(f, simulations)
-
-        # unparrallelized version for debugging
-        results = []
-        for sim in simulations:
-            with utils2.Timing('simulation'):
-                out = f(sim)
-                print(out)
-            results.append(out)
-
-        # save the results
-        np.save(get_results_path(Ngrid, use_model), np.array(results))
-        return results
+    results = [f(sim) for sim in simulations]
+    return results
 
 
-def get_results_path(Ngrid=80, use_model=False):
-    return f'period_ratio_figure_results_ngrid={Ngrid}_model={use_model}.npy'
+def get_list_chunk(lst, ix, total):
+    '''
+    split list into total chunks and return the ix-th chunk
+    example: get_list_chunk([0,1,2,3,4,5,6,7,8,9], 0, 3) -> [0,1,2]
+             get_list_chunk([0,1,2,3,4,5,6,7,8,9], 1, 3) -> [2,3,4]
+             get_list_chunk([0,1,2,3,4,5,6,7,8,9], 2, 3) -> [5,6,7,8,9]
+    '''
+    chunk_size = len(lst) // total
+    start = ix * chunk_size
+    end = start + chunk_size if ix < total - 1 else len(lst)
+    return lst[start:end]
+
+
+def compute_results(Ngrid=80, use_model=False, parallel_ix=None, parallel_total=None):
+    P12s, P23s = get_period_ratios(Ngrid)
+    parameters = get_parameters(P12s, P23s)
+    if parallel_ix is not None:
+        parameters = get_list_chunk(parameters, parallel_ix, parallel_total)
+
+    results = compute_results_for_parameters(parameters, use_model)
+    # save the results
+    np.save(get_results_path(Ngrid, use_model, parallel_ix, parallel_total), np.array(results))
+    print('saved results to', get_results_path(Ngrid, use_model, parallel_ix, parallel_total))
+    return results
+
+
+def get_results_path(Ngrid=80, use_model=False, parallel_ix=None, parallel_total=None):
+    model = 'bnn' if use_model else 'megno'
+    path = f'period_results/results_ngrid={Ngrid}_{model}'
+    if parallel_ix is not None:
+        path += f'_{parallel_ix}-{parallel_total}'
+    path += '.npy'
+    return path
 
 
 def load_results(path):
     return np.load(path)
+
+
+def collate_parallel_results(Ngrid, use_model, parallel_total):
+    '''load the parallel results and save as one big list'''
+    results = []
+    for ix in range(parallel_total):
+        path = get_results_path(Ngrid, use_model, ix, parallel_total)
+        sub_results = load_results(path)
+        results.append(sub_results)
+
+    # concatenate into one big numpy array
+    results = np.concatenate(results)
+    np.save(get_results_path(Ngrid, use_model), results)
 
 
 def plot_results(results, Ngrid=80, use_model=False):
@@ -179,17 +219,18 @@ def plot_results(results, Ngrid=80, use_model=False):
     ax.set_ylabel("P2/P3")
     s = '_bnn' if use_model else '_megno'
     s += f'_ngrid={Ngrid}'
-    s = 'period_ratio_figure' + s + '.png'
+    s = 'period_ratio_' + s + '.png'
     plt.savefig(s, dpi=200)
     print('saved figure to', s)
 
 
 if __name__ == '__main__':
-    Ngrid, use_model = get_args()
-    results = compute_results(Ngrid, use_model)
+    Ngrid, use_model, parallel_ix, parallel_total = get_args()
+    # results = compute_results(Ngrid, use_model, parallel_ix, parallel_total)
+    collate_parallel_results(Ngrid, use_model, parallel_total)
     # results = load_results(get_results_path(Ngrid, use_model))
-    plot_results(results, Ngrid, use_model)
-    print('done')
+    # plot_results(results, Ngrid, use_model)
+    # print('done')
 
 
 
