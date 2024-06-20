@@ -781,7 +781,7 @@ class VarModel(pl.LightningModule):
             additional_features = np.hstack(additional_features)
             additional_features_tensor = torch.tensor(additional_features, dtype=summary_stats.dtype, device=summary_stats.device)
             return torch.cat([summary_stats, additional_features_tensor], dim=-1)
-        
+
         if 'f2_residual' in hparams and hparams['f2_residual'] or 'pysr_f2_residual' in hparams and hparams['pysr_f2_residual']:
             if hparams['f2_residual'] == 'mlp':
                 residual_net = modules.mlp(summary_dim, 2, hparams['hidden_dim'], hparams['f2_depth'])
@@ -804,7 +804,7 @@ class VarModel(pl.LightningModule):
                 def combined_predict_instability(summary_stats):
                     summary_stats_with_additional = calculate_additional_features(summary_stats, hparams['pysr_f2_residual'])
                     return residual_net(summary_stats_with_additional)
-                
+
                 regress_nn = modules.SumModule(regress_nn, combined_predict_instability)
             else:
                 regress_nn = modules.SumModule(regress_nn, residual_net)
@@ -860,29 +860,15 @@ class VarModel(pl.LightningModule):
                                bias='no_bias' not in hparams or not hparams['no_bias'])
             feature_nn = nn.Sequential(modules.Products(), linear)
         elif hparams['f1_variant'] == 'products2':
-            linear = nn.Linear(self.n_features + 36, hparams['latent'],
+            products_net = modules.Products2()
+            linear = nn.Linear(self.n_features + len(products_net.products), hparams['latent'],
                                bias='no_bias' not in hparams or not hparams['no_bias'])
-            feature_nn = nn.Sequential(modules.Products2(), linear)
+            feature_nn = nn.Sequential(products_net, linear)
         elif hparams['f1_variant'] == 'products3':
-            # Pass through Products3 module
-            feature_nn = modules.Products3()
-            
-            # Dummy input to infer shape
-            dummy_input = torch.randn(1, self.n_features)  # Adjust this according to the actual input shape
-            dummy_output = feature_nn(dummy_input)
-            
-            # Print the output shape to verify
-            print(f"Products3 dummy output shape: {dummy_output.shape}")
-            
-            # Adjust the input dimension of the linear layer based on the dummy output shape
-            input_dim_for_linear = dummy_output.shape[1]
-            
-            linear = nn.Linear(input_dim_for_linear, hparams['latent'],
-                            bias='no_bias' not in hparams or not hparams['no_bias'])
-            
-            # Combine into a sequential model
-            feature_nn = nn.Sequential(modules.Products3(), linear)
-
+            products_net = modules.Products3()
+            linear = nn.Linear(self.n_features + len(products_net.products), hparams['latent'],
+                               bias='no_bias' not in hparams or not hparams['no_bias'])
+            feature_nn = nn.Sequential(products_net, linear)
         elif hparams['f1_variant'] == 'random':
             feature_nn = nn.Linear(self.n_features, hparams['latent'], bias='no_bias' not in hparams or not hparams['no_bias'])
             # make the linear projection random combinations of two input variables, with coefficients from U[-1, 1]

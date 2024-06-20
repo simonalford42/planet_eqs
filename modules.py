@@ -12,6 +12,9 @@ from petit20_survival_time import Tsurv
 
 
 class Products(nn.Module):
+    '''
+    Returns all products of the input variables.
+    '''
     def __init__(self):
         super().__init__()
 
@@ -21,9 +24,12 @@ class Products(nn.Module):
         x = torch.einsum('... i, ... j -> ... ij', x, x)
         x = einops.rearrange(x, '... i j -> ... (i j)')
         return x
-    
+
 
 class Products2(nn.Module):
+    '''
+    Just returns certain products: a_i/e_i * sin/cos of angles for planet_i. in total, 6 * 6 = 36 products.
+    '''
     def __init__(self):
         super().__init__()
         # [a1, e1], [a2, e2], [a3, e3]
@@ -46,6 +52,19 @@ class Products2(nn.Module):
 
 
 class Products3(nn.Module):
+    '''
+    An even more restricted set of products.
+    Computes just the following products:
+    - e_i * sin/cos(pomega_i) for each planet.
+    - a_i * sin/cos(theta_i) for each planet.
+    - i_i * sin/cos(Omega_i) for each planet.
+    i.e:
+        e1 sin(pomega1), e1 cos(pomega1), e2 sin(pomega2), e2 cos(pomega2), e3 sin(pomega3), e3 cos(pomega3),
+        a1 sin(theta1), a1 cos(theta1), a2 sin(theta2), a2 cos(theta2), a3 sin(theta3), a3 cos(theta3),
+        i1 sin(Omega1), i1 cos(Omega1), i2 sin(Omega2), i2 cos(Omega2), i3 sin(Omega3), i3 cos(Omega3).
+
+    for a total of 3 * 6 = 18 products.
+    '''
     def __init__(self):
         super().__init__()
         # Indices for each planet based on the provided labels list

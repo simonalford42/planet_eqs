@@ -19,7 +19,7 @@ import einops
 import torch
 
 
-ELEMENTWISE_LOSS = """
+LL_LOSS = """
 function elementwise_loss(prediction, target)
 
     function safe_log_erf(x)
@@ -135,12 +135,13 @@ def load_inputs_and_targets(config):
         # there are two ground truth predictions. create a data point for each
         X = einops.repeat(X, 'B F -> (B two) F', two=2)
         y = einops.rearrange(y, 'B two -> (B two) 1')
-        in_dim = model.summary_dim + 49
+        in_dim = model.summary_dim
         out_dim = 1
         n = X.shape[1] // 2
         variable_names = [f'm{i}' for i in range(n)] + [f's{i}' for i in range(n)]
 
         if config['sr_residual']:
+
             # Load the PySR equations from the previous round
             with open(config['previous_sr_path'], 'rb') as f:
                 previous_sr_model = pickle.load(f)
@@ -164,16 +165,15 @@ def load_inputs_and_targets(config):
             # (args.n, in_dim) = (250, 2*20+49)
             X = np.concatenate([summary_stats_np, additional_features], axis=1)
 
+            in_dim = model.summary_dim + additional_features.shape[1]
+
     else:
         raise ValueError(f"Unknown target: {config['target']}")
 
     if config['residual']:
-        predicted_mean = out_dict['predicted_mean']
-        predicted_mean = einops.repeat(predicted_mean, 'B F -> (B two) F', two=2)
-        predicted_mean = einops.rearrange(predicted_mean, 'B two -> (B two) 1')
-        if y.shape[0] != predicted_mean.shape[0]:
-            raise ValueError(f"Shape mismatch: y has shape {y.shape}, but predicted_mean has shape {predicted_mean.shape}")
-        y = y - predicted_mean
+        assert config['target'] == 'f2_direct', 'residual requires a direct target'
+        # target is the residual error of the model's prediction from the ground truth
+        y = y - out_dict['predicted_mean']
 
     # go down from having a batch of size B to just N
     ixs = np.random.choice(X.shape[0], size=config['n'], replace=False)
@@ -219,10 +219,9 @@ def get_config(args):
         ncyclesperiteration=1000, # increase utilization since usually using 32-ish cores?
     )
 
-    if args.target == 'f2_direct':
-        # use custom loss function when predicting directly
-        # pysr_config['elementwise_loss'] = ELEMENTWISE_LOSS
-        pass
+    if args.loss_fn == 'll':
+        assert args.target == 'f2_direct', 'log likelihood loss only useful for f2_direct'
+        pysr_config['elementwise_loss'] = LL_LOSS
 
     config = vars(args)
     config.update(pysr_config)
@@ -303,6 +302,7 @@ def parse_args():
     parser.add_argument('--residual', action='store_true', help='do residual training of your target')
     parser.add_argument('--n', type=int, default=5000, help='number of data points for the SR problem')
     parser.add_argument('--sr_residual', action='store_true', help='do residual training of your target with previous sr run as base')
+    parser.add_argument('--loss_fn', type=str, choices=['mse', 'll'], help='choose "ll" to use loglikelidhood loss')
     parser.add_argument('--previous_sr_path', type=str, default='sr_results/92985.pkl')
 
     args = parser.parse_args()
