@@ -1,0 +1,5 @@
+# requirements for running period_ratio_figure.py
+matplotlib
+multiprocess
+numpy
+rebound

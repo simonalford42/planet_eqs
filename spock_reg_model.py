@@ -16,7 +16,6 @@ import warnings
 from torch.optim.optimizer import Optimizer
 from collections import OrderedDict
 import einops
-from utils import assert_equal
 import utils
 import modules
 import glob
@@ -1119,7 +1118,7 @@ class VarModel(pl.LightningModule):
 
         self._cur_summary = summary_stats
 
-        assert_equal(self.summary_noise_logvar.shape[0], summary_stats.shape[1])
+        utils.assert_equal(self.summary_noise_logvar.shape[0], summary_stats.shape[1])
 
         #summary is (batch, feature)
         self._summary_kl = (1/2) * (

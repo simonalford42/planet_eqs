@@ -1,7 +1,7 @@
 import pysr
 import torch
 import torch.nn as nn
-from utils import assert_equal
+import utils
 import os
 import json
 import einops
@@ -166,7 +166,7 @@ class SpecialLinear(nn.Module):
         self.linear = nn.Linear(n_inputs + n_inputs * n_inputs, 2*n_features)
         if init:
             linear = spock_reg_model.load(total_steps=300000, seed=0, version=21101).feature_nn
-            assert_equal(type(linear), nn.Linear)
+            utils.assert_equal(type(linear), nn.Linear)
             self.init_layer(linear)
 
     def forward(self, x):
@@ -182,8 +182,8 @@ class SpecialLinear(nn.Module):
         # originally we take the mean and variance of the features.
         # now we are trying to recreate those features by running a linear transformation the means and variances of the inputs
         w, b = layer.weight.data, layer.bias.data
-        assert_equal(w.shape, (self.n_features, self.n_inputs))
-        assert_equal(b.shape, (self.n_features,))
+        utils.assert_equal(w.shape, (self.n_features, self.n_inputs))
+        utils.assert_equal(b.shape, (self.n_features,))
 
         with torch.no_grad():
             # values outside the mean/var-covar block diagonal are zero
@@ -269,7 +269,7 @@ class Cyborg(nn.Module):
         out1 = self.nn1(x)
         out2 = self.nn2(x)
         out = torch.cat([out1[..., self.nn1_ixs], out2[..., self.nn2_ixs]], dim=-1)
-        assert_equal(out.shape, out1.shape)
+        utils.assert_equal(out.shape, out1.shape)
         return out
 
 
@@ -322,11 +322,11 @@ class PySRRegressNN(nn.Module):
         if out.shape[-1] == 1:
             mean = out  # [B, 1]
             base = self.base_f2_module(x)  # [B, 2]
-            assert_equal(mean.shape, (B, 1))
-            assert_equal(base.shape, (B, 2))
+            utils.assert_equal(mean.shape, (B, 1))
+            utils.assert_equal(base.shape, (B, 2))
             out = einops.rearrange([mean[:, 0], base[:, 1]], 'two B -> B two')
 
-        assert_equal(out.shape, (B, 2))
+        utils.assert_equal(out.shape, (B, 2))
         return out
 
 
@@ -387,10 +387,10 @@ class RandomFeatureNN(torch.nn.Module):
 
     def forward(self, x):
         B, T, d = x.shape
-        assert_equal(d, self.in_n)
+        utils.assert_equal(d, self.in_n)
         # basically double batch matrix multiply
         out = torch.einsum('ijk, kl', x, self.random_projection)
-        assert_equal(out.shape, (B, T, self.out_n))
+        utils.assert_equal(out.shape, (B, T, self.out_n))
         return out
 
 
