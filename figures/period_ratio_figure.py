@@ -185,12 +185,28 @@ def collate_parallel_results(Ngrid, use_model, parallel_total):
     results = []
     for ix in range(parallel_total):
         path = get_results_path(Ngrid, use_model, ix, parallel_total)
-        sub_results = load_results(path)
+        try:
+            sub_results = load_results(path)
+        except FileNotFoundError:
+            sub_results = None
+            print('missing sub_results for ix', ix)
         results.append(sub_results)
+
+    # replace None values with NaN arrays of the same length as the first non-None subresult
+    length = None
+    for sub_results in results:
+        if sub_results is not None:
+            length = len(sub_results)
+            break
+
+    results = [sub_result if sub_result is not None
+               else np.array([np.NaN] * length)
+               for sub_result in results]
 
     # concatenate into one big numpy array
     results = np.concatenate(results)
     np.save(get_results_path(Ngrid, use_model), results)
+    print('saved results to', get_results_path(Ngrid, use_model))
 
 
 def plot_results(results, Ngrid=80, use_model=False):
@@ -230,7 +246,7 @@ if __name__ == '__main__':
     collate_parallel_results(Ngrid, use_model, parallel_total)
     # results = load_results(get_results_path(Ngrid, use_model))
     # plot_results(results, Ngrid, use_model)
-    # print('done')
+    print('done')
 
 
 
