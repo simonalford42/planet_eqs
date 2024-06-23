@@ -173,7 +173,14 @@ def load_inputs_and_targets(config):
     if config['residual']:
         assert config['target'] == 'f2_direct', 'residual requires a direct target'
         # target is the residual error of the model's prediction from the ground truth
-        y = y - out_dict['predicted_mean']
+        # because target was f2 direct, y shape is [B * 2, 1]
+        # but predicted mean is [B, 1]
+        # so repeat the predicted means
+        y_old = out_dict['predicted_mean']
+        assert_equal(y_old.shape[1], 1)
+        y_old = einops.repeat(y_old, 'B one -> (B repeat) one', repeat=2)
+        assert_equal(y_old.shape, y.shape)
+        y = y - y_old
 
     # go down from having a batch of size B to just N
     ixs = np.random.choice(X.shape[0], size=config['n'], replace=False)
