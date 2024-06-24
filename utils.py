@@ -19,6 +19,7 @@ def freeze_module(model: torch.nn.Module):
     for param in model.parameters():
         param.requires_grad = False
 
+
 def ckpt_path(version, seed=0, glob=False):
     if glob:
         return "results/" + str(version) + '_*'

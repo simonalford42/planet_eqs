@@ -20,21 +20,28 @@ import utils
 import modules
 import glob
 from matplotlib import pyplot as plt
+import os
 
 
 def load(version, seed=0):
     path = utils.ckpt_path(version, seed)
-    try:
-        f = path + '/version=0-v0.ckpt'
-        model = VarModel.load_from_checkpoint(f)
-    except FileNotFoundError:
-        f = path + '/version=0.ckpt'
-        model = VarModel.load_from_checkpoint(f)
 
-    return model
+    f = path + '/version=0-v0.ckpt'
+    if os.path.exists(f):
+        return VarModel.load_from_checkpoint(f)
+    f = path + '/version=0.ckpt'
+    if os.path.exists(f):
+        return VarModel.load_from_checkpoint(f)
 
-import os
-os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
+    # try again one directory up, in case we're running from figures/ folder
+    path = '../' + path
+    f = path + '/version=0-v0.ckpt'
+    if os.path.exists(f):
+        return VarModel.load_from_checkpoint(f)
+    f = path + '/version=0.ckpt'
+    if os.path.exists(f):
+        return VarModel.load_from_checkpoint(f)
+
 
 class BioLinear(nn.Module):
     # BioLinear is just Linear, but each neuron comes with coordinates.

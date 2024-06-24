@@ -1,4 +1,3 @@
-
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -12,7 +11,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import utils2
-from spock import FeatureRegressor
+from spock import FeatureRegressor, NonSwagFeatureRegressor
 
 from multiprocess import Pool
 import argparse
@@ -30,13 +29,14 @@ def get_args():
 
 
 def load_model():
-    version = 4157
-    model = FeatureRegressor(
-        cuda=True,
-        filebase='../' + utils2.ckpt_path(version, glob=True) +  '*output.pkl'
-        # filebase='*' + 'v30' + '*output.pkl'
-        #'long_zero_megno_with_angles_power_v14_*_output.pkl'
-    )
+    # version = 4157
+    # model = FeatureRegressor(
+    #     cuda=True,
+    #     filebase='../' + utils2.ckpt_path(version, glob=True) +  '*output.pkl'
+    #     # filebase='*' + 'v30' + '*output.pkl'
+    #     #'long_zero_megno_with_angles_power_v14_*_output.pkl'
+    # )
+    model = NonSwagFeatureRegressor(version=43139)
     return model
 
 
@@ -168,7 +168,7 @@ def compute_results(Ngrid=80, use_model=False, parallel_ix=None, parallel_total=
 
 
 def get_results_path(Ngrid=80, use_model=False, parallel_ix=None, parallel_total=None):
-    model = 'bnn' if use_model else 'megno'
+    model = 'bnn2' if use_model else 'megno'
     path = f'period_results/results_ngrid={Ngrid}_{model}'
     if parallel_ix is not None:
         path += f'_{parallel_ix}-{parallel_total}'
@@ -233,7 +233,7 @@ def plot_results(results, Ngrid=80, use_model=False):
         cb.set_label("log(MEGNO-2) (red = chaotic)")
     ax.set_xlabel("P1/P2")
     ax.set_ylabel("P2/P3")
-    s = '_bnn' if use_model else '_megno'
+    s = '_bnn2' if use_model else '_megno'
     s += f'_ngrid={Ngrid}'
     s = 'period_ratio_' + s + '.png'
     plt.savefig(s, dpi=200)
@@ -242,11 +242,8 @@ def plot_results(results, Ngrid=80, use_model=False):
 
 if __name__ == '__main__':
     Ngrid, use_model, parallel_ix, parallel_total = get_args()
-    # results = compute_results(Ngrid, use_model, parallel_ix, parallel_total)
-    collate_parallel_results(Ngrid, use_model, parallel_total)
+    results = compute_results(Ngrid, use_model, parallel_ix, parallel_total)
+    # collate_parallel_results(Ngrid, use_model, parallel_total)
     # results = load_results(get_results_path(Ngrid, use_model))
     # plot_results(results, Ngrid, use_model)
     print('done')
-
-
-

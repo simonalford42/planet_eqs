@@ -2,7 +2,7 @@
 """Stability of Planetary Orbital Configurations Klassifier"""
 
 from .featureclassifier import FeatureClassifier
-from .regression import FeatureRegressor, FeatureRegressorXGB
+from .regression import FeatureRegressor, FeatureRegressorXGB, NonSwagFeatureRegressor
 from .nbodyregressor import NbodyRegressor
 from .version import __version__
 

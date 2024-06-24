@@ -1,8 +1,16 @@
 #!/usr/bin/env bash
 
+# ------------------------------- Sun June 23 -----------------------------------
+
+sbatch -J sr --partition ellis --time 00:05:00 sr.sh --time_in_hours 0.01 --version 24880 --residual
+
+# ------------------------------- Fri June 21 -----------------------------------
+
+# sbatch -J prod3 --partition gpu train.sh --f1_variant products3
+
 # ------------------------------- Wed June 18 -----------------------------------
 
-sbatch -J sr --partition gpu --time 00:01:00 sr.sh --time_in_hours 0.01 --version 24880
+# sbatch -J sr --partition gpu --time 00:01:00 sr.sh --time_in_hours 0.01 --version 24880
 # sbatch -J sr --partition ellis --time 00:01:00 sr.sh --time_in_hours 0.001 --version 24880 --sr_residual --previous_sr_path 'sr_results/8092.pkl'
 
 # ------------------------------- Tue June 18 -----------------------------------
