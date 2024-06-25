@@ -25,8 +25,11 @@ def get_args():
     parser.add_argument('--Ngrid', type=int, default=80)
     parser.add_argument('--ix', type=int, default=None)
     parser.add_argument('--total', type=int, default=None)
+    parser.add_argument('--compute', action='store_true')
+    parser.add_argument('--plot', action='store_true')
+    parser.add_argument('--collate', action='store_true')
     args = parser.parse_args()
-    return args.Ngrid, not args.use_megno, args.ix, args.total, args.std
+    return args
 
 
 def load_model():
@@ -221,18 +224,15 @@ def plot_results(results, Ngrid=80, use_model=False, return_std=False):
 
     X,Y,Z = get_centered_grid(P12s, P23s, results)
 
-    cmap = plt.get_cmap('seismic').copy()
-    cmap.set_bad(color='yellow')
-
     if use_model:
         Zfilt = Z
         Zfilt[Zfilt == np.NaN] = 0
-        im = ax.pcolormesh(X, Y, Zfilt, cmap=cmap)
+        im = ax.pcolormesh(X, Y, Zfilt, cmap='seismic')
 
     else:
         Zfilt = Z
         Zfilt[Zfilt <2] = 2.01
-        im = ax.pcolormesh(X, Y, np.log10(Zfilt-2), vmin=-4, vmax=4, cmap=cmap)
+        im = ax.pcolormesh(X, Y, np.log10(Zfilt-2), vmin=-4, vmax=4, cmap='seismic')
 
     cb = plt.colorbar(im, ax=ax)
     if use_model:
@@ -251,9 +251,19 @@ def plot_results(results, Ngrid=80, use_model=False, return_std=False):
 
 
 if __name__ == '__main__':
-    Ngrid, use_model, parallel_ix, parallel_total, return_std = get_args()
-    results = compute_results(Ngrid, use_model, parallel_ix, parallel_total, return_std)
-    # collate_parallel_results(Ngrid, use_model, parallel_total, return_std)
-    # results = load_results(get_results_path(Ngrid, use_model, return_std))
-    # plot_results(results, Ngrid, use_model, return_std)
+    args = get_args()
+    Ngrid = args.Ngrid
+    use_model = not args.use_megno
+    return_std = args.std
+    parallel_ix = args.ix
+    parallel_total = args.total
+
+    if args.compute:
+        results = compute_results(Ngrid, use_model, parallel_ix, parallel_total, return_std)
+    if args.collate:
+        collate_parallel_results(Ngrid, use_model, parallel_total, return_std)
+    if args.plot:
+        results = load_results(get_results_path(Ngrid, use_model, return_std))
+        plot_results(results, Ngrid, use_model, return_std)
+
     print('done')
