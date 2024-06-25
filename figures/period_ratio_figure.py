@@ -193,7 +193,7 @@ def collate_parallel_results(Ngrid, use_model, std, parallel_total):
             sub_results = load_results(path)
         except FileNotFoundError:
             sub_results = None
-            print('missing sub_results for ix', ix)
+            print('Missing results for ix', ix)
         results.append(sub_results)
 
     # replace None values with NaN arrays of the same length as the first non-None subresult
@@ -259,7 +259,7 @@ if __name__ == '__main__':
     if args.compute:
         results = compute_results(Ngrid, use_model, parallel_ix, parallel_total, return_std)
     if args.collate:
-        collate_parallel_results(Ngrid, use_model, parallel_total, return_std)
+        collate_parallel_results(Ngrid, use_model, return_std, parallel_total)
     if args.plot:
         results = load_results(get_results_path(Ngrid, use_model, return_std))
         plot_results(results, Ngrid, use_model, return_std)
