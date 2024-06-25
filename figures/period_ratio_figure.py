@@ -21,11 +21,12 @@ def get_args():
     print(utils2.get_script_execution_command())
     parser = argparse.ArgumentParser()
     parser.add_argument('--use_megno', action='store_true')
+    parser.add_argument('--std', action='store_true')
     parser.add_argument('--Ngrid', type=int, default=80)
     parser.add_argument('--ix', type=int, default=None)
     parser.add_argument('--total', type=int, default=None)
     args = parser.parse_args()
-    return args.Ngrid, not args.use_megno, args.ix, args.total
+    return args.Ngrid, not args.use_megno, args.ix, args.total, args.std
 
 
 def load_model():
@@ -36,6 +37,7 @@ def load_model():
     #     # filebase='*' + 'v30' + '*output.pkl'
     #     #'long_zero_megno_with_angles_power_v14_*_output.pkl'
     # )
+    version = 43139 # val loss 1.603
     model = NonSwagFeatureRegressor(version=43139)
     return model
 
@@ -86,14 +88,14 @@ def get_megno_prediction(sim):
     except rebound.Escape:
         return 10. # At least one particle got ejected, returning large MEGNO.
 
-def get_model_prediction(sim, model):
+def get_model_prediction(sim, model, return_std=False):
     sim = sim.copy()
     sim.dt = 0.05
     sim.init_megno()
     sim.exit_max_distance = 20.
     try:
-        out = model.predict(sim)
-    except rebound.Escape as error:
+        out = model.predict(sim, return_std=return_std)
+    except:
         out = np.NaN
 
     return out
@@ -127,13 +129,13 @@ def get_parameters(P12s, P23s):
     return parameters
 
 
-def compute_results_for_parameters(parameters, use_model=False):
+def compute_results_for_parameters(parameters, use_model=False, return_std=False):
     if use_model:
         model = load_model()
 
     simulations = [get_simulation(par) for par in parameters]
     if use_model:
-        f = lambda sim: get_model_prediction(sim, model)
+        f = lambda sim: get_model_prediction(sim, model, return_std)
     else:
         f = get_megno_prediction
 
@@ -154,22 +156,25 @@ def get_list_chunk(lst, ix, total):
     return lst[start:end]
 
 
-def compute_results(Ngrid=80, use_model=False, parallel_ix=None, parallel_total=None):
+def compute_results(Ngrid=80, use_model=False, parallel_ix=None, parallel_total=None, return_std=False):
     P12s, P23s = get_period_ratios(Ngrid)
     parameters = get_parameters(P12s, P23s)
     if parallel_ix is not None:
         parameters = get_list_chunk(parameters, parallel_ix, parallel_total)
 
-    results = compute_results_for_parameters(parameters, use_model)
+    results = compute_results_for_parameters(parameters, use_model, return_std)
     # save the results
-    np.save(get_results_path(Ngrid, use_model, parallel_ix, parallel_total), np.array(results))
-    print('saved results to', get_results_path(Ngrid, use_model, parallel_ix, parallel_total))
+    path = get_results_path(Ngrid, use_model, parallel_ix, parallel_total, return_std)
+    np.save(path, np.array(results))
+    print('saved results to', path)
     return results
 
 
-def get_results_path(Ngrid=80, use_model=False, parallel_ix=None, parallel_total=None):
+def get_results_path(Ngrid=80, use_model=False, parallel_ix=None, parallel_total=None, return_std=False):
     model = 'bnn' if use_model else 'megno'
     path = f'period_results/results_ngrid={Ngrid}_{model}'
+    if return_std:
+        path += '_std'
     if parallel_ix is not None:
         path += f'_{parallel_ix}-{parallel_total}'
     path += '.npy'
@@ -180,11 +185,11 @@ def load_results(path):
     return np.load(path)
 
 
-def collate_parallel_results(Ngrid, use_model, parallel_total):
+def collate_parallel_results(Ngrid, use_model, parallel_total, return_std=False):
     '''load the parallel results and save as one big list'''
     results = []
     for ix in range(parallel_total):
-        path = get_results_path(Ngrid, use_model, ix, parallel_total)
+        path = get_results_path(Ngrid, use_model, ix, parallel_total, return_std)
         try:
             sub_results = load_results(path)
         except FileNotFoundError:
@@ -205,11 +210,11 @@ def collate_parallel_results(Ngrid, use_model, parallel_total):
 
     # concatenate into one big numpy array
     results = np.concatenate(results)
-    np.save(get_results_path(Ngrid, use_model), results)
-    print('saved results to', get_results_path(Ngrid, use_model))
+    np.save(get_results_path(Ngrid, use_model, return_std), results)
+    print('saved results to', get_results_path(Ngrid, use_model, return_std))
 
 
-def plot_results(results, Ngrid=80, use_model=False):
+def plot_results(results, Ngrid=80, use_model=False, return_std=False):
     P12s, P23s = get_period_ratios(Ngrid)
 
     fig, ax = plt.subplots(figsize=(8,6))
@@ -236,17 +241,19 @@ def plot_results(results, Ngrid=80, use_model=False):
         cb.set_label("log(MEGNO-2) (red = chaotic)")
     ax.set_xlabel("P1/P2")
     ax.set_ylabel("P2/P3")
-    s = 'bnn' if use_model else 'megno'
+    s = '_bnn' if use_model else '_megno'
     s += f'_ngrid={Ngrid}'
+    if return_std:
+        s += '_std'
     s = 'period_results/period_ratio_' + s + '.png'
     plt.savefig(s, dpi=200)
     print('saved figure to', s)
 
 
 if __name__ == '__main__':
-    Ngrid, use_model, parallel_ix, parallel_total = get_args()
-    # results = compute_results(Ngrid, use_model, parallel_ix, parallel_total)
-    # collate_parallel_results(Ngrid, use_model, parallel_total)
-    results = load_results(get_results_path(Ngrid, use_model))
-    plot_results(results, Ngrid, use_model)
+    Ngrid, use_model, parallel_ix, parallel_total, return_std = get_args()
+    results = compute_results(Ngrid, use_model, parallel_ix, parallel_total, return_std)
+    # collate_parallel_results(Ngrid, use_model, parallel_total, return_std)
+    # results = load_results(get_results_path(Ngrid, use_model, return_std))
+    # plot_results(results, Ngrid, use_model, return_std)
     print('done')

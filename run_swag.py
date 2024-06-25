@@ -29,10 +29,6 @@ checkpoint_filename = utils.ckpt_path(args.version, args.seed)
 
 seed = args.seed
 
-if not args.run_swag:
-    print('no swag, exiting')
-    exit(0)
-
 TOTAL_STEPS = args.swa_steps
 TRAIN_LEN = 78660
 batch_size = args.batch_size  # 2000 #ilog_rand(32, 3200)

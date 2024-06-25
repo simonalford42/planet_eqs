@@ -21,7 +21,6 @@ def parse():
 
     ########## logging, etc ##########
     parser.add_argument('--no_log', action='store_true', default=False, help='disable wandb logging')
-    parser.add_argument('--run_swag', action='store_true')
     parser.add_argument('--version', type=int, help='', default=1278)
     parser.add_argument('--seed', type=int, default=0, help='default=0')
 
