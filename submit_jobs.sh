@@ -1,8 +1,20 @@
 #!/usr/bin/env bash
 
+# ------------------------------- Tue June 25 -----------------------------------
+
+# sbatch -J 1eval --partition gpu train.sh --total_steps 100 --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 1 --freeze_pysr_f2 --eval
+# sbatch -J 20eval --partition gpu train.sh --total_steps 100 --no_swag --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 20 --freeze_pysr_f2 --eval
+# sbatch -J 14eval --partition gpu train.sh --total_steps 100 --no_swag --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 14 --freeze_pysr_f2 --eval
+# sbatch -J sr --partition ellis --time 12:00:00 sr.sh --time_in_hours 7 --version 43139
+
+# ------------------------------- Mon June 24 -----------------------------------
+
+# sbatch -J sr --partition ellis --time 08:00:00 sr.sh --time_in_hours 7 --version 43139
+# sbatch -J sr --partition ellis --time 24:00:00 sr.sh --time_in_hours 23 --version 43139
+
 # ------------------------------- Sun June 23 -----------------------------------
 
-sbatch -J sr --partition ellis --time 00:05:00 sr.sh --time_in_hours 0.01 --version 24880 --residual
+# sbatch -J sr --partition ellis --time 00:05:00 sr.sh --time_in_hours 0.01 --version 24880 --residual
 
 # ------------------------------- Fri June 21 -----------------------------------
 

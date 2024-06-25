@@ -72,10 +72,7 @@ class NonSwagFeatureRegressor():
         ssX.var_ = ssX.scale_**2
         self.ssX = ssX
 
-    def sample_non_swag(self, X_sample):
-        return self.model(X_sample)
-
-    def predict(self, sim, indices=None, samples=1000):
+    def predict(self, sim, indices=None, samples=1000, return_std=False):
         """Estimate instability time for a given simulation.
 
         :sim: The rebound simulation.
@@ -88,8 +85,11 @@ class NonSwagFeatureRegressor():
             between 4 and 12.
 
         """
-        samples = self.sample(sim, indices, samples)
-        return np.median(samples)
+        mu, std = self.sample(sim, indices, samples)
+        if return_std:
+            return np.median(std)
+        else:
+            return np.median(mu)
 
     @profile
     def sample(self, sim, indices=None, samples=1000):
@@ -130,12 +130,7 @@ class NonSwagFeatureRegressor():
             if self.cuda:
                 X = X.cuda()
 
-            # print(X.shape)
-            # print(self.model(X, noisy_val=False).shape)
             time = torch.cat([self.model(X, noisy_val=False)[None] for _ in range(1)], dim=0).detach()
-            # time = torch.zeros((1,1,2))
-            # print(time.shape)
-            # assert 0
 
             if self.cuda:
                 time = time.cpu()
@@ -240,8 +235,8 @@ class FeatureRegressor(object):
             between 4 and 12.
 
         """
-        samples = self.sample(sim, indices, samples)
-        return np.median(samples)
+        mu, std = self.sample(sim, indices, samples)
+        return np.median(mu)
 
     @profile
     def sample(self, sim, indices=None, samples=1000):
