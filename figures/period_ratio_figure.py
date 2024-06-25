@@ -257,7 +257,7 @@ if __name__ == '__main__':
     parallel_total = args.total
 
     if args.compute:
-        results = compute_results(Ngrid, use_model, parallel_ix, parallel_total, return_std)
+        results = compute_results(Ngrid, use_model, return_std, parallel_ix, parallel_total)
     if args.collate:
         collate_parallel_results(Ngrid, use_model, return_std, parallel_total)
     if args.plot:
