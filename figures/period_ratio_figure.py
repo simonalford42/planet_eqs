@@ -8,9 +8,12 @@ import rebound
 import numpy as np
 import matplotlib.pyplot as plt
 
+import spock
 import utils2
-from spock import FeatureRegressor, NonSwagFeatureRegressor
 import argparse
+
+import warnings
+warnings.filterwarnings("ignore", category=ResourceWarning)
 
 
 def get_args():
@@ -30,14 +33,14 @@ def get_args():
 
 def load_model():
     # version = 4157
-    # model = FeatureRegressor(
+    # model = spock.FeatureRegressor(
     #     cuda=True,
     #     filebase='../' + utils2.ckpt_path(version, glob=True) +  '*output.pkl'
     #     # filebase='*' + 'v30' + '*output.pkl'
     #     #'long_zero_megno_with_angles_power_v14_*_output.pkl'
     # )
     version = 43139 # val loss 1.603
-    model = NonSwagFeatureRegressor(version=43139)
+    model = spock.NonSwagFeatureRegressor(version=43139)
     return model
 
 
