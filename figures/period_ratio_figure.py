@@ -1,6 +1,6 @@
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
-import pysr  # just to avoid errors if its imported after pytorch
+# import pysr  # just to avoid errors if its imported after pytorch
 
 import sys
 sys.path.append('../')
