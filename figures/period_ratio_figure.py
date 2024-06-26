@@ -1,6 +1,7 @@
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
-import pysr  # just to avoid errors if its imported after pytorch
+
+# import pysr  # just to avoid errors if its imported after pytorch
 
 import sys
 sys.path.append('../')
@@ -228,15 +229,19 @@ def plot_results(results, Ngrid, use_model, std):
 
     X,Y,Z = get_centered_grid(P12s, P23s, results)
 
+    # Create a custom colormap with yellow for NaN
+    cmap = plt.cm.seismic.copy()
+    cmap.set_bad(color='yellow')
+
     if use_model:
         Zfilt = Z
         Zfilt[Zfilt == np.NaN] = 0
-        im = ax.pcolormesh(X, Y, Zfilt, cmap='seismic')
+        im = ax.pcolormesh(X, Y, Zfilt, cmap=cmap)
 
     else:
         Zfilt = Z
         Zfilt[Zfilt <2] = 2.01
-        im = ax.pcolormesh(X, Y, np.log10(Zfilt-2), vmin=-4, vmax=4, cmap='seismic')
+        im = ax.pcolormesh(X, Y, np.log10(Zfilt-2), vmin=-4, vmax=4, cmap=cmap)
 
     cb = plt.colorbar(im, ax=ax)
     if not use_model:
