@@ -66,6 +66,7 @@ def simulation(par):
     except rebound.Escape:
         return 10. # At least one particle got ejected, returning large MEGNO.
 
+
 def get_simulation(par):
     P12, P23 = par # unpack parameters
     sim = rebound.Simulation()
@@ -79,6 +80,7 @@ def get_simulation(par):
 
     return sim
 
+
 def get_megno_prediction(sim):
     sim = sim.copy()
     sim.dt = 0.05
@@ -91,6 +93,7 @@ def get_megno_prediction(sim):
     except rebound.Escape:
         return 10. # At least one particle got ejected, returning large MEGNO.
 
+
 def get_model_prediction(sim, model, std):
     sim = sim.copy()
     sim.dt = 0.05
@@ -102,6 +105,7 @@ def get_model_prediction(sim, model, std):
         out = np.NaN
 
     return out
+
 
 def get_centered_grid(xlist, ylist, probs):
     # assumes uniformly spaced values in x and y (can have different lengths)
