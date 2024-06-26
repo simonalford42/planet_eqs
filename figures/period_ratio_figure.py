@@ -276,4 +276,4 @@ if __name__ == '__main__':
         results = load_results(get_results_path(Ngrid, use_model, return_std))
         plot_results(results, Ngrid, use_model, return_std)
 
-    print('done')
+    print('Done')
