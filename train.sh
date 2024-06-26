@@ -24,4 +24,7 @@ set -e
 version=$((1 + RANDOM % 999999))
 
 python -u find_minima.py --version $version "$@"
-python -u run_swag.py --version $version "$@"
+# Check if --run_swag is in the arguments
+if [[ "$*" =~ (^| )--run_swag($| ) ]]; then
+    python -u run_swag.py --version $version "$@"
+fi

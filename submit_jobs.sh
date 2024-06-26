@@ -2,6 +2,8 @@
 
 # ------------------------------- Tue June 25 -----------------------------------
 
+# bash train.sh --total_steps 50 --load_f1 43139 --pysr_f2 'sr_results/66312.pkl' --pysr_f2_model_selection best --eval
+
 # sbatch -J 1eval --partition gpu train.sh --total_steps 100 --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 1 --freeze_pysr_f2 --eval
 # sbatch -J 20eval --partition gpu train.sh --total_steps 100 --no_swag --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 20 --freeze_pysr_f2 --eval
 # sbatch -J 14eval --partition gpu train.sh --total_steps 100 --no_swag --load 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_model_selection 14 --freeze_pysr_f2 --eval

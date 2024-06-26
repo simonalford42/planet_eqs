@@ -8,6 +8,7 @@ import spock_reg_model
 import numpy as np
 import torch.nn.functional as F
 from petit20_survival_time import Tsurv
+import pysr
 
 
 class Products(nn.Module):
@@ -337,12 +338,16 @@ class PySRRegressNN(nn.Module):
     def forward(self, x):
         B = x.shape[0]
         out = self.pysr_net(x)
-        if out.shape[-1] == 1:
-            mean = out  # [B, 1]
-            base = self.base_f2_module(x)  # [B, 2]
-            utils.assert_equal(mean.shape, (B, 1))
-            utils.assert_equal(base.shape, (B, 2))
-            out = einops.rearrange([mean[:, 0], base[:, 1]], 'two B -> B two')
+        # if out.shape[-1] == 1:
+        # mean = out  # [B, 1]
+        mean = out[:, 0:1]
+        base = self.base_f2_module(x)  # [B, 2]
+        utils.assert_equal(mean.shape, (B, 1))
+        utils.assert_equal(base.shape, (B, 2))
+        # calculate the MSE between base and mean
+        mse = F.mse_loss(mean, base[:, 0:1], reduction='mean')
+        print('mse: ', mse)
+        out = einops.rearrange([mean[:, 0], base[:, 1]], 'two B -> B two')
 
         utils.assert_equal(out.shape, (B, 2))
         return out
