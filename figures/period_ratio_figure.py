@@ -1,5 +1,6 @@
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
+import pysr  # just to avoid errors if its imported after pytorch
 
 import sys
 sys.path.append('../')
@@ -175,7 +176,7 @@ def get_results_path(Ngrid, use_model, std, parallel_ix=None, parallel_total=Non
     if std:
         path += '_std'
     if parallel_ix is not None:
-        path += f'_{parallel_ix}-{parallel_total}'
+        path += f'/{parallel_ix}-{parallel_total}'
     path += '.npy'
     return path
 
@@ -202,6 +203,10 @@ def collate_parallel_results(Ngrid, use_model, std, parallel_total):
         if sub_results is not None:
             length = len(sub_results)
             break
+
+    if length is None:
+        print('No results found')
+        return
 
     results = [sub_result if sub_result is not None
                else np.array([np.NaN] * length)

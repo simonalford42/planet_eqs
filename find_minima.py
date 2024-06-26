@@ -35,6 +35,8 @@ TRAIN_LEN = 78660
 batch_size = 2000 #ilog_rand(32, 3200)
 steps_per_epoch = int(1+TRAIN_LEN/batch_size)
 epochs = int(1+TOTAL_STEPS/steps_per_epoch)
+if parse_args.eval:
+    epochs = 1
 
 command = utils.get_script_execution_command()
 print(command)
