@@ -6,6 +6,7 @@ import sys
 sys.path.append('../')
 
 import rebound
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -172,6 +173,8 @@ def compute_results(Ngrid, use_model, std, parallel_ix=None, parallel_total=None
     results = compute_results_for_parameters(parameters, use_model, std)
     # save the results
     path = get_results_path(Ngrid, use_model, std, parallel_ix, parallel_total)
+    # Create the directory if it doesn't exist
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     np.save(path, np.array(results))
     print('saved results to', path)
     return results

@@ -124,9 +124,9 @@ model.load_state_dict(torch.load(checkpointer.best_model_path)['state_dict'])
 model.make_dataloaders()
 
 # loading models with pt lightning sometimes doesnt work, so lets also save the feature_nn and regress_nn directly
-if 'pysr' not in args['f1_variant']:
+if args['pysr_f2'] and not args['eval']:
     torch.save(model.feature_nn, f'models/{args["version"]}_feature_nn.pt')
-if 'pysr' not in args['f2_variant']:
+if args['pysr_f2'] and not args['eval']:
     torch.save(model.regress_nn, f'models/{args["version"]}_regress_nn.pt')
 if args['f2_variant'] == 'pysr_residual':
     torch.save(model.regress_nn.module1, f'models/{args["version"]}_pysr_nn.pt')

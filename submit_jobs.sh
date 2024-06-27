@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
 
+# ------------------------------- Thu June 27 -----------------------------------
+
+# sbatch -J sr --partition ellis --time 24:00:00 sr.sh --time_in_hours 22 --version 43139
+# bash train.sh --load_f1 43139 --pysr_f2 'sr_results/20592.pkl' --pysr_f2_model_selection best --eval
+# bash train.sh --load_f1 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_f2_model_selection 14 --eval
+# bash sr.sh --time_in_hours 0.1 --version 43139 --target f2
+# bash train.sh --load_f1 43139 --pysr_f2 'sr_results/87545.pkl' --pysr_f2_model_selection best --eval
+bash train.sh --load_f1 21101 --pysr_f2 'sr_results/hall_of_fame_f2_21101_0_1.pkl' --pysr_f2_model_selection best --eval
+
 # ------------------------------- Tue June 25 -----------------------------------
 
 # bash train.sh --total_steps 50 --load_f1 43139 --pysr_f2 'sr_results/66312.pkl' --pysr_f2_model_selection best --eval
