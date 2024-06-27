@@ -72,7 +72,7 @@ class NonSwagFeatureRegressor():
         ssX.var_ = ssX.scale_**2
         self.ssX = ssX
 
-    def predict(self, sim, indices=None, samples=1000, return_std=False):
+    def predict(self, sim, indices=None, samples=1000):
         """Estimate instability time for a given simulation.
 
         :sim: The rebound simulation.
@@ -86,10 +86,16 @@ class NonSwagFeatureRegressor():
 
         """
         mu, std = self.sample(sim, indices, samples)
-        if return_std:
-            return np.median(std)
-        else:
-            return np.median(mu)
+
+        mu = np.median(mu)
+        std = np.median(std)
+
+        return {
+            'mu': mu,
+            'std': std,
+            'f1': None,
+        }
+
 
     @profile
     def sample(self, sim, indices=None, samples=1000):

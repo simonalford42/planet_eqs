@@ -21,14 +21,11 @@ warnings.filterwarnings("ignore", category=ResourceWarning)
 def get_args():
     print(utils2.get_script_execution_command())
     parser = argparse.ArgumentParser()
-    parser.add_argument('--Ngrid', type=int, default=80)
-    parser.add_argument('--use_megno', action='store_true')
-    parser.add_argument('--std', action='store_true')
+    parser.add_argument('--Ngrid', '-n', type=int, default=80)
+    parser.add_argument('--metric', '-m', type=str, choices=['megno', 'f1', 'std', 'mean'], default='mean')
+    parser.add_argument('--action', '-a', choices=['compute', 'collate', 'plot'], type=str, default='compute')
     parser.add_argument('--ix', type=int, default=None)
     parser.add_argument('--total', type=int, default=None)
-    parser.add_argument('--compute', action='store_true')
-    parser.add_argument('--plot', action='store_true')
-    parser.add_argument('--collate', action='store_true')
     args = parser.parse_args()
     return args
 
@@ -95,13 +92,14 @@ def get_megno_prediction(sim):
         return 10. # At least one particle got ejected, returning large MEGNO.
 
 
-def get_model_prediction(sim, model, std):
+def get_model_prediction(sim, model, metric):
     sim = sim.copy()
     sim.dt = 0.05
     sim.init_megno()
     sim.exit_max_distance = 20.
     try:
-        out = model.predict(sim, return_std=std)
+        out_dict = model.predict(sim)
+        out = out_dict[metric]
     except:
         out = np.NaN
 
@@ -137,15 +135,14 @@ def get_parameters(P12s, P23s):
     return parameters
 
 
-def compute_results_for_parameters(parameters, use_model, std):
-    if use_model:
-        model = load_model()
-
+def compute_results_for_parameters(parameters, metric):
     simulations = [get_simulation(par) for par in parameters]
-    if use_model:
-        f = lambda sim: get_model_prediction(sim, model, std)
-    else:
+
+    if metric == 'megno':
         f = get_megno_prediction
+    else:
+        model = load_model()
+        f = lambda sim: get_model_prediction(sim, model, metric)
 
     results = [f(sim) for sim in simulations]
     return results
@@ -164,15 +161,15 @@ def get_list_chunk(lst, ix, total):
     return lst[start:end]
 
 
-def compute_results(Ngrid, use_model, std, parallel_ix=None, parallel_total=None):
+def compute_results(Ngrid, metric, parallel_ix=None, parallel_total=None):
     P12s, P23s = get_period_ratios(Ngrid)
     parameters = get_parameters(P12s, P23s)
     if parallel_ix is not None:
         parameters = get_list_chunk(parameters, parallel_ix, parallel_total)
 
-    results = compute_results_for_parameters(parameters, use_model, std)
+    results = compute_results_for_parameters(parameters, metric)
     # save the results
-    path = get_results_path(Ngrid, use_model, std, parallel_ix, parallel_total)
+    path = get_results_path(Ngrid, metric, parallel_ix, parallel_total)
     # Create the directory if it doesn't exist
     os.makedirs(os.path.dirname(path), exist_ok=True)
     np.save(path, np.array(results))
@@ -180,13 +177,18 @@ def compute_results(Ngrid, use_model, std, parallel_ix=None, parallel_total=None
     return results
 
 
-def get_results_path(Ngrid, use_model, std, parallel_ix=None, parallel_total=None):
-    model = 'bnn' if use_model else 'megno'
+def get_results_path(Ngrid, metric, parallel_ix=None, parallel_total=None):
+    model = 'megno' if metric == 'megno' else 'bnn'
     path = f'period_results/results_ngrid={Ngrid}_{model}'
-    if std:
+
+    if metric == 'std':
         path += '_std'
+    elif metric == 'f1':
+        path += '_f1'
+
     if parallel_ix is not None:
         path += f'/{parallel_ix}-{parallel_total}'
+
     path += '.npy'
     return path
 
@@ -195,11 +197,11 @@ def load_results(path):
     return np.load(path)
 
 
-def collate_parallel_results(Ngrid, use_model, std, parallel_total):
+def collate_parallel_results(Ngrid, metric):
     '''load the parallel results and save as one big list'''
     results = []
     for ix in range(parallel_total):
-        path = get_results_path(Ngrid, use_model, std, ix, parallel_total)
+        path = get_results_path(Ngrid, metric, ix, parallel_total)
         try:
             sub_results = load_results(path)
         except FileNotFoundError:
@@ -224,8 +226,8 @@ def collate_parallel_results(Ngrid, use_model, std, parallel_total):
 
     # concatenate into one big numpy array
     results = np.concatenate(results)
-    np.save(get_results_path(Ngrid, use_model, std), results)
-    print('saved results to', get_results_path(Ngrid, use_model, std))
+    np.save(get_results_path(Ngrid, metric), results)
+    print('saved results to', get_results_path(Ngrid, metric))
 
 
 def plot_results(results, Ngrid, use_model, std):
@@ -270,17 +272,16 @@ def plot_results(results, Ngrid, use_model, std):
 if __name__ == '__main__':
     args = get_args()
     Ngrid = args.Ngrid
-    use_model = not args.use_megno
-    return_std = args.std
+    metric = args.metric
     parallel_ix = args.ix
     parallel_total = args.total
 
-    if args.compute:
-        results = compute_results(Ngrid, use_model, return_std, parallel_ix, parallel_total)
-    if args.collate:
-        collate_parallel_results(Ngrid, use_model, return_std, parallel_total)
-    if args.plot:
-        results = load_results(get_results_path(Ngrid, use_model, return_std))
-        plot_results(results, Ngrid, use_model, return_std)
+    if args.action == 'compute':
+        results = compute_results(Ngrid, metric, parallel_ix, parallel_total)
+    elif args.action == 'collate':
+        collate_parallel_results(Ngrid, metric, parallel_total)
+    elif args.action == 'plot':
+        results = load_results(get_results_path(Ngrid, metric))
+        plot_results(results, Ngrid, metric)
 
     print('Done')

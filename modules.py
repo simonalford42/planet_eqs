@@ -345,11 +345,9 @@ class PySRRegressNN(nn.Module):
         base = self.base_f2_module(x)  # [B, 2]
         utils.assert_equal(mean.shape, (B, 1))
         utils.assert_equal(base.shape, (B, 2))
-        # calculate the MSE between base and mean
-        mse = F.mse_loss(mean, base[:, 0:1], reduction='mean')
-        print('mse: ', mse)
+        # utils.assert_equal(base.shape, (B, 1))
+        # out = einops.rearrange([mean[:, 0], base[:, 0]], 'two B -> B two')
         out = einops.rearrange([mean[:, 0], base[:, 1]], 'two B -> B two')
-
         utils.assert_equal(out.shape, (B, 2))
         return out
 

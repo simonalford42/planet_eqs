@@ -761,6 +761,9 @@ class VarModel(pl.LightningModule):
                 if 'load_f1' in hparams and hparams['load_f1']:
                     print('Using --load_f1 network regress_nn to predict std')
                     base_f2 = load(hparams['load_f1'], seed=hparams['seed']).regress_nn
+                    regress_nn = base_f2
+                    # base_f2 = modules.PySRNet('sr_results/29741.pkl', 'best')
+                    utils.freeze_module(base_f2)
                 else:
                     print('Initializing new network to predict std')
                     base_f2 = modules.mlp(summary_dim, 2, hparams['hidden_dim'], hparams['f2_depth'])
@@ -823,6 +826,7 @@ class VarModel(pl.LightningModule):
 
         return regress_nn, summary_dim
 
+
     def get_feature_nn(self, hparams):
         feature_nn = None
         out_dim = hparams['latent'] # certain f1 variants might change this
@@ -855,8 +859,8 @@ class VarModel(pl.LightningModule):
         elif hparams['f1_variant'] == 'zero':
             feature_nn = modules.ZeroNN(in_n=self.n_features, out_n=hparams['latent'])
         elif hparams['f1_variant'] == 'linear':
-            # feature_nn = nn.Linear(self.n_features, hparams['latent'], bias=False)
-            feature_nn = nn.Linear(self.n_features, hparams['latent'], bias=True) # if loading 21101
+            feature_nn = nn.Linear(self.n_features, hparams['latent'], bias=False)
+            # feature_nn = nn.Linear(self.n_features, hparams['latent'], bias=True) # if loading 21101
         elif hparams['f1_variant'] == 'bimt':
             feature_nn = BioMLP(in_dim=self.n_features, out_dim=hparams['latent'])
         elif hparams['f1_variant'] == 'biolinear':
