@@ -244,6 +244,13 @@ def get_config(args):
 
 
 def run_pysr(config):
+    command = utils.get_script_execution_command()
+    print(command)
+
+    X, y, variable_names = load_inputs_and_targets(config)
+
+    model = pysr.PySRRegressor(**config['pysr_config'])
+
     if not config['no_log']:
         wandb.init(
             entity='bnn-chaos-model',
@@ -251,24 +258,17 @@ def run_pysr(config):
             config=config,
         )
 
-    command = utils.get_script_execution_command()
-    print(command)
-
-    X, y, variable_names = load_inputs_and_targets(config)
-
-    model = pysr.PySRRegressor(**config['pysr_config'])
     model.fit(X, y, variable_names=variable_names)
     print('Done running pysr')
 
     losses = [min(eqs['loss']) for eqs in model.equation_file_contents_]
+
     if not config['no_log']:
         wandb.log({'avg_loss': sum(losses)/len(losses),
                    'losses': losses,
                    })
 
     try:
-        # delete the backup files
-        subprocess.run(f"rm {config['equation_file'][:-4]}.csv.out*.bkup", shell=True, check=True)
         # delete julia files: julia-1911988-17110333239-0016.out
         subprocess.run(f'rm julia*.out', shell=True, check=True)
     except subprocess.CalledProcessError as e:

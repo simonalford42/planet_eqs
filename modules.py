@@ -323,7 +323,8 @@ def load_pysr_module_list(filepath, model_selection):
             ixs = [ix]
 
         print('PySR model selection ixs:', ixs)
-        return nn.ModuleList(reg.pytorch(index=ixs))
+        modules = reg.pytorch(index=ixs)
+        return nn.ModuleList(modules)
 
 
 class PySRRegressNN(nn.Module):
