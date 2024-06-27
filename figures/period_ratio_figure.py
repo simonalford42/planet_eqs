@@ -233,18 +233,29 @@ def plot_results(results, Ngrid, use_model, std):
 
     X,Y,Z = get_centered_grid(P12s, P23s, results)
 
-    # Create a custom colormap with yellow for NaN
-    cmap = plt.cm.seismic.copy()
-    cmap.set_bad(color='yellow')
-
     if use_model:
         Zfilt = Z
         Zfilt[Zfilt == np.NaN] = 0
-        im = ax.pcolormesh(X, Y, Zfilt, cmap=cmap)
+
+        if std:
+            cmap = plt.cm.inferno.copy().reversed()
+            cmap.set_bad(color='white')
+        else:
+            cmap = plt.cm.inferno.copy().reversed()
+            cmap.set_bad(color='white')
+
+
+        if std:
+            im = ax.pcolormesh(X, Y, Zfilt, vmin=0, vmax=6, cmap=cmap)
+        else:
+            im = ax.pcolormesh(X, Y, Zfilt, vmin=4, vmax=12, cmap=cmap)
 
     else:
         Zfilt = Z
         Zfilt[Zfilt <2] = 2.01
+
+        cmap = plt.cm.seismic.copy()
+        cmap.set_bad(color='yellow')
         im = ax.pcolormesh(X, Y, np.log10(Zfilt-2), vmin=-4, vmax=4, cmap=cmap)
 
     cb = plt.colorbar(im, ax=ax)
@@ -261,7 +272,7 @@ def plot_results(results, Ngrid, use_model, std):
     if std:
         s += '_std'
     s = 'period_results/period_ratio_' + s + '.png'
-    plt.savefig(s, dpi=200)
+    plt.savefig(s, dpi=400)
     print('saved figure to', s)
 
 
