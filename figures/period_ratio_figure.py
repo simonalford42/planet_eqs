@@ -1,4 +1,4 @@
-import pysr
+# import pysr
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 # import pysr  # just to avoid errors if its imported after pytorch
@@ -284,6 +284,18 @@ def compute_pysr_f2_results(results, sr_results_file, model_selection):
     results = np.full((len(f1_results), pred.shape[1]), np.NaN)
     results[good_ixs] = pred
 
+    assert_equal(results.shape[1], 2)
+    # convert back to dictionary of 'mean': mean, 'std': std, for compatibility with the other results
+    results2 = []
+    for result in results:
+        if np.isnan(result).any():
+            results2.append(None)
+        else:
+            results2.append({
+                'mean': result[0],
+                'std': result[1]
+            })
+
 
     # save the results
     path = get_results_path(Ngrid, pysr_f2=True)
@@ -309,11 +321,11 @@ if __name__ == '__main__':
         results = compute_results(Ngrid, parallel_ix, parallel_total)
     if args.collate:
         collate_parallel_results(Ngrid, parallel_total)
-    if args.pysr_f2:
+    if args.pysr_f2 and not args.plot:
         results = load_results(get_results_path(Ngrid))
         compute_pysr_f2_results(results, pysr_f2, model_selection)
     if args.plot:
-        results = load_results(get_results_path(Ngrid, args.pysr_f2))
-        plot_results(results, Ngrid, plot_metric, pysr_f2)
+        results = load_results(get_results_path(Ngrid, pysr_f2=args.pysr_f2))
+        plot_results(results, Ngrid, plot_metric, pysr_f2=args.pysr_f2)
 
     print('Done')
