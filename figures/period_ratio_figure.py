@@ -177,10 +177,10 @@ def compute_results(Ngrid, parallel_ix=None, parallel_total=None):
     return results
 
 
-def get_results_path(Ngrid, parallel_ix=None, parallel_total=None, pysr_f2=False, model_selection=None):
+def get_results_path(Ngrid, parallel_ix=None, parallel_total=None, model_selection=None):
     path = f'period_results/results_ngrid={Ngrid}_bnn'
 
-    if pysr_f2:
+    if model_selection is not None:
         path += f'_pysr_f2/{model_selection}'
 
     if parallel_ix is not None:
@@ -229,11 +229,12 @@ def collate_parallel_results(Ngrid, parallel_total):
     print('saved results to', path)
 
 
-def plot_results(results, Ngrid, metric, pysr_f2=False, model_selection=None):
+def plot_results(results, Ngrid, metric, model_selection=None):
     P12s, P23s = get_period_ratios(Ngrid)
 
     fig, ax = plt.subplots(figsize=(8,6))
 
+    import pdb; pdb.set_trace()
     # get the results for the specific metric
     if metric == 'mean':
         results = [d['mean'] if d is not None else np.NaN for d in results]
@@ -263,12 +264,14 @@ def plot_results(results, Ngrid, metric, pysr_f2=False, model_selection=None):
 
     if metric == 'std':
         s += '_std'
-    if pysr_f2:
-        s += f'_pysr_f2_{model_selection}'
+    if model_selection is not None:
+        s += f'_pysr_f2/{model_selection}'
 
     s = 'period_results/period_ratio_' + s + '.png'
+    os.makedirs(os.path.dirname(s), exist_ok=True)
     plt.savefig(s, dpi=800)
     print('saved figure to', s)
+    assert 0
 
 
 def pair_complexities(l1, l2):
@@ -286,16 +289,14 @@ def pair_complexities(l1, l2):
     return complexities
 
 
-def get_model_selections(sr_results_path, model_selection=None):
-    if model_selection is None:
-        reg = pickle.load(open(sr_results_path, 'rb'))
-        return list(reg.equations_[0]['complexity'])
-    else:
-        return [model_selection]
 
 
 def compute_pysr_f2_results(results, sr_results_path, model_selection=None):
-    model_selections=get_model_selections(sr_results_path, model_selection)
+    if model_selection is None:
+        reg = pickle.load(open(sr_results_path, 'rb'))
+        model_selections = list(reg.equations_[0]['complexity'])
+    else:
+        model_selections = [model_selection]
 
     f1_results = [d['f1'] if d is not None else None for d in results]
     good_ixs = np.array([i for i in range(len(f1_results)) if f1_results[i] is not None])
@@ -321,8 +322,10 @@ def compute_pysr_f2_results(results, sr_results_path, model_selection=None):
                     'std': result[1]
                 })
 
+        results = results2
+
         # save the results
-        path = get_results_path(Ngrid, pysr_f2=True, model_selection=model_selection)
+        path = get_results_path(Ngrid, model_selection=model_selection)
         os.makedirs(os.path.dirname(path), exist_ok=True)
 
         with open(path, 'wb') as f:
@@ -332,6 +335,16 @@ def compute_pysr_f2_results(results, sr_results_path, model_selection=None):
 
     return results
 
+
+def plot_results_pysr_f2(Ngrid, metric, model_selection):
+    # get the model selections by grepping for the files
+    path = get_results_path(Ngrid, model_selection='*')
+    files = os.listdir(os.path.dirname(path))
+    # go from f'{model_selection}.pkl' to model_selection
+    model_selections = sorted([int(f.split('.')[0]) for f in files])
+    for model_selection in model_selections:
+        results = load_results(get_results_path(Ngrid, model_selection=model_selection))
+        plot_results(results, Ngrid, plot_metric, model_selection=model_selection)
 
 if __name__ == '__main__':
     args = get_args()
@@ -350,9 +363,9 @@ if __name__ == '__main__':
         results = load_results(get_results_path(Ngrid))
         compute_pysr_f2_results(results, pysr_f2, model_selection)
     if args.plot:
-        model_selections=get_model_selections(pysr_f2, model_selection)
-        for model_selection in model_selections:
-            results = load_results(get_results_path(Ngrid, pysr_f2=pysr_f2, model_selection=model_selection))
-            plot_results(results, Ngrid, plot_metric, pysr_f2=pysr_f2, model_selection=model_selection)
-
+        if args.pysr_f2:
+            plot_results_pysr_f2(Ngrid, plot_metric, model_selection)
+        else:
+            results = load_results(get_results_path(Ngrid))
+            plot_results(results, Ngrid, plot_metric)
     print('Done')
