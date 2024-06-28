@@ -93,9 +93,9 @@ def get_model_prediction(sim, model):
     try:
         out_dict = model.predict(sim)
         return {
-            'mean': out_dict['mean'].detach().cpu().numpy(),
-            'std': out_dict['std'].detach().cpu().numpy(),
-            'f1': out_dict['summary_stats'].detach().cpu().numpy()
+            'mean': out_dict['mean'][0,0].detach().cpu().numpy(),
+            'std': out_dict['std'][0,0].detach().cpu().numpy(),
+            'f1': out_dict['summary_stats'][0].detach().cpu().numpy()
         }
 
     except rebound.Escape:
@@ -233,9 +233,9 @@ def plot_results(results, Ngrid, metric):
 
     # get the results for the specific metric
     if metric == 'mean':
-        results = [d['mean'] for d in results]
+        results = [d['mean'] if d is not None else np.NaN for d in results]
     elif metric == 'std':
-        results = [d['std'] for d in results]
+        results = [d['std'] if d is not None else np.NaN for d in results]
 
     results = np.array(results)
     X,Y,Z = get_centered_grid(P12s, P23s, results)
