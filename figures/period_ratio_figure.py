@@ -11,8 +11,11 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 
+import torch
+import modules
 import spock
 import utils2
+import pickle
 from utils2 import assert_equal
 import argparse
 
@@ -24,10 +27,18 @@ def get_args():
     print(utils2.get_script_execution_command())
     parser = argparse.ArgumentParser()
     parser.add_argument('--Ngrid', '-n', type=int)
-    parser.add_argument('--metric', '-m', type=str, choices=['megno', 'f1', 'std', 'mean'], default='mean')
-    parser.add_argument('--action', '-a', choices=['compute', 'collate', 'plot'], type=str, default='compute')
+
+    parser.add_argument('--plot', '-p', type=str, choices=['mean', 'std'], default=None)
+    parser.add_argument('--compute', action='store_true')
+    parser.add_argument('--collate', action='store_true')
+
+    parser.add_argument('--pysr_f2', type=str, default=None) # PySR model to load and replace f2 with, e.g. 'sr_results/hall_of_fame_f2_21101_0_1.pkl'
+    parser.add_argument('--model_selection', type=str, default='best', help='"best", "accuracy", "score", or an integer of the "complexity"')
+
+    # parallel processing args
     parser.add_argument('--ix', type=int, default=None)
     parser.add_argument('--total', type=int, default=None)
+
     args = parser.parse_args()
     return args
 
@@ -74,47 +85,27 @@ def get_simulation(par):
     return sim
 
 
-def get_megno_prediction(sim):
-    sim = sim.copy()
-    sim.dt = 0.05
-    sim.init_megno()
-    sim.exit_max_distance = 20.
-    try:
-        sim.integrate(1e4)
-        megno = sim.calculate_megno()
-        return megno
-    except rebound.Escape:
-        return 10. # At least one particle got ejected, returning large MEGNO.
-
-
-def get_model_prediction(sim, model, metric):
+def get_model_prediction(sim, model):
     sim = sim.copy()
     sim.dt = 0.05
     sim.init_megno()
     sim.exit_max_distance = 20.
     try:
         out_dict = model.predict(sim)
-        if metric == 'mean':
-            out = out_dict['mean']
-        elif metric == 'std':
-            out = out_dict['std']
-        elif metric == 'f1':
-            out = out_dict['summary_stats']
+        return {
+            'mean': out_dict['mean'].detach().cpu().numpy(),
+            'std': out_dict['std'].detach().cpu().numpy(),
+            'f1': out_dict['summary_stats'].detach().cpu().numpy()
+        }
 
-        assert_equal(out.shape[0], 1)
-        out = out[0].detach().cpu().numpy()
     except rebound.Escape:
-        out = np.NaN
+        return None
 
     except Exception as e:
         print(e)
         import traceback
         traceback.print_exc()
-        print('returning NaN for now')
-
-        out = np.NaN
-
-    return out
+        return None
 
 
 def get_centered_grid(xlist, ylist, probs):
@@ -146,22 +137,11 @@ def get_parameters(P12s, P23s):
     return parameters
 
 
-def compute_results_for_parameters(parameters, metric):
+def compute_results_for_parameters(parameters):
     simulations = [get_simulation(par) for par in parameters]
 
-    if metric == 'megno':
-        f = get_megno_prediction
-    else:
-        model = load_model()
-        f = lambda sim: get_model_prediction(sim, model, metric)
-
-    results = [f(sim) for sim in simulations]
-    if metric == 'f1':
-        # convert NaN's to arrays of NaNs of the correct size
-        entry = next((x for x in results if isinstance(x, np.ndarray)), None)
-        length = len(entry)
-        results = [np.full(length, np.NaN) if not isinstance(x, np.ndarray) else x for x in results]
-
+    model = load_model()
+    results = [get_model_prediction(sim, model) for sim in simulations]
     return results
 
 
@@ -178,48 +158,45 @@ def get_list_chunk(lst, ix, total):
     return lst[start:end]
 
 
-def compute_results(Ngrid, metric, parallel_ix=None, parallel_total=None):
+def compute_results(Ngrid, parallel_ix=None, parallel_total=None):
     P12s, P23s = get_period_ratios(Ngrid)
     parameters = get_parameters(P12s, P23s)
     if parallel_ix is not None:
         parameters = get_list_chunk(parameters, parallel_ix, parallel_total)
 
-    results = compute_results_for_parameters(parameters, metric)
+    results = compute_results_for_parameters(parameters)
+
     # save the results
-    path = get_results_path(Ngrid, metric, parallel_ix, parallel_total)
-    # Create the directory if it doesn't exist
+    path = get_results_path(Ngrid, parallel_ix, parallel_total)
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    results = np.array(results)
-    np.save(path, results)
+
+    with open(path, 'wb') as f:
+        pickle.dump(results, f)
+
     print('saved results to', path)
     return results
 
 
-def get_results_path(Ngrid, metric, parallel_ix=None, parallel_total=None):
-    model = 'megno' if metric == 'megno' else 'bnn'
-    path = f'period_results/results_ngrid={Ngrid}_{model}'
-
-    if metric == 'std':
-        path += '_std'
-    elif metric == 'f1':
-        path += '_f1'
+def get_results_path(Ngrid, parallel_ix=None, parallel_total=None):
+    path = f'period_results/results_ngrid={Ngrid}_bnn'
 
     if parallel_ix is not None:
         path += f'/{parallel_ix}-{parallel_total}'
 
-    path += '.npy'
+    path += '.pkl'
     return path
 
 
 def load_results(path):
-    return np.load(path)
+    with open(path, 'rb') as f:
+        return pickle.load(f)
 
 
-def collate_parallel_results(Ngrid, metric, parallel_total):
+def collate_parallel_results(Ngrid, parallel_total):
     '''load the parallel results and save as one big list'''
     results = []
     for ix in range(parallel_total):
-        path = get_results_path(Ngrid, metric, ix, parallel_total)
+        path = get_results_path(Ngrid, ix, parallel_total)
         try:
             sub_results = load_results(path)
         except FileNotFoundError:
@@ -227,7 +204,6 @@ def collate_parallel_results(Ngrid, metric, parallel_total):
             print('Missing results for ix', ix)
         results.append(sub_results)
 
-    # replace None values with NaN arrays of the same length as the first non-None subresult
     length = None
     for sub_results in results:
         if sub_results is not None:
@@ -239,13 +215,15 @@ def collate_parallel_results(Ngrid, metric, parallel_total):
         return
 
     results = [sub_result if sub_result is not None
-               else np.array([np.NaN] * length)
+               else [None for _ in range(length)]
                for sub_result in results]
 
-    # concatenate into one big numpy array
-    results = np.concatenate(results)
-    np.save(get_results_path(Ngrid, metric), results)
-    print('saved results to', get_results_path(Ngrid, metric))
+    # concatenate into one big list of results, maintaining ordering
+    results = [result for sub_results in results for result in sub_results]
+    path = get_results_path(Ngrid)
+    with open(path, 'wb') as f:
+        pickle.dump(results, f)
+    print('saved results to', path)
 
 
 def plot_results(results, Ngrid, metric):
@@ -253,18 +231,16 @@ def plot_results(results, Ngrid, metric):
 
     fig, ax = plt.subplots(figsize=(8,6))
 
+    # get the results for the specific metric
+    if metric == 'mean':
+        results = [d['mean'] for d in results]
+    elif metric == 'std':
+        results = [d['std'] for d in results]
+
+    results = np.array(results)
     X,Y,Z = get_centered_grid(P12s, P23s, results)
 
-    if metric == 'megno':
-        Zfilt = Z
-        Zfilt[Zfilt < 2] = 2.01
-
-        cmap = plt.cm.seismic.copy()
-        cmap.set_bad(color='yellow')
-        im = ax.pcolormesh(X, Y, np.log10(Zfilt-2), vmin=-4, vmax=4, cmap=cmap)
-        label = "log(MEGNO-2) (red = chaotic)"
-
-    elif metric == 'std':
+    if metric == 'std':
         cmap = plt.cm.inferno.copy().reversed()
         cmap.set_bad(color='white')
         im = ax.pcolormesh(X, Y, Z, vmin=0, vmax=6, cmap=cmap)
@@ -274,38 +250,50 @@ def plot_results(results, Ngrid, metric):
         cmap.set_bad(color='white')
         im = ax.pcolormesh(X, Y, Z, vmin=4, vmax=12, cmap=cmap)
         label = "log(T_unstable)"
-    else:
-        raise NotImplementedError()
 
     cb = plt.colorbar(im, ax=ax)
     cb.set_label(label)
     ax.set_xlabel("P1/P2")
     ax.set_ylabel("P2/P3")
 
-    s = 'megno' if metric == 'megno' else 'bnn'
-    s += f'_ngrid={Ngrid}'
+    s = f'bnn_ngrid={Ngrid}'
     if metric == 'std':
         s += '_std'
-    elif metric == 'f1':
-        s += '_f1'
     s = 'period_results/period_ratio_' + s + '.png'
     plt.savefig(s, dpi=800)
     print('saved figure to', s)
 
 
+def compute_pysr_f2_results(f1_results, sr_results_file, model_selection):
+    regress_nn = modules.PySRNet(sr_results_file, model_selection).cuda()
+
+    # f1_results is a big batch of summary stats
+    # - mark which indices are NaN
+    # - remove NaNs from the batch
+    # - pass through regress_nn
+    # - insert the results back into the correct indices
+    nan_ixs = np.isnan(f1_results).all(axis=1)
+    batch = f1_results[~nan_ixs]
+    batch = torch.tensor(batch).float().cuda()
+    pred = regress_nn(batch).detach().cpu().numpy()
+    results = np.full((len(f1_results), pred.shape[1]), np.NaN)
+    results[~nan_ixs] = pred
+    return results
+
+
 if __name__ == '__main__':
     args = get_args()
     Ngrid = args.Ngrid
-    metric = args.metric
     parallel_ix = args.ix
     parallel_total = args.total
+    plot_metric = args.plot
 
-    if args.action == 'compute':
-        results = compute_results(Ngrid, metric, parallel_ix, parallel_total)
-    elif args.action == 'collate':
-        collate_parallel_results(Ngrid, metric, parallel_total)
-    elif args.action == 'plot':
-        results = load_results(get_results_path(Ngrid, metric))
-        plot_results(results, Ngrid, metric)
+    if args.compute:
+        results = compute_results(Ngrid, parallel_ix, parallel_total)
+    if args.collate:
+        collate_parallel_results(Ngrid, parallel_total)
+    if args.plot:
+        results = load_results(get_results_path(Ngrid))
+        plot_results(results, Ngrid, plot_metric)
 
     print('Done')
