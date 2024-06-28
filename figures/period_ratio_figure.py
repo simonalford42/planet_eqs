@@ -1,4 +1,4 @@
-import pysr
+# import pysr
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 # import pysr  # just to avoid errors if its imported after pytorch
@@ -234,7 +234,6 @@ def plot_results(results, Ngrid, metric, model_selection=None):
 
     fig, ax = plt.subplots(figsize=(8,6))
 
-    import pdb; pdb.set_trace()
     # get the results for the specific metric
     if metric == 'mean':
         results = [d['mean'] if d is not None else np.NaN for d in results]
@@ -270,8 +269,8 @@ def plot_results(results, Ngrid, metric, model_selection=None):
     s = 'period_results/period_ratio_' + s + '.png'
     os.makedirs(os.path.dirname(s), exist_ok=True)
     plt.savefig(s, dpi=800)
+    plt.close()
     print('saved figure to', s)
-    assert 0
 
 
 def pair_complexities(l1, l2):
