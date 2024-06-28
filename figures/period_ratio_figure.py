@@ -1,4 +1,4 @@
-# import pysr
+import pysr
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 # import pysr  # just to avoid errors if its imported after pytorch
@@ -295,6 +295,8 @@ def compute_pysr_f2_results(results, sr_results_file, model_selection):
                 'mean': result[0],
                 'std': result[1]
             })
+
+    results = results2
 
 
     # save the results
