@@ -177,8 +177,11 @@ def compute_results(Ngrid, parallel_ix=None, parallel_total=None):
     return results
 
 
-def get_results_path(Ngrid, parallel_ix=None, parallel_total=None):
+def get_results_path(Ngrid, parallel_ix=None, parallel_total=None, pysr_f2=False):
     path = f'period_results/results_ngrid={Ngrid}_bnn'
+
+    if pysr_f2:
+        path += '_pysr_f2'
 
     if parallel_ix is not None:
         path += f'/{parallel_ix}-{parallel_total}'
@@ -226,7 +229,7 @@ def collate_parallel_results(Ngrid, parallel_total):
     print('saved results to', path)
 
 
-def plot_results(results, Ngrid, metric):
+def plot_results(results, Ngrid, metric, pysr_f2=False):
     P12s, P23s = get_period_ratios(Ngrid)
 
     fig, ax = plt.subplots(figsize=(8,6))
@@ -257,27 +260,39 @@ def plot_results(results, Ngrid, metric):
     ax.set_ylabel("P2/P3")
 
     s = f'bnn_ngrid={Ngrid}'
+
     if metric == 'std':
         s += '_std'
+    if pysr_f2:
+        s += '_pysr_f2'
+
     s = 'period_results/period_ratio_' + s + '.png'
     plt.savefig(s, dpi=800)
     print('saved figure to', s)
 
 
-def compute_pysr_f2_results(f1_results, sr_results_file, model_selection):
+def compute_pysr_f2_results(results, sr_results_file, model_selection):
     regress_nn = modules.PySRNet(sr_results_file, model_selection).cuda()
 
-    # f1_results is a big batch of summary stats
-    # - mark which indices are NaN
-    # - remove NaNs from the batch
-    # - pass through regress_nn
-    # - insert the results back into the correct indices
-    nan_ixs = np.isnan(f1_results).all(axis=1)
-    batch = f1_results[~nan_ixs]
+    f1_results = [d['f1'] if d is not None else None for d in results]
+    good_ixs = np.array([i for i in range(len(f1_results)) if f1_results[i] is not None])
+
+    batch = np.array([d for d in f1_results if d is not None])
     batch = torch.tensor(batch).float().cuda()
     pred = regress_nn(batch).detach().cpu().numpy()
+
     results = np.full((len(f1_results), pred.shape[1]), np.NaN)
-    results[~nan_ixs] = pred
+    results[good_ixs] = pred
+
+
+    # save the results
+    path = get_results_path(Ngrid, pysr_f2=True)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+
+    with open(path, 'wb') as f:
+        pickle.dump(results, f)
+
+    print('saved results to', path)
     return results
 
 
@@ -287,13 +302,18 @@ if __name__ == '__main__':
     parallel_ix = args.ix
     parallel_total = args.total
     plot_metric = args.plot
+    pysr_f2 = args.pysr_f2
+    model_selection=args.model_selection
 
     if args.compute:
         results = compute_results(Ngrid, parallel_ix, parallel_total)
     if args.collate:
         collate_parallel_results(Ngrid, parallel_total)
-    if args.plot:
+    if args.pysr_f2:
         results = load_results(get_results_path(Ngrid))
-        plot_results(results, Ngrid, plot_metric)
+        compute_pysr_f2_results(results, pysr_f2, model_selection)
+    if args.plot:
+        results = load_results(get_results_path(Ngrid, args.pysr_f2))
+        plot_results(results, Ngrid, plot_metric, pysr_f2)
 
     print('Done')

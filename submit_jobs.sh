@@ -18,7 +18,7 @@
 
 # bash train.sh --load_f1 21101 --pysr_f2 'sr_results/61400.pkl' --pysr_f2_model_selection best --eval
 
-sbatch -J sr --partition gpu sr.sh --time_in_hours 0.05 --version 43139 --target f2
+# sbatch -J sr --partition gpu sr.sh --time_in_hours 0.05 --version 43139 --target f2
 # sbatch -J sr --partition gpu --time 2:00:00 sr.sh --time_in_hours 1 --version 43139 --target f2
 # sbatch -J sr --partition gpu --time 9:00:00 sr.sh --time_in_hours 8 --version 43139 --target f2
 # sbatch -J sr --partition gpu --time 25:00:00 sr.sh --time_in_hours 24 --version 43139 --target f2
