@@ -33,7 +33,7 @@ def get_args():
     parser.add_argument('--collate', action='store_true')
 
     parser.add_argument('--pysr_f2', type=str, default=None) # PySR model to load and replace f2 with, e.g. 'sr_results/hall_of_fame_f2_21101_0_1.pkl'
-    parser.add_argument('--model_selection', type=str, default='best', help='"best", "accuracy", "score", or an integer of the "complexity"')
+    parser.add_argument('--model_selection', type=str, default=None, help='"best", "accuracy", "score", or an integer of the pysr equation complexity')
 
     # parallel processing args
     parser.add_argument('--ix', type=int, default=None)
@@ -177,11 +177,11 @@ def compute_results(Ngrid, parallel_ix=None, parallel_total=None):
     return results
 
 
-def get_results_path(Ngrid, parallel_ix=None, parallel_total=None, pysr_f2=False):
+def get_results_path(Ngrid, parallel_ix=None, parallel_total=None, pysr_f2=False, model_selection=None):
     path = f'period_results/results_ngrid={Ngrid}_bnn'
 
     if pysr_f2:
-        path += '_pysr_f2'
+        path += f'_pysr_f2/{model_selection}'
 
     if parallel_ix is not None:
         path += f'/{parallel_ix}-{parallel_total}'
@@ -229,7 +229,7 @@ def collate_parallel_results(Ngrid, parallel_total):
     print('saved results to', path)
 
 
-def plot_results(results, Ngrid, metric, pysr_f2=False):
+def plot_results(results, Ngrid, metric, pysr_f2=False, model_selection=None):
     P12s, P23s = get_period_ratios(Ngrid)
 
     fig, ax = plt.subplots(figsize=(8,6))
@@ -264,49 +264,72 @@ def plot_results(results, Ngrid, metric, pysr_f2=False):
     if metric == 'std':
         s += '_std'
     if pysr_f2:
-        s += '_pysr_f2'
+        s += f'_pysr_f2_{model_selection}'
 
     s = 'period_results/period_ratio_' + s + '.png'
     plt.savefig(s, dpi=800)
     print('saved figure to', s)
 
 
-def compute_pysr_f2_results(results, sr_results_file, model_selection):
-    regress_nn = modules.PySRNet(sr_results_file, model_selection).cuda()
+def pair_complexities(l1, l2):
+    def closest_value_in_list(value, lst):
+        return lst[np.argmin([abs(value - x) for x in lst])]
+
+    swap = len(l2) > len(l1)
+    if swap:
+        l1, l2 = l2, l1
+
+    complexities = [(val, closest_value_in_list(val, l2)) for val in l1]
+    if swap:
+        complexities = [(b, a) for a, b in complexities]
+
+    return complexities
+
+
+def get_model_selections(sr_results_path, model_selection=None):
+    if model_selection is None:
+        reg = pickle.load(open(sr_results_path, 'rb'))
+        return list(reg.equations_[0]['complexity'])
+    else:
+        return [model_selection]
+
+
+def compute_pysr_f2_results(results, sr_results_path, model_selection=None):
+    model_selections=get_model_selections(sr_results_path, model_selection)
 
     f1_results = [d['f1'] if d is not None else None for d in results]
     good_ixs = np.array([i for i in range(len(f1_results)) if f1_results[i] is not None])
 
     batch = np.array([d for d in f1_results if d is not None])
     batch = torch.tensor(batch).float().cuda()
-    pred = regress_nn(batch).detach().cpu().numpy()
 
-    results = np.full((len(f1_results), pred.shape[1]), np.NaN)
-    results[good_ixs] = pred
+    for model_selection in model_selections:
+        regress_nn = modules.PySRNet(sr_results_path, model_selection).cuda()
+        pred = regress_nn(batch).detach().cpu().numpy()
+        results = np.full((len(f1_results), pred.shape[1]), np.NaN)
+        results[good_ixs] = pred
 
-    assert_equal(results.shape[1], 2)
-    # convert back to dictionary of 'mean': mean, 'std': std, for compatibility with the other results
-    results2 = []
-    for result in results:
-        if np.isnan(result).any():
-            results2.append(None)
-        else:
-            results2.append({
-                'mean': result[0],
-                'std': result[1]
-            })
+        assert_equal(results.shape[1], 2)
+        # convert back to dictionary of 'mean': mean, 'std': std, for compatibility with the other results
+        results2 = []
+        for result in results:
+            if np.isnan(result).any():
+                results2.append(None)
+            else:
+                results2.append({
+                    'mean': result[0],
+                    'std': result[1]
+                })
 
-    results = results2
+        # save the results
+        path = get_results_path(Ngrid, pysr_f2=True, model_selection=model_selection)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
 
+        with open(path, 'wb') as f:
+            pickle.dump(results, f)
 
-    # save the results
-    path = get_results_path(Ngrid, pysr_f2=True)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
+        print('saved results to', path)
 
-    with open(path, 'wb') as f:
-        pickle.dump(results, f)
-
-    print('saved results to', path)
     return results
 
 
@@ -327,7 +350,9 @@ if __name__ == '__main__':
         results = load_results(get_results_path(Ngrid))
         compute_pysr_f2_results(results, pysr_f2, model_selection)
     if args.plot:
-        results = load_results(get_results_path(Ngrid, pysr_f2=args.pysr_f2))
-        plot_results(results, Ngrid, plot_metric, pysr_f2=args.pysr_f2)
+        model_selections=get_model_selections(pysr_f2, model_selection)
+        for model_selection in model_selections:
+            results = load_results(get_results_path(Ngrid, pysr_f2=pysr_f2, model_selection=model_selection))
+            plot_results(results, Ngrid, plot_metric, pysr_f2=pysr_f2, model_selection=model_selection)
 
     print('Done')
