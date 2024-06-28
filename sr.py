@@ -186,7 +186,7 @@ def load_inputs_and_targets(config):
         # because target was f2 direct, y shape is [B * 2, 1]
         # but predicted mean is [B, 1]
         # so repeat the predicted means
-        y_old = out_dict['predicted_mean']
+        y_old = out_dict['mean']
         assert_equal(y_old.shape[1], 1)
         y_old = einops.repeat(y_old, 'B one -> (B repeat) one', repeat=2)
         assert_equal(y_old.shape, y.shape)

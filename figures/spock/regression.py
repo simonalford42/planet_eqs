@@ -72,29 +72,65 @@ class NonSwagFeatureRegressor():
         ssX.var_ = ssX.scale_**2
         self.ssX = ssX
 
-    def predict(self, sim, indices=None, samples=1000):
+    def predict(self, sim, indices=None):
         """Estimate instability time for a given simulation.
 
         :sim: The rebound simulation.
         :indices: The list of planets to consider.
-        :samples: How many MC samples to return.
-        :returns: Array of samples of log10(T) for the simulation.
-            The spread of samples covers both epistemic
-            (model-based) and aleatoric (real, data-based) uncertainty.
-            Samples above log10(T) indicate a stable simulation. Bounded
-            between 4 and 12.
-
         """
-        mu, std = self.sample(sim, indices, samples)
+        if sim.N_real < 4:
+            raise AttributeError("SPOCK Error: SPOCK only works for systems with 3 or more planets")
+        if indices:
+            if len(indices) != 3:
+                raise AttributeError("SPOCK Error: indices must be a list of 3 particle indices")
+            trios = [indices] # always make it into a list of trios to test
+        else:
+            trios = [[i,i+1,i+2] for i in range(1,sim.N_real-2)] # list of adjacent trios
 
-        mu = np.median(mu)
-        std = np.median(std)
+        kwargs = OrderedDict()
+        kwargs['Norbits'] = int(1e4)
+        kwargs['Nout'] = 1000
+        kwargs['trios'] = trios
+        args = list(kwargs.values())
+        # These are the .npy.
+        # In the other file, we concatenate (restseries, orbtseries, mass_array)
+        tseries, stable = get_extended_tseries(sim, args)
 
-        return {
-            'mu': mu,
-            'std': std,
-            'f1': None,
-        }
+        if not stable:
+            return None
+
+        tseries = np.array(tseries)
+        simt = sim.copy()
+        alltime = []
+        for i, trio in enumerate(trios):
+            sim = simt.copy()
+            # These are the .npy.
+            # In the other file, we concatenate (restseries, orbtseries, mass_array)
+            cur_tseries = tseries[None, i, ::10]
+            mass_array = np.array([sim.particles[j].m/sim.particles[0].m for j in trio])
+            X = data_setup_kernel(mass_array, cur_tseries)
+            X = self.ssX.transform(X.reshape(-1, X.shape[-1])).reshape(X.shape)
+            X = torch.tensor(X).float()
+            if self.cuda:
+                X = X.cuda()
+
+            out = self.model(X, noisy_val=False, return_intermediates=True)
+            alltime.append(out)
+
+        # keeping the old code above in case we ever want to do more than one...
+        assert len(alltime) == 1, 'current implementation only made for one calculation'
+        out = alltime[0]
+
+        # from VarModel.forward:
+        # out = {
+        #     'inputs': x,
+        #     'f1_output': self.feature_nn(x),
+        #     'summary_stats': summary_stats,
+        #     'prediction': pred,
+        #     'mean': mu,
+        #     'std': std
+        # }
+        return out
 
 
     @profile

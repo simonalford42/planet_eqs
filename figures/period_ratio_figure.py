@@ -1,3 +1,4 @@
+import pysr
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 # import pysr  # just to avoid errors if its imported after pytorch
@@ -12,6 +13,7 @@ import matplotlib.pyplot as plt
 
 import spock
 import utils2
+from utils2 import assert_equal
 import argparse
 
 import warnings
@@ -21,7 +23,7 @@ warnings.filterwarnings("ignore", category=ResourceWarning)
 def get_args():
     print(utils2.get_script_execution_command())
     parser = argparse.ArgumentParser()
-    parser.add_argument('--Ngrid', '-n', type=int, default=80)
+    parser.add_argument('--Ngrid', '-n', type=int)
     parser.add_argument('--metric', '-m', type=str, choices=['megno', 'f1', 'std', 'mean'], default='mean')
     parser.add_argument('--action', '-a', choices=['compute', 'collate', 'plot'], type=str, default='compute')
     parser.add_argument('--ix', type=int, default=None)
@@ -31,15 +33,8 @@ def get_args():
 
 
 def load_model():
-    # version = 4157
-    # model = spock.FeatureRegressor(
-    #     cuda=True,
-    #     filebase='../' + utils2.ckpt_path(version, glob=True) +  '*output.pkl'
-    #     # filebase='*' + 'v30' + '*output.pkl'
-    #     #'long_zero_megno_with_angles_power_v14_*_output.pkl'
-    # )
     version = 43139 # val loss 1.603
-    model = spock.NonSwagFeatureRegressor(version=43139)
+    model = spock.NonSwagFeatureRegressor(version=version)
     return model
 
 
@@ -99,8 +94,24 @@ def get_model_prediction(sim, model, metric):
     sim.exit_max_distance = 20.
     try:
         out_dict = model.predict(sim)
-        out = out_dict[metric]
-    except:
+        if metric == 'mean':
+            out = out_dict['mean']
+        elif metric == 'std':
+            out = out_dict['std']
+        elif metric == 'f1':
+            out = out_dict['summary_stats']
+
+        assert_equal(out.shape[0], 1)
+        out = out[0].detach().cpu().numpy()
+    except rebound.Escape:
+        out = np.NaN
+
+    except Exception as e:
+        print(e)
+        import traceback
+        traceback.print_exc()
+        print('returning NaN for now')
+
         out = np.NaN
 
     return out
@@ -145,6 +156,12 @@ def compute_results_for_parameters(parameters, metric):
         f = lambda sim: get_model_prediction(sim, model, metric)
 
     results = [f(sim) for sim in simulations]
+    if metric == 'f1':
+        # convert NaN's to arrays of NaNs of the correct size
+        entry = next((x for x in results if isinstance(x, np.ndarray)), None)
+        length = len(entry)
+        results = [np.full(length, np.NaN) if not isinstance(x, np.ndarray) else x for x in results]
+
     return results
 
 
@@ -172,7 +189,8 @@ def compute_results(Ngrid, metric, parallel_ix=None, parallel_total=None):
     path = get_results_path(Ngrid, metric, parallel_ix, parallel_total)
     # Create the directory if it doesn't exist
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    np.save(path, np.array(results))
+    results = np.array(results)
+    np.save(path, results)
     print('saved results to', path)
     return results
 
@@ -197,7 +215,7 @@ def load_results(path):
     return np.load(path)
 
 
-def collate_parallel_results(Ngrid, metric):
+def collate_parallel_results(Ngrid, metric, parallel_total):
     '''load the parallel results and save as one big list'''
     results = []
     for ix in range(parallel_total):
@@ -230,53 +248,48 @@ def collate_parallel_results(Ngrid, metric):
     print('saved results to', get_results_path(Ngrid, metric))
 
 
-def plot_results(results, Ngrid, use_model, std):
+def plot_results(results, Ngrid, metric):
     P12s, P23s = get_period_ratios(Ngrid)
 
     fig, ax = plt.subplots(figsize=(8,6))
 
     X,Y,Z = get_centered_grid(P12s, P23s, results)
 
-    if use_model:
+    if metric == 'megno':
         Zfilt = Z
-        Zfilt[Zfilt == np.NaN] = 0
-
-        if std:
-            cmap = plt.cm.inferno.copy().reversed()
-            cmap.set_bad(color='white')
-        else:
-            cmap = plt.cm.inferno.copy().reversed()
-            cmap.set_bad(color='white')
-
-
-        if std:
-            im = ax.pcolormesh(X, Y, Zfilt, vmin=0, vmax=6, cmap=cmap)
-        else:
-            im = ax.pcolormesh(X, Y, Zfilt, vmin=4, vmax=12, cmap=cmap)
-
-    else:
-        Zfilt = Z
-        Zfilt[Zfilt <2] = 2.01
+        Zfilt[Zfilt < 2] = 2.01
 
         cmap = plt.cm.seismic.copy()
         cmap.set_bad(color='yellow')
         im = ax.pcolormesh(X, Y, np.log10(Zfilt-2), vmin=-4, vmax=4, cmap=cmap)
+        label = "log(MEGNO-2) (red = chaotic)"
+
+    elif metric == 'std':
+        cmap = plt.cm.inferno.copy().reversed()
+        cmap.set_bad(color='white')
+        im = ax.pcolormesh(X, Y, Z, vmin=0, vmax=6, cmap=cmap)
+        label = "std(log(T_unstable))"
+    elif metric == 'mean':
+        cmap = plt.cm.inferno.copy().reversed()
+        cmap.set_bad(color='white')
+        im = ax.pcolormesh(X, Y, Z, vmin=4, vmax=12, cmap=cmap)
+        label = "log(T_unstable)"
+    else:
+        raise NotImplementedError()
 
     cb = plt.colorbar(im, ax=ax)
-    if not use_model:
-        cb.set_label("log(MEGNO-2) (red = chaotic)")
-    elif std:
-        cb.set_label("std(log(T_unstable))")
-    else:
-        cb.set_label("log(T_unstable)")
+    cb.set_label(label)
     ax.set_xlabel("P1/P2")
     ax.set_ylabel("P2/P3")
-    s = 'bnn' if use_model else 'megno'
+
+    s = 'megno' if metric == 'megno' else 'bnn'
     s += f'_ngrid={Ngrid}'
-    if std:
+    if metric == 'std':
         s += '_std'
+    elif metric == 'f1':
+        s += '_f1'
     s = 'period_results/period_ratio_' + s + '.png'
-    plt.savefig(s, dpi=400)
+    plt.savefig(s, dpi=800)
     print('saved figure to', s)
 
 

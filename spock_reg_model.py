@@ -1153,8 +1153,8 @@ class VarModel(pl.LightningModule):
                 'f1_output': self.feature_nn(x),
                 'summary_stats': summary_stats,
                 'prediction': pred,
-                'predicted_mean': mu,
-                'predicted_std': std
+                'mean': mu,
+                'std': std
             }
             if 'ifthen' in self.hparams['f2_variant']:
                 d['ifthen_preds'] = self.regress_nn.preds(summary_stats)
