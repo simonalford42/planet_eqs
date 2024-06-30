@@ -26,14 +26,14 @@ warnings.filterwarnings("ignore", category=ResourceWarning)
 def get_args():
     print(utils2.get_script_execution_command())
     parser = argparse.ArgumentParser()
-    parser.add_argument('--Ngrid', '-n', type=int)
+    parser.add_argument('--Ngrid', '-n', type=int, required=True)
 
     parser.add_argument('--plot', '-p', type=str, choices=['mean', 'std'], default=None)
     parser.add_argument('--compute', action='store_true')
     parser.add_argument('--collate', action='store_true')
 
     parser.add_argument('--pysr_f2', type=str, default=None) # PySR model to load and replace f2 with, e.g. 'sr_results/hall_of_fame_f2_21101_0_1.pkl'
-    parser.add_argument('--model_selection', type=str, default=None, help='"best", "accuracy", "score", or an integer of the pysr equation complexity')
+    parser.add_argument('--model_selection', type=str, default=None, help='"best", "accuracy", "score", or an integer of the pysr equation complexity. if not provided, will plot all of them. If plotting, has to be an integer complexity.')
 
     # parallel processing args
     parser.add_argument('--ix', type=int, default=None)
@@ -288,6 +288,14 @@ def pair_complexities(l1, l2):
     return complexities
 
 
+def get_pysr_module(sr_results_path, residual_sr_results_path=None, model_selection=None, residual_model_selection=None):
+    if residual_sr_results_path is None:
+        # nonresidual sr
+        regress_nn = modules.PySRNet(sr_results_path, model_selection).cuda()
+        return regress_nn
+    else:
+        # ... do it for residual.
+        pass
 
 
 def compute_pysr_f2_results(results, sr_results_path, model_selection=None):
@@ -335,12 +343,23 @@ def compute_pysr_f2_results(results, sr_results_path, model_selection=None):
     return results
 
 
-def plot_results_pysr_f2(Ngrid, metric, model_selection):
+def plot_results_pysr_f2(Ngrid, metric, model_selection=None):
     # get the model selections by grepping for the files
-    path = get_results_path(Ngrid, model_selection='*')
+    path = get_results_path(Ngrid, model_selection=model_selection)
+
+    # get all the files in the directory, ignoring the directory itself
     files = os.listdir(os.path.dirname(path))
+
+    # filter to those of form f'{i}.pkl'
+    files = [file for file in files if file.endswith('.pkl')]
+
+    # if model selection is provided, filter to those
+    if model_selection is not None:
+        files = [file for file in files if file.startswith(model_selection)]
+
     # go from f'{model_selection}.pkl' to model_selection
-    model_selections = sorted([int(f.split('.')[0]) for f in files])
+    model_selections = [int(f.split('.')[0]) for f in files]
+    model_selections = sorted(model_selections)
     for model_selection in model_selections:
         results = load_results(get_results_path(Ngrid, model_selection=model_selection))
         plot_results(results, Ngrid, plot_metric, model_selection=model_selection)
