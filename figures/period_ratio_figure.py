@@ -289,6 +289,7 @@ def pair_complexities(l1, l2):
 
 
 def get_pysr_module(sr_results_path, residual_sr_results_path=None, model_selection=None, residual_model_selection=None):
+    # TODO: edward
     if residual_sr_results_path is None:
         # nonresidual sr
         regress_nn = modules.PySRNet(sr_results_path, model_selection).cuda()
