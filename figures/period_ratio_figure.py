@@ -1,7 +1,6 @@
-# import pysr
+import pysr
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
-# import pysr  # just to avoid errors if its imported after pytorch
 
 import sys
 sys.path.append('../')
@@ -232,8 +231,20 @@ def load_results(path):
 def collate_parallel_results(args):
     '''load the parallel results and save as one big list'''
     results = []
-    for ix in range(args.parallel_total):
-        path = get_results_path(args.Ngrid, args.version, ix, args.parallel_total)
+    if args.parallel_total is None:
+        # try to detect the total
+        files = os.listdir(get_results_path(args.Ngrid, args.version)[:-4])
+        # filter to those of form f'{ix}-{total}.pkl'
+        files = [file for file in files if file.endswith('.pkl')]
+        # get the total. use the largest possible total
+        assert len(files) > 0
+        total = int(files[0].split('-')[1].split('.')[0])
+        print('Detected parallel total as', total)
+    else:
+        total = args.parallel_total
+
+    for ix in range(total):
+        path = get_results_path(args.Ngrid, args.version, ix, total)
         try:
             sub_results = load_results(path)
         except FileNotFoundError:
