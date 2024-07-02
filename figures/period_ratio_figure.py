@@ -1,4 +1,4 @@
-import pysr
+# import pysr
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 # import pysr  # just to avoid errors if its imported after pytorch
@@ -51,7 +51,7 @@ scopy bnn_chaos_model/figures/period_results/v=43139_ngrid=6.pkl ~/code/bnn_chao
 def get_args():
     print(utils2.get_script_execution_command())
     parser = argparse.ArgumentParser()
-    parser.add_argument('--Ngrid', '-n', type=int)
+    parser.add_argument('--Ngrid', '-n', type=int, required=True)
     parser.add_argument('--version', '-v', type=int, default=43139)
 
     parser.add_argument('--plot', '-p', action='store_true')
@@ -59,7 +59,7 @@ def get_args():
     parser.add_argument('--collate', action='store_true')
 
     parser.add_argument('--pysr_path', type=str, default=None) # PySR model to load and replace f2 with, e.g. 'sr_results/33060.pkl'
-    parser.add_argument('--pysr_model_selection', type=str, default=None, help='"best", "accuracy", "score", or an integer of the pysr equation complexity')
+    parser.add_argument('--pysr_model_selection', type=str, default=None, help='"best", "accuracy", "score", or an integer of the pysr equation complexity. If not provided, will do all complexities. If plotting, has to be an integer complexity')
 
     # parallel processing args
     # ix should be in [0, total)
@@ -266,7 +266,6 @@ def plot_results(args, metric=None):
 
     fig, ax = plt.subplots(figsize=(8,6))
 
-    import pdb; pdb.set_trace()
     # get the results for the specific metric
     if args.plot == 'mean':
         results = [d['mean'] if d is not None else np.NaN for d in results]
@@ -309,6 +308,17 @@ def plot_results(args, metric=None):
     plt.savefig(path, dpi=800)
     print('Saved figure to', path)
     plt.close(fig)
+
+
+def get_pysr_module(sr_results_path, residual_sr_results_path=None, model_selection=None, residual_model_selection=None):
+    # TODO: edward
+    if residual_sr_results_path is None:
+        # nonresidual sr
+        regress_nn = modules.PySRNet(sr_results_path, model_selection).cuda()
+        return regress_nn
+    else:
+        # ... do it for residual.
+        pass
 
 
 def compute_pysr_f2_results(args):
@@ -359,20 +369,30 @@ def compute_pysr_f2_results(args):
 
 
 def plot_results_pysr_f2(args):
-    if args.pysr_model_selection is not None:
-        model_selections = [args.pysr_model_selection]
-    else:
-        # get the model selections by grepping for the files
-        path = get_results_path(args.Ngrid, args.version, pysr_model_selection='*')
-        files = os.listdir(os.path.dirname(path))
-        # go from f'{model_selection}.pkl' to model_selection
-        model_selections = sorted([int(f.split('.')[0]) for f in files])
+    # get the model selections by grepping for the files
+    path = get_results_path(args.Ngrid, args.version, pysr_model_selection='*')
+    files = os.listdir(os.path.dirname(path))
+
+    # filter to those of form f'{i}.pkl'
+    files = [file for file in files if file.endswith('.pkl')]
+
+    # go from f'{model_selection}.pkl' to model_selection
+    model_selections = sorted([int(f.split('.')[0]) for f in files])
+
+    # if model selection is provided, filter to those
+    if model_selection is not None:
+        files = [file for file in files if file.startswith(model_selection)]
+
+    # go from f'{model_selection}.pkl' to model_selection
+    model_selections = [int(f.split('.')[0]) for f in files]
+    model_selections = sorted(model_selections)
 
     original_model_selection = args.pysr_model_selection
     for model_selection in model_selections:
         args.pysr_model_selection = model_selection
         plot_results(args)
     args.pysr_model_selection = original_model_selection
+
 
 if __name__ == '__main__':
     args = get_args()
