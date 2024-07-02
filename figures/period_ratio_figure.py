@@ -58,8 +58,8 @@ def get_args():
     parser.add_argument('--compute', action='store_true')
     parser.add_argument('--collate', action='store_true')
 
-    parser.add_argument('--pysr_version', type=str, default=33060) # sr_results/33060.pkl
-    parser.add_argument('--pysr_dir', type=str, default='../sr_results/')
+    parser.add_argument('--pysr_version', type=str, default=None) # sr_results/33060.pkl
+    parser.add_argument('--pysr_dir', type=str, default='../sr_results/')  # folder containing pysr results pkl
 
     parser.add_argument('--pysr_model_selection', type=str, default=None, help='"best", "accuracy", "score", or an integer of the pysr equation complexity. If not provided, will do all complexities. If plotting, has to be an integer complexity')
 
@@ -69,6 +69,12 @@ def get_args():
     parser.add_argument('--parallel_total', '-t', type=int, default=None)
 
     args = parser.parse_args()
+
+    if args.pysr_version is not None:
+        args.pysr_path = os.path.join(args.pysr_dir, f'{args.pysr_version}.pkl')
+    else:
+        args.pysr_path = None
+
     return args
 
 
@@ -195,7 +201,7 @@ def compute_results(args):
     results = compute_results_for_parameters(parameters, model)
 
     # save the results
-    path = get_results_path(args.Ngrid, args.version, args.parallel_ix, args.parallel_total, args.pysr_model_selection)
+    path = get_results_path(args.Ngrid, args.version, args.parallel_ix, args.parallel_total, args.pysr_version, args.pysr_model_selection)
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
     with open(path, 'wb') as f:
@@ -205,11 +211,11 @@ def compute_results(args):
     return results
 
 
-def get_results_path(Ngrid, version, parallel_ix=None, parallel_total=None, pysr_model_selection=None):
+def get_results_path(Ngrid, version, parallel_ix=None, parallel_total=None, pysr_version=None, pysr_model_selection=None):
     path = f'period_results/v={version}_ngrid={Ngrid}'
 
     if pysr_model_selection is not None:
-        path += f'_pysr_f2/{pysr_model_selection}'
+        path += f'_pysr_f2_v={pysr_version}/{pysr_model_selection}'
 
     if parallel_ix is not None:
         path += f'/{parallel_ix}-{parallel_total}'
@@ -263,7 +269,7 @@ def plot_results(args, metric=None):
             plot_results(args, metric)
         return
 
-    results = load_results(get_results_path(args.Ngrid, args.version, pysr_model_selection=args.pysr_model_selection))
+    results = load_results(get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection))
     P12s, P23s = get_period_ratios(args.Ngrid)
 
     fig, ax = plt.subplots(figsize=(8,6))
@@ -302,7 +308,7 @@ def plot_results(args, metric=None):
         path += '_std'
 
     if args.pysr_model_selection is not None:
-        path += f'_pysr_f2/{args.pysr_model_selection}'
+        path += f'_pysr_f2_v={args.pysr_version}/{args.pysr_model_selection}'
 
     path += '.png'
 
@@ -359,7 +365,7 @@ def compute_pysr_f2_results(args):
         results = results2
 
         # save the results
-        path = get_results_path(args.Ngrid, args.version, pysr_model_selection=model_selection)
+        path = get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection=model_selection)
         os.makedirs(os.path.dirname(path), exist_ok=True)
 
         with open(path, 'wb') as f:
@@ -372,7 +378,7 @@ def compute_pysr_f2_results(args):
 
 def plot_results_pysr_f2(args):
     # get the model selections by grepping for the files
-    path = get_results_path(args.Ngrid, args.version, pysr_model_selection='*')
+    path = get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection='*')
     files = os.listdir(os.path.dirname(path))
 
     # filter to those of form f'{i}.pkl'
