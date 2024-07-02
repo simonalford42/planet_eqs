@@ -58,7 +58,9 @@ def get_args():
     parser.add_argument('--compute', action='store_true')
     parser.add_argument('--collate', action='store_true')
 
-    parser.add_argument('--pysr_path', type=str, default=None) # PySR model to load and replace f2 with, e.g. 'sr_results/33060.pkl'
+    parser.add_argument('--pysr_version', type=str, default=33060) # sr_results/33060.pkl
+    parser.add_argument('--pysr_dir', type=str, default='../sr_results/')
+
     parser.add_argument('--pysr_model_selection', type=str, default=None, help='"best", "accuracy", "score", or an integer of the pysr equation complexity. If not provided, will do all complexities. If plotting, has to be an integer complexity')
 
     # parallel processing args
@@ -261,16 +263,16 @@ def plot_results(args, metric=None):
             plot_results(args, metric)
         return
 
-    results = load_results(get_results_path(args.Ngrid, args.version, args.pysr_model_selection))
+    results = load_results(get_results_path(args.Ngrid, args.version, pysr_model_selection=args.pysr_model_selection))
     P12s, P23s = get_period_ratios(args.Ngrid)
 
     fig, ax = plt.subplots(figsize=(8,6))
 
     # get the results for the specific metric
-    if args.plot == 'mean':
-        results = [d['mean'] if d is not None else np.NaN for d in results]
-    elif args.plot == 'std':
-        results = [d['std'] if d is not None else np.NaN for d in results]
+    if metric == 'mean':
+        results = [d['mean'] if d is not None else np.nan for d in results]
+    elif metric == 'std':
+        results = [d['std'] if d is not None else np.nan for d in results]
 
     results = np.array(results)
     X,Y,Z = get_centered_grid(P12s, P23s, results)
@@ -291,7 +293,7 @@ def plot_results(args, metric=None):
     ax.set_xlabel("P1/P2")
     ax.set_ylabel("P2/P3")
 
-    path = get_results_path(args.Ngrid, args.version, args.pysr_model_selection)
+    path = get_results_path(args.Ngrid, args.version)
     # get rid of .pkl
     path = path[:-4]
     path += '_plot'
@@ -380,8 +382,8 @@ def plot_results_pysr_f2(args):
     model_selections = sorted([int(f.split('.')[0]) for f in files])
 
     # if model selection is provided, filter to those
-    if model_selection is not None:
-        files = [file for file in files if file.startswith(model_selection)]
+    if args.pysr_model_selection is not None:
+        files = [file for file in files if file.startswith(args.pysr_model_selection)]
 
     # go from f'{model_selection}.pkl' to model_selection
     model_selections = [int(f.split('.')[0]) for f in files]
