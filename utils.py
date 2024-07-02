@@ -20,11 +20,25 @@ def freeze_module(model: torch.nn.Module):
         param.requires_grad = False
 
 
-def ckpt_path(version, seed=0, glob=False):
+def ckpt_path(version, seed=None, glob=False):
     if glob:
         return "results/" + str(version) + '_*'
-    else:
-        return "results/" + str(version) + '_' + str(seed)
+
+    if seed is None:
+        # detect which seeds are present by looking for directories of form 'results/{version}_{seed}'
+        seeds = [int(d.split('_')[-1])
+                 for d in os.listdir('results')
+                 if (d.startswith(str(version) + '_')
+                     and os.path.isdir(os.path.join('results', d)))]
+        if len(seeds) == 0:
+            raise ValueError(f"No results found for version {version}")
+        if len(seeds) > 1:
+            print(f'Warning: multiple seeds found for version {version}: {seeds}. Using first seed.')
+
+        seed = seeds[0]
+        print('Using seed:', seed)
+
+    return "results/" + str(version) + '_' + str(seed)
 
 
 # batched covariance calculation:

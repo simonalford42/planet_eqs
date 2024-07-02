@@ -1,5 +1,25 @@
 #!/usr/bin/env bash
 
+# compute and plot for BNN predictions
+python period_ratio_figure.py --Ngrid 4 --version 24880 --compute
+python period_ratio_figure.py --Ngrid 4 --version 24880 --plot
+
+# compute and plot for pysr f2 (need to have computed for BNN before running this)
+python period_ratio_figure.py --Ngrid 4 --version 24880 --pysr_path '../sr_results/33060.pkl' --compute
+python period_ratio_figure.py --Ngrid 4 --version 24880 --pysr_path '../sr_results/33060.pkl' --plot
+
+# compute using 4 parallel jobs
+python period_ratio_figure.py --Ngrid 400 --version 24880 --compute --parallel_ix 0 --parallel_total 4
+python period_ratio_figure.py --Ngrid 400 --version 24880 --compute --parallel_ix 1 --parallel_total 4
+python period_ratio_figure.py --Ngrid 400 --version 24880 --compute --parallel_ix 2 --parallel_total 4
+python period_ratio_figure.py --Ngrid 400 --version 24880 --compute --parallel_ix 3 --parallel_total 4
+
+# collate the parallel results and save
+python period_ratio_figure.py --Ngrid 400 --version 24880 --collate --parallel_total 4
+
+python period_ratio_figure.py --Ngrid 400 --version 24880 --pysr_path 'sr_results/33060.pkl' --plot
+
+# sbatch -J p0 --partition gpu run.sh --Ngrid 1600 --compute --ix 0 --total 80
 # sbatch -J p1 --partition gpu run.sh --Ngrid 1600 --compute --ix 1 --total 80
 # sbatch -J p2 --partition gpu run.sh --Ngrid 1600 --compute --ix 2 --total 80
 # sbatch -J p3 --partition gpu run.sh --Ngrid 1600 --compute --ix 3 --total 80
@@ -11,7 +31,7 @@
 # sbatch -J p9 --partition gpu run.sh --Ngrid 1600 --compute --ix 9 --total 80
 # sbatch -J p10 --partition gpu run.sh --Ngrid 1600 --compute --ix 10 --total 80
 # sbatch -J p11 --partition gpu run.sh --Ngrid 1600 --compute --ix 11 --total 80
-sbatch -J p12 --partition gpu run.sh --Ngrid 1600 --compute --ix 12 --total 80
+# sbatch -J p12 --partition gpu run.sh --Ngrid 1600 --compute --ix 12 --total 80
 # sbatch -J p13 --partition gpu run.sh --Ngrid 1600 --compute --ix 13 --total 80
 # sbatch -J p14 --partition gpu run.sh --Ngrid 1600 --compute --ix 14 --total 80
 # sbatch -J p15 --partition gpu run.sh --Ngrid 1600 --compute --ix 15 --total 80

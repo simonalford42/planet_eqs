@@ -23,30 +23,55 @@ import warnings
 warnings.filterwarnings("ignore", category=ResourceWarning)
 
 
+'''
+Example commands:
+
+# compute and plot for BNN predictions
+python period_ratio_figure.py --Ngrid 4 --version 24880 --compute
+python period_ratio_figure.py --Ngrid 4 --version 24880 --plot
+
+# compute and plot for pysr f2 (need to have computed for BNN before running this)
+python period_ratio_figure.py --Ngrid 4 --version 24880 --pysr_path 'sr_results/33060.pkl' --compute
+python period_ratio_figure.py --Ngrid 4 --version 24880 --pysr_path 'sr_results/33060.pkl' --plot
+
+# compute using 4 parallel jobs
+python period_ratio_figure.py --Ngrid 400 --version 24880 --compute --parallel_ix 0 --parallel_total 4
+python period_ratio_figure.py --Ngrid 400 --version 24880 --compute --parallel_ix 1 --parallel_total 4
+python period_ratio_figure.py --Ngrid 400 --version 24880 --compute --parallel_ix 2 --parallel_total 4
+python period_ratio_figure.py --Ngrid 400 --version 24880 --compute --parallel_ix 3 --parallel_total 4
+
+# collate the parallel results and save
+python period_ratio_figure.py --Ngrid 400 --version 24880 --collate --parallel_total 4
+
+# copy needed files to local so we can plot
+scopy bnn_chaos_model/figures/period_results/v=43139_ngrid=6_pysr_f2/ ~/code/bnn_chaos_model/figures/period_results/
+scopy bnn_chaos_model/figures/period_results/v=43139_ngrid=6.pkl ~/code/bnn_chaos_model/figures/period_results/
+'''
+
 def get_args():
     print(utils2.get_script_execution_command())
     parser = argparse.ArgumentParser()
     parser.add_argument('--Ngrid', '-n', type=int)
+    parser.add_argument('--version', '-v', type=int, default=43139)
 
-    parser.add_argument('--plot', '-p', type=str, choices=['mean', 'std'], default=None)
+    parser.add_argument('--plot', '-p', action='store_true')
     parser.add_argument('--compute', action='store_true')
     parser.add_argument('--collate', action='store_true')
 
-    parser.add_argument('--pysr_f2', type=str, default=None) # PySR model to load and replace f2 with, e.g. 'sr_results/hall_of_fame_f2_21101_0_1.pkl'
-    parser.add_argument('--model_selection', type=str, default=None, help='"best", "accuracy", "score", or an integer of the pysr equation complexity')
+    parser.add_argument('--pysr_path', type=str, default=None) # PySR model to load and replace f2 with, e.g. 'sr_results/33060.pkl'
+    parser.add_argument('--pysr_model_selection', type=str, default=None, help='"best", "accuracy", "score", or an integer of the pysr equation complexity')
 
     # parallel processing args
-    parser.add_argument('--ix', type=int, default=None)
-    parser.add_argument('--total', type=int, default=None)
+    # ix should be in [0, total)
+    parser.add_argument('--parallel_ix', '-i', type=int, default=None)
+    parser.add_argument('--parallel_total', '-t', type=int, default=None)
 
     args = parser.parse_args()
     return args
 
 
-def load_model():
-    version = 43139 # val loss 1.603
-    model = spock.NonSwagFeatureRegressor(version=version)
-    return model
+def load_model(version):
+    return spock.NonSwagFeatureRegressor(version=version)
 
 
 def simulation(par):
@@ -137,10 +162,9 @@ def get_parameters(P12s, P23s):
     return parameters
 
 
-def compute_results_for_parameters(parameters):
+def compute_results_for_parameters(parameters, model):
     simulations = [get_simulation(par) for par in parameters]
 
-    model = load_model()
     results = [get_model_prediction(sim, model) for sim in simulations]
     return results
 
@@ -152,36 +176,38 @@ def get_list_chunk(lst, ix, total):
              get_list_chunk([0,1,2,3,4,5,6,7,8,9], 1, 3) -> [2,3,4]
              get_list_chunk([0,1,2,3,4,5,6,7,8,9], 2, 3) -> [5,6,7,8,9]
     '''
+    assert ix < total
     chunk_size = len(lst) // total
     start = ix * chunk_size
     end = start + chunk_size if ix < total - 1 else len(lst)
     return lst[start:end]
 
 
-def compute_results(Ngrid, parallel_ix=None, parallel_total=None):
-    P12s, P23s = get_period_ratios(Ngrid)
+def compute_results(args):
+    model = load_model(args.version)
+    P12s, P23s = get_period_ratios(args.Ngrid)
     parameters = get_parameters(P12s, P23s)
-    if parallel_ix is not None:
-        parameters = get_list_chunk(parameters, parallel_ix, parallel_total)
+    if args.parallel_ix is not None:
+        parameters = get_list_chunk(parameters, args.parallel_ix, args.parallel_total)
 
-    results = compute_results_for_parameters(parameters)
+    results = compute_results_for_parameters(parameters, model)
 
     # save the results
-    path = get_results_path(Ngrid, parallel_ix, parallel_total)
+    path = get_results_path(args.Ngrid, args.version, args.parallel_ix, args.parallel_total, args.pysr_model_selection)
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
     with open(path, 'wb') as f:
         pickle.dump(results, f)
 
-    print('saved results to', path)
+    print('Saved results to', path)
     return results
 
 
-def get_results_path(Ngrid, parallel_ix=None, parallel_total=None, model_selection=None):
-    path = f'period_results/results_ngrid={Ngrid}_bnn'
+def get_results_path(Ngrid, version, parallel_ix=None, parallel_total=None, pysr_model_selection=None):
+    path = f'period_results/v={version}_ngrid={Ngrid}'
 
-    if model_selection is not None:
-        path += f'_pysr_f2/{model_selection}'
+    if pysr_model_selection is not None:
+        path += f'_pysr_f2/{pysr_model_selection}'
 
     if parallel_ix is not None:
         path += f'/{parallel_ix}-{parallel_total}'
@@ -195,11 +221,11 @@ def load_results(path):
         return pickle.load(f)
 
 
-def collate_parallel_results(Ngrid, parallel_total):
+def collate_parallel_results(args):
     '''load the parallel results and save as one big list'''
     results = []
-    for ix in range(parallel_total):
-        path = get_results_path(Ngrid, ix, parallel_total)
+    for ix in range(args.parallel_total):
+        path = get_results_path(args.Ngrid, args.version, ix, args.parallel_total)
         try:
             sub_results = load_results(path)
         except FileNotFoundError:
@@ -223,22 +249,28 @@ def collate_parallel_results(Ngrid, parallel_total):
 
     # concatenate into one big list of results, maintaining ordering
     results = [result for sub_results in results for result in sub_results]
-    path = get_results_path(Ngrid)
+    path = get_results_path(args.Ngrid, args.version)
     with open(path, 'wb') as f:
         pickle.dump(results, f)
-    print('saved results to', path)
+    print('Saved results to', path)
 
 
-def plot_results(results, Ngrid, metric, model_selection=None):
-    P12s, P23s = get_period_ratios(Ngrid)
+def plot_results(args, metric=None):
+    if metric is None:
+        for metric in ['mean', 'std']:
+            plot_results(args, metric)
+        return
+
+    results = load_results(get_results_path(args.Ngrid, args.version, args.pysr_model_selection))
+    P12s, P23s = get_period_ratios(args.Ngrid)
 
     fig, ax = plt.subplots(figsize=(8,6))
 
     import pdb; pdb.set_trace()
     # get the results for the specific metric
-    if metric == 'mean':
+    if args.plot == 'mean':
         results = [d['mean'] if d is not None else np.NaN for d in results]
-    elif metric == 'std':
+    elif args.plot == 'std':
         results = [d['std'] if d is not None else np.NaN for d in results]
 
     results = np.array(results)
@@ -260,43 +292,33 @@ def plot_results(results, Ngrid, metric, model_selection=None):
     ax.set_xlabel("P1/P2")
     ax.set_ylabel("P2/P3")
 
-    s = f'bnn_ngrid={Ngrid}'
+    path = get_results_path(args.Ngrid, args.version, args.pysr_model_selection)
+    # get rid of .pkl
+    path = path[:-4]
+    path += '_plot'
 
     if metric == 'std':
-        s += '_std'
-    if model_selection is not None:
-        s += f'_pysr_f2/{model_selection}'
+        path += '_std'
 
-    s = 'period_results/period_ratio_' + s + '.png'
-    os.makedirs(os.path.dirname(s), exist_ok=True)
-    plt.savefig(s, dpi=800)
-    print('saved figure to', s)
-    assert 0
+    if args.pysr_model_selection is not None:
+        path += f'_pysr_f2/{args.pysr_model_selection}'
 
+    path += '.png'
 
-def pair_complexities(l1, l2):
-    def closest_value_in_list(value, lst):
-        return lst[np.argmin([abs(value - x) for x in lst])]
-
-    swap = len(l2) > len(l1)
-    if swap:
-        l1, l2 = l2, l1
-
-    complexities = [(val, closest_value_in_list(val, l2)) for val in l1]
-    if swap:
-        complexities = [(b, a) for a, b in complexities]
-
-    return complexities
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    plt.savefig(path, dpi=800)
+    print('Saved figure to', path)
+    plt.close(fig)
 
 
+def compute_pysr_f2_results(args):
+    results = load_results(get_results_path(args.Ngrid, args.version))
 
-
-def compute_pysr_f2_results(results, sr_results_path, model_selection=None):
-    if model_selection is None:
-        reg = pickle.load(open(sr_results_path, 'rb'))
+    if args.pysr_model_selection is None:
+        reg = pickle.load(open(args.pysr_path, 'rb'))
         model_selections = list(reg.equations_[0]['complexity'])
     else:
-        model_selections = [model_selection]
+        model_selections = [args.pysr_model_selection]
 
     f1_results = [d['f1'] if d is not None else None for d in results]
     good_ixs = np.array([i for i in range(len(f1_results)) if f1_results[i] is not None])
@@ -305,7 +327,7 @@ def compute_pysr_f2_results(results, sr_results_path, model_selection=None):
     batch = torch.tensor(batch).float().cuda()
 
     for model_selection in model_selections:
-        regress_nn = modules.PySRNet(sr_results_path, model_selection).cuda()
+        regress_nn = modules.PySRNet(args.pysr_path, model_selection).cuda()
         pred = regress_nn(batch).detach().cpu().numpy()
         results = np.full((len(f1_results), pred.shape[1]), np.NaN)
         results[good_ixs] = pred
@@ -325,47 +347,49 @@ def compute_pysr_f2_results(results, sr_results_path, model_selection=None):
         results = results2
 
         # save the results
-        path = get_results_path(Ngrid, model_selection=model_selection)
+        path = get_results_path(args.Ngrid, args.version, pysr_model_selection=model_selection)
         os.makedirs(os.path.dirname(path), exist_ok=True)
 
         with open(path, 'wb') as f:
             pickle.dump(results, f)
 
-        print('saved results to', path)
+        print('Saved results to', path)
 
     return results
 
 
-def plot_results_pysr_f2(Ngrid, metric, model_selection):
-    # get the model selections by grepping for the files
-    path = get_results_path(Ngrid, model_selection='*')
-    files = os.listdir(os.path.dirname(path))
-    # go from f'{model_selection}.pkl' to model_selection
-    model_selections = sorted([int(f.split('.')[0]) for f in files])
+def plot_results_pysr_f2(args):
+    if args.pysr_model_selection is not None:
+        model_selections = [args.pysr_model_selection]
+    else:
+        # get the model selections by grepping for the files
+        path = get_results_path(args.Ngrid, args.version, pysr_model_selection='*')
+        files = os.listdir(os.path.dirname(path))
+        # go from f'{model_selection}.pkl' to model_selection
+        model_selections = sorted([int(f.split('.')[0]) for f in files])
+
+    original_model_selection = args.pysr_model_selection
     for model_selection in model_selections:
-        results = load_results(get_results_path(Ngrid, model_selection=model_selection))
-        plot_results(results, Ngrid, plot_metric, model_selection=model_selection)
+        args.pysr_model_selection = model_selection
+        plot_results(args)
+    args.pysr_model_selection = original_model_selection
 
 if __name__ == '__main__':
     args = get_args()
-    Ngrid = args.Ngrid
-    parallel_ix = args.ix
-    parallel_total = args.total
-    plot_metric = args.plot
-    pysr_f2 = args.pysr_f2
-    model_selection=args.model_selection
 
     if args.compute:
-        results = compute_results(Ngrid, parallel_ix, parallel_total)
-    if args.collate:
-        collate_parallel_results(Ngrid, parallel_total)
-    if args.pysr_f2 and not args.plot:
-        results = load_results(get_results_path(Ngrid))
-        compute_pysr_f2_results(results, pysr_f2, model_selection)
-    if args.plot:
-        if args.pysr_f2:
-            plot_results_pysr_f2(Ngrid, plot_metric, model_selection)
+        if args.pysr_path:
+            compute_pysr_f2_results(args)
         else:
-            results = load_results(get_results_path(Ngrid))
-            plot_results(results, Ngrid, plot_metric)
+            results = compute_results(args)
+
+    if args.collate:
+        collate_parallel_results(args)
+
+    if args.plot:
+        if args.pysr_path:
+            plot_results_pysr_f2(args)
+        else:
+            plot_results(args)
+
     print('Done')

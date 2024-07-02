@@ -23,7 +23,7 @@ from matplotlib import pyplot as plt
 import os
 
 
-def load(version, seed=0):
+def load(version, seed=None):
     path = utils.ckpt_path(version, seed)
 
     f = path + '/version=0-v0.ckpt'

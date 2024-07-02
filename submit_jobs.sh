@@ -1,5 +1,17 @@
 #!/usr/bin/env bash
 
+# ------------------------------- Fri June 28 -----------------------------------
+
+# bash train.sh --load_f1 43139 --pysr_f2 'sr_results/33060.pkl' --pysr_f2_model_selection best --eval
+
+complexity_values=(1 3 4 5 7 9 10 11 12 13 14 15 20 25 30)
+
+for complexity in "${complexity_values[@]}"; do
+    echo "Running for complexity: $complexity"
+    bash train.sh --load_f1 43139 --pysr_f2 'sr_results/33060.pkl' --pysr_f2_model_selection "$complexity" --eval
+done
+
+
 # ------------------------------- Thu June 27 -----------------------------------
 
 # sbatch -J sr --partition ellis --time 24:00:00 sr.sh --time_in_hours 22 --version 43139
