@@ -44,9 +44,10 @@ swa_args = {
     'swa_start' : int(0.5*TOTAL_STEPS), #step
     'swa_recording_lr_factor': 0.5,
     'c': 5,
-    'K': 30,
+    'K': args.K,
     'steps': TOTAL_STEPS,
     'swag': True,
+    'eval': args.eval,
 }
 
 output_filename = checkpoint_filename + '_output'
@@ -72,6 +73,8 @@ max_l2_norm = 0.1*sum(p.numel() for p in swag_model.parameters() if p.requires_g
 
 swag_model.hparams.steps = TOTAL_STEPS
 swag_model.hparams.epochs = epochs
+
+print(swag_model)
 
 lr_logger = LearningRateMonitor()
 name = 'full_swag_post_' + checkpoint_filename

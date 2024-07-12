@@ -48,6 +48,7 @@ def parse():
     parser.add_argument('--tsurv', action='store_true')
     parser.add_argument('--n_predicates', default=10, type=int, help='number predictates for if then f2')
     parser.add_argument('--fix_variance', action='store_true', help='fix the variance prediction to be one')
+    parser.add_argument('--K', type=int, default=30, help='run swag K choice')
 
     ########## architecture variant args ##########
     parser.add_argument('--f1_variant', type=str, default='linear',

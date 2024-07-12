@@ -36,7 +36,7 @@ def ckpt_path(version, seed=None, glob=False):
             print(f'Warning: multiple seeds found for version {version}: {seeds}. Using first seed.')
 
         seed = seeds[0]
-        print('Using seed:', seed)
+        # print('Using seed:', seed)
 
     return "results/" + str(version) + '_' + str(seed)
 

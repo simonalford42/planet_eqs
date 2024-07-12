@@ -4,6 +4,7 @@ import torch
 from petit20_survival_time import Tsurv
 import numpy as np
 from utils import assert_equal
+import modules
 
 LABELS = ['time', 'e+_near', 'e-_near', 'max_strength_mmr_near', 'e+_far', 'e-_far', 'max_strength_mmr_far', 'megno', 'a1', 'e1', 'i1', 'cos_Omega1', 'sin_Omega1', 'cos_pomega1', 'sin_pomega1', 'cos_theta1', 'sin_theta1', 'a2', 'e2', 'i2', 'cos_Omega2', 'sin_Omega2', 'cos_pomega2', 'sin_pomega2', 'cos_theta2', 'sin_theta2', 'a3', 'e3', 'i3', 'cos_Omega3', 'sin_Omega3', 'cos_pomega3', 'sin_pomega3', 'cos_theta3', 'sin_theta3', 'm1', 'm2', 'm3', 'nan_mmr_near', 'nan_mmr_far', 'nan_megno']
 
@@ -98,8 +99,11 @@ no_op_scaler = StandardScaler(with_mean=False, with_std=False)
 model.make_dataloaders(ssX=no_op_scaler, train_ssX=True)
 tsurv_validation_set = model.val_dataloader()
 # remake the dataloaders with data of correct scaling for NN
-model = load(12646)
+model = load(22040)
 model.make_dataloaders()
+eq_model = load(24880)
+eq_model.regress_nn = modules.PySRNet('sr_results/11003.pkl', model_selection=30)
+model = eq_model
 model_validation_set = model.val_dataloader()
 
 
@@ -128,33 +132,33 @@ for tsurv_batch, model_batch in zip(tsurv_validation_set, model_validation_set):
     model_rmse = model_rmse + rmse
     model_val_loss += _lossfnc(model_preds, model_y).sum()
 
-    tsurv_pred = tsurv(tsurv_X)
-    # add dummt std 0
-    testy = torch.stack([tsurv_pred, model_preds[:, 1].clone()], dim=-1)
-    assert_equal(testy.shape, tsurv_y.shape)
-    loss = _lossfnc(testy, tsurv_y).sum()
+    # tsurv_pred = tsurv(tsurv_X)
+    # # add dummt std 0
+    # testy = torch.stack([tsurv_pred, model_preds[:, 1].clone()], dim=-1)
+    # assert_equal(testy.shape, tsurv_y.shape)
+    # loss = _lossfnc(testy, tsurv_y).sum()
 
-    val_loss = val_loss + loss
+    # val_loss = val_loss + loss
 
-    rmse = rmse + (tsurv_pred - tsurv_y[:, 0]).pow(2).sum().item()
-    const9_rmse = const9_rmse + (9 - tsurv_y[:, 0]).pow(2).sum().item()
-    const9_val_loss = const9_val_loss + _lossfnc(torch.stack([torch.full_like(tsurv_y[:, 0], 9), model_preds[:, 1].clone()], dim=-1), tsurv_y).sum()
+    # rmse = rmse + (tsurv_pred - tsurv_y[:, 0]).pow(2).sum().item()
+    # const9_rmse = const9_rmse + (9 - tsurv_y[:, 0]).pow(2).sum().item()
+    # const9_val_loss = const9_val_loss + _lossfnc(torch.stack([torch.full_like(tsurv_y[:, 0], 9), model_preds[:, 1].clone()], dim=-1), tsurv_y).sum()
 
     for i in range(len(model_X)):
         x_store.append(model_X[i])
         y_store.append(model_y[i])
         y_model_store.append(model_preds[i])
-        y_tsurv_store.append(tsurv_pred[i])
+        # y_tsurv_store.append(tsurv_pred[i])
 
 x_store = torch.stack(x_store)
 y_store = torch.stack(y_store)
 y_model_store = torch.stack(y_model_store)
-y_tsurv_store = torch.stack(y_tsurv_store)
+# y_tsurv_store = torch.stack(y_tsurv_store)
 
-torch.save(x_store, 'x.pt')
-torch.save(y_store, 'y.pt')
-torch.save(y_model_store, 'y_model.pt')
-torch.save(y_tsurv_store, 'y_tsurv.pt')
+# torch.save(x_store, 'x.pt')
+# torch.save(y_store, 'y.pt')
+# torch.save(y_model_store, 'y_model.pt')
+# torch.save(y_tsurv_store, 'y_tsurv.pt')
 
 print('val loss: ', val_loss / N)
 print('model voss: ', model_val_loss / N)

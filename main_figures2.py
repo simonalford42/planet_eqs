@@ -234,8 +234,6 @@ def calc_scores(args, checkpoint_filename, logger=None, plot_random=False):
     prior = lambda logT: _prior(logT)/normalization
 
     # Let's generate random samples of that prior:
-
-
     n_samples = stable_past_9.sum()
     bins = n_samples*4
     top = 100.

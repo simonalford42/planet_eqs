@@ -1,15 +1,31 @@
 #!/usr/bin/env bash
 
+# ------------------------------- Mon July 8 -----------------------------------
+
+# sbatch -J swag --partition ellis run_swag.sh --version 24880 --eval
+bash run_swag.sh --version 24880 --eval
+
+# ------------------------------- Mon July 2 -----------------------------------
+
+# sbatch -J sr --partition gpu --time 2:00:00 sr.sh --time_in_hours 1 --version 24880 --target f2
+# sbatch -J sr --partition gpu --time 9:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2
+# sbatch -J sr --partition gpu --time 25:00:00 sr.sh --time_in_hours 24 --version 24880 --target f2
+
+# sbatch -J 14ft_f2froz --partition gpu train.sh --load_f1 24880 --pysr_f2 'sr_results/11003.pkl' --pysr_f2_model_selection 14 --freeze_f2 --total_steps 50000
+# bash train.sh --load_f1 24880 --pysr_f2 'sr_results/11003.pkl' --pysr_f2_model_selection 5 --freeze_f2 --total_steps 100
+# sbatch -J 14ft --partition gpu train.sh --load_f1 24880 --pysr_f2 'sr_results/11003.pkl' --pysr_f2_model_selection 14 --total_steps 50000
+# sbatch -J lincomp --partition ellis train.sh --load_f1 24880 --f2_variant linear --total_steps 50000
+
 # ------------------------------- Fri June 28 -----------------------------------
 
 # bash train.sh --load_f1 43139 --pysr_f2 'sr_results/33060.pkl' --pysr_f2_model_selection best --eval
 
-complexity_values=(1 3 4 5 7 9 10 11 12 13 14 15 20 25 30)
+# complexity_values=(1 3 4 5 7 9 10 11 12 13 14 15 20 25 30)
 
-for complexity in "${complexity_values[@]}"; do
-    echo "Running for complexity: $complexity"
-    bash train.sh --load_f1 43139 --pysr_f2 'sr_results/33060.pkl' --pysr_f2_model_selection "$complexity" --eval
-done
+# for complexity in "${complexity_values[@]}"; do
+#     echo "Running for complexity: $complexity"
+#     bash train.sh --load_f1 43139 --pysr_f2 'sr_results/33060.pkl' --pysr_f2_model_selection "$complexity" --eval
+# done
 
 
 # ------------------------------- Thu June 27 -----------------------------------

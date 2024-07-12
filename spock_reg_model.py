@@ -1370,6 +1370,9 @@ class SWAGModel(VarModel):
         self.swa_params['c'] = self.c
         self.swa_params['K'] = self.K
 
+        if 'eval' in swa_params and swa_params['eval']:
+            self.disable_optimization()
+
         return self
 
     def configure_optimizers(self):

@@ -78,7 +78,7 @@ INPUT_VARIABLE_NAMES = [LABELS[ix] for ix in INCLUDED_IXS]
 
 
 def load_inputs_and_targets(config):
-    model = spock_reg_model.load(version=config['version'], seed=config['seed'])
+    model = spock_reg_model.load(version=config['version'])
     model.make_dataloaders()
     model.eval()
 
@@ -123,6 +123,43 @@ def load_inputs_and_targets(config):
 
         n = X.shape[1] // 2
         variable_names = [f'm{i}' for i in range(n)] + [f's{i}' for i in range(n)]
+
+        if config['sr_residual']:
+            # 1. load the previous pysr results, using highest complexity
+            # 2. calculate mean and std from previous results (previous run must have used target=='f2')
+            # 3. concatenate mean and std to produce previous "prediction" of shape [B, 2]
+            # 4. subtract previous prediction from y to get residual target
+
+            # 1
+            with open(config['previous_sr_path'], 'rb') as f:
+                previous_sr_model = pickle.load(f)
+
+            # 2
+            summary_stats_np = out_dict['summary_stats'].detach().numpy()
+
+            # get the highest complexity equation
+            max_complexity_idx = previous_sr_model.equations['complexity'].max()
+            mean_equation = previous_sr_model.equations_[0].iloc[max_complexity_idx]
+            std_equation = previous_sr_model.equations_[1].iloc[max_complexity_idx]
+
+            # mean and std
+            results = []
+            for equation in mean_equation, std_equation:
+                lambda_func = equation['lambda_format']
+                evaluated_result = lambda_func(summary_stats_np)
+                # Ensure the result is reshaped to match the batch size
+                evaluated_result = evaluated_result.reshape(-1, 1)
+                results.append(evaluated_result)
+
+            # 3
+            previous_prediction = np.hstack(results)
+            assert_equal(previous_prediction.shape, (X.shape[0], 2))  # [B, 2]
+
+            # 4
+            y = y - previous_prediction
+
+
+
 
     elif config['target'] == 'f2_ifthen':
         # inputs to SR are the inputs to f2 neural network
@@ -310,7 +347,6 @@ def parse_args():
     # when importing from jupyter nb, it passes an arg to --f which we should just ignore
     parser.add_argument('--no_log', action='store_true', default=False, help='disable wandb logging')
     parser.add_argument('--version', type=int, help='')
-    parser.add_argument('--seed', type=int, default=0, help='default=0')
 
     parser.add_argument('--time_in_hours', type=float, default=1)
     parser.add_argument('--niterations', type=float, default=500000) # by default, use time in hours as limit
