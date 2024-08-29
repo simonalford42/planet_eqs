@@ -16,9 +16,12 @@
 #SBATCH --partition=ellis
 
 source /home/sca63/mambaforge/etc/profile.d/conda.sh
-conda activate bnn_period
 
 # Enable errexit (exit on error)
 set -e
 
-python period_ratio_figure.py "$@"
+# conda activate bnn_period
+# python period_ratio_figure.py "$@"
+
+conda activate bnn_chaos_model
+python multiswag_5_planet.py "$@"

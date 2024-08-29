@@ -15,6 +15,7 @@ import time
 from tqdm.notebook import tqdm
 import utils
 import os
+import main_figures
 
 command = utils.get_script_execution_command()
 print(command)
@@ -113,5 +114,4 @@ pkl.dump(swag_model.ssX, open(output_filename + '_ssX.pkl', 'wb'))
 print('saved model to ' + output_filename + '.pkl ...')
 
 print('Finished running')
-import main_figures2
-main_figures2.calc_scores(args, checkpoint_filename, logger=logger)
+main_figures.calc_scores(args, checkpoint_filename, logger=logger)

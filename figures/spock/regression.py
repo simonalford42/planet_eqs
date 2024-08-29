@@ -27,6 +27,7 @@ import torch
 import numpy as np
 import time
 from tqdm.notebook import tqdm
+import petit
 
 from numba import jit
 
@@ -36,12 +37,17 @@ profile = lambda _: _
 
 
 class NonSwagFeatureRegressor():
-    def __init__(self, version, seed=0, cuda=True):
+    # def __init__(self, model, cuda=True):
+    def __init__(self, model, cuda=True):
         pwd = os.path.dirname(__file__)
         self.cuda = cuda
 
-        # Load model
-        self.model = spock_reg_model.load(version, seed)
+        if type(model) == int:
+            version = model
+            self.model = spock_reg_model.load(version, seed=0)
+        else:
+            self.model = model
+
         if self.cuda:
             self.model.cuda()
 
@@ -72,7 +78,7 @@ class NonSwagFeatureRegressor():
         ssX.var_ = ssX.scale_**2
         self.ssX = ssX
 
-    def predict(self, sim, indices=None):
+    def predict(self, sim, indices=None, use_petit=False):
         """Estimate instability time for a given simulation.
 
         :sim: The rebound simulation.
@@ -102,6 +108,7 @@ class NonSwagFeatureRegressor():
         tseries = np.array(tseries)
         simt = sim.copy()
         alltime = []
+        allpetit = []
         for i, trio in enumerate(trios):
             sim = simt.copy()
             # These are the .npy.
@@ -109,17 +116,25 @@ class NonSwagFeatureRegressor():
             cur_tseries = tseries[None, i, ::10]
             mass_array = np.array([sim.particles[j].m/sim.particles[0].m for j in trio])
             X = data_setup_kernel(mass_array, cur_tseries)
-            X = self.ssX.transform(X.reshape(-1, X.shape[-1])).reshape(X.shape)
-            X = torch.tensor(X).float()
-            if self.cuda:
-                X = X.cuda()
+            if use_petit:
+                petit_X = X  # no transform for petit data
+                petit_out = petit.tsurv(petit_X)
+                alltime.append(petit_out)
+            else:
+                X = self.ssX.transform(X.reshape(-1, X.shape[-1])).reshape(X.shape)
+                X = torch.tensor(X).float()
+                if self.cuda:
+                    X = X.cuda()
 
-            out = self.model(X, noisy_val=False, return_intermediates=True)
-            alltime.append(out)
+                out = self.model(X, noisy_val=False, return_intermediates=True)
+                alltime.append(out)
 
         # keeping the old code above in case we ever want to do more than one...
         assert len(alltime) == 1, 'current implementation only made for one calculation'
         out = alltime[0]
+
+        if use_petit:
+            return {'petit': petit_out}
 
         # from VarModel.forward:
         # out = {
@@ -132,6 +147,9 @@ class NonSwagFeatureRegressor():
         # }
         return out
 
+    def sample_full_swag(self, X_sample):
+        """nonswag version"""
+        return self.model(X_sample, noisy_val=False)
 
     @profile
     def sample(self, sim, indices=None, samples=1000):

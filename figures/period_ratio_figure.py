@@ -1,5 +1,6 @@
 import pysr
 import warnings
+# import spock_reg_model
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 import sys
@@ -21,7 +22,6 @@ import argparse
 import warnings
 warnings.filterwarnings("ignore", category=ResourceWarning)
 
-
 '''
 Example commands:
 
@@ -42,6 +42,10 @@ python period_ratio_figure.py --Ngrid 400 --version 24880 --compute --parallel_i
 # collate the parallel results and save
 python period_ratio_figure.py --Ngrid 400 --version 24880 --collate
 
+# compute and plot for petit predictions
+python period_ratio_figure.py --Ngrid 4 --petit --compute
+python period_ratio_figure.py --Ngrid 4 --petit --plot
+
 # copy needed files to local so we can plot
 scopy bnn_chaos_model/figures/period_results/v=43139_ngrid=6_pysr_f2_v=33060/ ~/code/bnn_chaos_model/figures/period_results/
 scopy bnn_chaos_model/figures/period_results/v=43139_ngrid=6.pkl ~/code/bnn_chaos_model/figures/period_results/
@@ -56,6 +60,7 @@ def get_args():
     parser.add_argument('--plot', '-p', action='store_true')
     parser.add_argument('--compute', action='store_true')
     parser.add_argument('--collate', action='store_true')
+    parser.add_argument('--petit', action='store_true')
 
     parser.add_argument('--pysr_version', type=str, default=None) # sr_results/33060.pkl
     parser.add_argument('--pysr_dir', type=str, default='../sr_results/')  # folder containing pysr results pkl
@@ -74,11 +79,14 @@ def get_args():
     else:
         args.pysr_path = None
 
+
     return args
 
 
 def load_model(version):
-    return spock.NonSwagFeatureRegressor(version=version)
+    # model = spock_reg_model.load(version, seed=0)
+    # return spock.NonSwagFeatureRegressor(model)
+    return spock.NonSwagFeatureRegressor(version)
 
 
 def simulation(par):
@@ -117,18 +125,24 @@ def get_simulation(par):
     return sim
 
 
-def get_model_prediction(sim, model):
+def get_model_prediction(sim, model, use_petit=False):
     sim = sim.copy()
     sim.dt = 0.05
     sim.init_megno()
     sim.exit_max_distance = 20.
     try:
-        out_dict = model.predict(sim)
-        return {
-            'mean': out_dict['mean'][0,0].detach().cpu().numpy(),
-            'std': out_dict['std'][0,0].detach().cpu().numpy(),
-            'f1': out_dict['summary_stats'][0].detach().cpu().numpy()
-        }
+        out_dict = model.predict(sim, use_petit=use_petit)
+        if use_petit:
+            assert_equal(out_dict['petit'].shape, (1,))
+            return {
+                'petit': out_dict['petit'][0].detach().cpu().numpy(),
+            }
+        else:
+            return {
+                'mean': out_dict['mean'][0,0].detach().cpu().numpy(),
+                'std': out_dict['std'][0,0].detach().cpu().numpy(),
+                'f1': out_dict['summary_stats'][0].detach().cpu().numpy(),
+            }
 
     except rebound.Escape:
         return None
@@ -169,10 +183,10 @@ def get_parameters(P12s, P23s):
     return parameters
 
 
-def compute_results_for_parameters(parameters, model):
+def compute_results_for_parameters(parameters, model, use_petit=False):
     simulations = [get_simulation(par) for par in parameters]
 
-    results = [get_model_prediction(sim, model) for sim in simulations]
+    results = [get_model_prediction(sim, model, use_petit=use_petit) for sim in simulations]
     return results
 
 
@@ -197,10 +211,10 @@ def compute_results(args):
     if args.parallel_ix is not None:
         parameters = get_list_chunk(parameters, args.parallel_ix, args.parallel_total)
 
-    results = compute_results_for_parameters(parameters, model)
+    results = compute_results_for_parameters(parameters, model, use_petit=args.petit)
 
     # save the results
-    path = get_results_path(args.Ngrid, args.version, args.parallel_ix, args.parallel_total, args.pysr_version, args.pysr_model_selection)
+    path = get_results_path(args.Ngrid, args.version, args.parallel_ix, args.parallel_total, args.pysr_version, args.pysr_model_selection, args.petit)
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
     with open(path, 'wb') as f:
@@ -210,11 +224,21 @@ def compute_results(args):
     return results
 
 
-def get_results_path(Ngrid, version, parallel_ix=None, parallel_total=None, pysr_version=None, pysr_model_selection=None):
-    path = f'period_results/v={version}_ngrid={Ngrid}'
+def get_results_path(Ngrid, version=None, parallel_ix=None, parallel_total=None, pysr_version=None, pysr_model_selection=None, use_petit=False):
+    if use_petit:
+        path = f'period_results/petit_ngrid={Ngrid}'
+    else:
+        path = f'period_results/v={version}_ngrid={Ngrid}'
 
-    if pysr_model_selection is not None:
-        path += f'_pysr_f2_v={pysr_version}/{pysr_model_selection}'
+        if pysr_model_selection is not None:
+            if pysr_model_selection == 'accuracy':
+                # get the best (highest accuracy) model selection
+                files = os.listdir(path + f'_pysr_f2_v={pysr_version}')
+                files = [file for file in files if file.endswith('.pkl')]
+                model_selections = [int(file.split('.')[0]) for file in files]
+                pysr_model_selection = max(model_selections)
+
+            path += f'_pysr_f2_v={pysr_version}/{pysr_model_selection}'
 
     if parallel_ix is not None:
         path += f'/{parallel_ix}-{parallel_total}'
@@ -233,7 +257,7 @@ def collate_parallel_results(args):
     results = []
     if args.parallel_total is None:
         # try to detect the total
-        files = os.listdir(get_results_path(args.Ngrid, args.version)[:-4])
+        files = os.listdir(get_results_path(args.Ngrid, args.version, use_petit=args.petit)[:-4])
         # filter to those of form f'{ix}-{total}.pkl'
         files = [file for file in files if file.endswith('.pkl')]
         # get the total. use the largest possible total
@@ -243,14 +267,19 @@ def collate_parallel_results(args):
     else:
         total = args.parallel_total
 
+    missing = False
     for ix in range(total):
-        path = get_results_path(args.Ngrid, args.version, ix, total)
+        path = get_results_path(args.Ngrid, args.version, ix, total, use_petit=args.petit)
         try:
             sub_results = load_results(path)
         except FileNotFoundError:
             sub_results = None
             print('Missing results for ix', ix)
+            missing = True
         results.append(sub_results)
+
+    if not missing:
+        print('All subresults files found!')
 
     length = None
     for sub_results in results:
@@ -268,25 +297,27 @@ def collate_parallel_results(args):
 
     # concatenate into one big list of results, maintaining ordering
     results = [result for sub_results in results for result in sub_results]
-    path = get_results_path(args.Ngrid, args.version)
+    path = get_results_path(args.Ngrid, args.version, use_petit=args.petit)
     with open(path, 'wb') as f:
         pickle.dump(results, f)
     print('Saved results to', path)
 
 
 def plot_results(args, metric=None):
-    if metric is None:
+    if not args.petit and metric is None:
         for metric in ['mean', 'std']:
             plot_results(args, metric)
         return
 
-    results = load_results(get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection))
+    results = load_results(get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection, use_petit=args.petit))
     P12s, P23s = get_period_ratios(args.Ngrid)
 
     fig, ax = plt.subplots(figsize=(8,6))
 
     # get the results for the specific metric
-    if metric == 'mean':
+    if args.petit:
+        results = [d['petit'] if d is not None else np.nan for d in results]
+    elif metric == 'mean':
         results = [d['mean'] if d is not None else np.nan for d in results]
     elif metric == 'std':
         results = [d['std'] if d is not None else np.nan for d in results]
@@ -294,7 +325,12 @@ def plot_results(args, metric=None):
     results = np.array(results)
     X,Y,Z = get_centered_grid(P12s, P23s, results)
 
-    if metric == 'std':
+    if args.petit:
+        cmap = plt.cm.inferno.copy().reversed()
+        cmap.set_bad(color='white')
+        im = ax.pcolormesh(X, Y, Z, cmap=cmap)
+        label = "Petit 2020 log(T_unstable)"
+    elif metric == 'std':
         cmap = plt.cm.inferno.copy().reversed()
         cmap.set_bad(color='white')
         im = ax.pcolormesh(X, Y, Z, vmin=0, vmax=6, cmap=cmap)
@@ -310,7 +346,7 @@ def plot_results(args, metric=None):
     ax.set_xlabel("P1/P2")
     ax.set_ylabel("P2/P3")
 
-    path = get_results_path(args.Ngrid, args.version)
+    path = get_results_path(args.Ngrid, args.version, use_petit=args.petit)
     # get rid of .pkl
     path = path[:-4]
     path += '_plot'
@@ -411,6 +447,48 @@ def plot_results_pysr_f2(args):
         args.pysr_model_selection = model_selection
         plot_results(args)
     args.pysr_model_selection = original_model_selection
+
+
+def calculate_mse(Ngrid, version, pysr_version):
+    # since we don't have a ground truth, use the BNN predictions as ground truth
+    # compare petit and pysr f2
+    bnn_results = load_results(get_results_path(Ngrid, version))
+    petit_results = load_results(get_results_path(Ngrid, use_petit=True))
+    pysr_f2_results = load_results(get_results_path(Ngrid, version, pysr_version=pysr_version, pysr_model_selection='accuracy'))
+
+    bnn_results = [d['mean'] if d is not None else np.nan for d in bnn_results]
+    petit_results = [d['petit'] if d is not None else np.nan for d in petit_results]
+    pysr_f2_results = [d['mean'] if d is not None else np.nan for d in pysr_f2_results]
+
+    bnn_results, petit_results, pysr_f2_results = np.array(bnn_results), np.array(petit_results), np.array(pysr_f2_results)
+
+    assert_equal(bnn_results.shape, petit_results.shape)
+    assert_equal(bnn_results.shape, pysr_f2_results.shape)
+    assert_equal(len(bnn_results.shape), 1)
+
+    # ignore entries where bnn_results is nan
+    nan_ixs = np.isnan(bnn_results)
+    bnn_results = bnn_results[~nan_ixs]
+    petit_results = petit_results[~nan_ixs]
+    pysr_f2_results = pysr_f2_results[~nan_ixs]
+
+    # ignore entries where petit_results is nan
+    nan_ixs = np.isnan(petit_results)
+    bnn_results = bnn_results[~nan_ixs]
+    petit_results = petit_results[~nan_ixs]
+    pysr_f2_results = pysr_f2_results[~nan_ixs]
+
+    # ignore entries where pysr_f2 is nan
+    nan_ixs = np.isnan(pysr_f2_results)
+    bnn_results = bnn_results[~nan_ixs]
+    petit_results = petit_results[~nan_ixs]
+    pysr_f2_results = pysr_f2_results[~nan_ixs]
+
+    # calculate mse
+    mse_petit = np.mean((bnn_results - petit_results)**2)
+    mse_pysr_f2 = np.mean((bnn_results - pysr_f2_results)**2)
+    print('MSE Petit:', mse_petit)
+    print('MSE PySR F2:', mse_pysr_f2)
 
 
 if __name__ == '__main__':
