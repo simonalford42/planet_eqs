@@ -107,7 +107,7 @@ if args['calc_scores']:
 
     # just do this, don't train
     import main_figures
-    main_figures.calc_scores_nonswag(args, model, logger)
+    main_figures.calc_scores_nonswag(model, logger, plot_random=args['plot_random'], train_all=args['train_all'])
     logger.save()
     logger.finalize('success')
     import sys
@@ -128,7 +128,7 @@ logger.log_hyperparams(params=args)
 logger.experiment.config['val_loss'] = checkpointer.best_model_score.item()
 
 import main_figures
-main_figures.calc_scores_nonswag(args, model, logger=logger)
+main_figures.calc_scores_nonswag(model, logger=logger, plot_random=args['plot_random'], train_all=args['train_all'])
 
 logger.save()
 logger.finalize('success')

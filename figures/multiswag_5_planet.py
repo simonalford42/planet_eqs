@@ -550,7 +550,7 @@ from matplotlib import ticker
 
 
 # +
-cleaned['petit'] = np.log10(pd.Series([Tsurv(
+cleaned['petitf'] = np.log10(pd.Series([Tsurv(
         *list(cleaned[['p12', 'p23']].iloc[i]),
         [m_planet, m_planet, m_planet],
         res=False,
@@ -584,5 +584,5 @@ cleaned['pperiodetitf'] = np.log10(pd.Series([Tsurv(
 
 import time
 cleaned.to_csv(f'cur_plot_dataset_{time.time()}.csv')
-make_plot(cleaned, version, pysr_version=args.pysr_version)
+make_plot(cleaned, version, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection)
 print('made plot')

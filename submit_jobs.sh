@@ -1,10 +1,26 @@
 #!/usr/bin/env bash
 
 
+# Thu August 29
+
+model_selection_values=(5 7 9 11 14 18 20 27 29)
+# model_selection_values=(3)
+for val in "${model_selection_values[@]}"
+do
+    bash train.sh --load_f1 24880 --pysr_f2 "sr_results/11003.pkl" --pysr_f2_model_selection "$val" --eval
+done
+
+# sbatch -J eval7 --partition gpu train.sh --load_f1 24880 --pysr_f2 "sr_results/51897.pkl" --pysr_f2_model_selection accuracy --eval
+# sbatch -J eval3 --partition gpu train.sh --load_f1 24880 --pysr_f2 "sr_results/3535.pkl" --pysr_f2_model_selection accuracy --eval
+# sbatch -J eval7_2 --partition gpu train.sh --load_f1 24880 --pysr_f2 "sr_results/78515.pkl" --pysr_f2_model_selection accuracy --eval
+
+# sbatch -J sr7 --partition ellis --time 7-00:00:00 sr.sh --time_in_hours 160 --version 1021 --target f2 --max_size 60
+# sbatch -J sr7 --partition gpu --time 7-00:00:00 sr.sh --time_in_hours 160 --version 1021 --target f2 --max_size 60
+
 # Thu August 22
 
 # sbatch -J evaleqs --partition gpu train.sh --load_f1 24880 --pysr_f2 'sr_results/11003.pkl' --pysr_f2_model_selection accuracy --calc_scores
-sbatch -J evaleqs --partition gpu train.sh --load_f1 24880 --pysr_f2 'sr_results/11003.pkl' --pysr_f2_model_selection 1 --calc_scores
+# sbatch -J evaleqs --partition gpu train.sh --load_f1 24880 --pysr_f2 'sr_results/11003.pkl' --pysr_f2_model_selection 1 --calc_scores
 # sbatch -J evaleqs --partition gpu train.sh --load_f1 24880 --pysr_f2 'sr_results/11003.pkl' --pysr_f2_model_selection 3 --calc_scores
 # sbatch -J evaleqs --partition gpu train.sh --load_f1 24880 --pysr_f2 'sr_results/11003.pkl' --pysr_f2_model_selection 7 --calc_scores
 # sbatch -J evaleqs --partition gpu train.sh --load_f1 24880 --pysr_f2 'sr_results/11003.pkl' --pysr_f2_model_selection 14 --calc_scores
@@ -14,19 +30,22 @@ sbatch -J evaleqs --partition gpu train.sh --load_f1 24880 --pysr_f2 'sr_results
 
 # Thu August 14
 
-# sbatch -J 50-1k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 50 --n 1000
-# sbatch -J 100-1k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 100 --n 1000
-# sbatch -J 50-5k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 50 --n 5000
-# sbatch -J 100-5k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 100 --n 5000
-# sbatch -J 500-5k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 500 --n 5000
-# sbatch -J 1000-5k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 1000 --n 5000
-# sbatch -J 50-10k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 50 --n 10000
-# sbatch -J 100-10k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 100 --n 10000
-# sbatch -J 500-10k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 500 --n 10000
-# sbatch -J 1k-10k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 1000 --n 10000
-# sbatch -J 100-20k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 100 --n 20000
-# sbatch -J 500-20k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 500 --n 20000
-# sbatch -J 1k-20k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 1000 --n 20000
+# 3.35 # sbatch -J 50-1k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 50 --n 1000
+# 2.80 # sbatch -J 100-1k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 100 --n 1000
+
+# 2.31 # sbatch -J 50-5k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 50 --n 5000
+# 2.30 # sbatch -J 100-5k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 100 --n 5000
+# 2.36 sbatch -J 500-5k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 500 --n 5000
+# 2.28 sbatch -J 1000-5k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 1000 --n 5000
+
+# 2.36 # sbatch -J 50-10k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 50 --n 10000
+# 2.52 # sbatch -J 100-10k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 100 --n 10000
+# 2.30 # sbatch -J 500-10k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 500 --n 10000
+# 2.45 # sbatch -J 1k-10k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 1000 --n 10000
+
+# 2.32 # sbatch -J 100-20k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 100 --n 20000
+# 2.39 # sbatch -J 500-20k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 500 --n 20000
+# 2.31 # sbatch -J 1k-20k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 1000 --n 20000
 
 
 # sbatch -J f2_l2 --partition gpu f2_prune_train.sh --latent 10 --load_f1 24880 --prune_f2_topk 2

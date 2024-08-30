@@ -606,6 +606,9 @@ def get_data(
 def soft_clamp(x, lo, high):
     return 0.5*(torch.tanh(x)+1)*(high-lo) + lo
 
+def hard_clamp(x, lo, high):
+    return torch.max(torch.min(x, torch.tensor(high)), torch.tensor(lo))
+
 
 def safe_log_erf(x):
     base_mask = x < -1
@@ -719,12 +722,20 @@ class VarModel(pl.LightningModule):
 
 
     def path(self):
-        path = f'{self.hparams["version"]}_{self.hparams["seed"]}'
+        version = self.hparams['version']
+        if 'eval' in self.hparams and self.hparams['eval']:
+            if 'load_f1' in self.hparams and self.hparams['load_f1']:
+                version =  self.hparams['load_f1']
+            if 'load_f1_f2' in self.hparams and self.hparams['load_f1_f2']:
+                version =  self.hparams['load_f1_f2']
+
+        path = f'{version}_{self.hparams["seed"]}'
 
         if self.hparams['pysr_f2'] or type(self.regress_nn) == modules.PySRNet:
             # go from 'sr_results/11003.pkl' to 11003 by extracting the number from it
             pysr_version = int(''.join(filter(str.isdigit, self.regress_nn.filepath)))
             path += f'_pysr_f2_v={pysr_version}'
+            path += f'_ms={self.regress_nn.model_selection}'
 
         return path
 
@@ -1063,6 +1074,8 @@ class VarModel(pl.LightningModule):
         if type(self.regress_nn) in [modules.PySRNet]:
             mu = testy[:, [0]]
             std = testy[:, [1]]
+            mu = hard_clamp(mu, 4.0, 12.0)
+            std = hard_clamp(std, self.lowest, 6.0)
         else:
             mu = soft_clamp(testy[:, [0]], 4.0, 12.0)
             std = soft_clamp(testy[:, [1]], self.lowest, 6.0)

@@ -354,7 +354,7 @@ def parse_args():
     parser.add_argument('--target', type=str, default='f2_direct', choices=['f1', 'f2', 'f2_ifthen', 'f2_direct', 'f2_2'])
     parser.add_argument('--residual', action='store_true', help='do residual training of your target')
     parser.add_argument('--n', type=int, default=10000, help='number of data points for the SR problem')
-    parser.add_argument('--batch_size', type=int, default=100, help='number of data points for the SR problem')
+    parser.add_argument('--batch_size', type=int, default=500, help='number of data points for the SR problem')
     parser.add_argument('--sr_residual', action='store_true', help='do residual training of your target with previous sr run as base')
     parser.add_argument('--loss_fn', type=str, choices=['mse', 'll'], help='choose "ll" to use loglikelidhood loss')
     parser.add_argument('--previous_sr_path', type=str, default='sr_results/92985.pkl')

@@ -358,6 +358,7 @@ class PySRNet(nn.Module):
         self.filepath = filepath
         assert os.path.exists(filepath), f'filepath does not exist: {filepath}'
         self.module_list = load_pysr_module_list(filepath, model_selection)
+        self.model_selection = model_selection
 
     def forward(self, x):
         # input: [B, d]

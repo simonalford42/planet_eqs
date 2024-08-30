@@ -55,7 +55,7 @@ for l in colorstr.replace(' ', '').split('\n'):
         shade = 0
 colors = np.array(colors)/255.0
 
-def make_plot(cleaned, version, pysr_version=None, t20=True):
+def make_plot(cleaned, version, pysr_version=None, t20=True, pysr_model_selection=None):
 # +
 # %matplotlib inline
     # plt.style.use('science')
@@ -118,6 +118,8 @@ def make_plot(cleaned, version, pysr_version=None, t20=True):
                frameon=True, fontsize=8)
 
     s = '' if pysr_version is None else f'pysr={pysr_version}_'
+    if pysr_model_selection is not None:
+        s += f'ms={pysr_model_selection}_'
     path = basedir_bayes + '/' + f'comparison_v{version}_' + s + '5planet.png'
     fig.savefig(path)
     print('Saved to', path)

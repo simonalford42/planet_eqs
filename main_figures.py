@@ -596,15 +596,18 @@ def calc_scores(args, checkpoint_filename, logger=None, plot_random=False):
         logger.log_metrics({"classification": wandb.Image(fig)})
 
 
-def calc_scores_nonswag(args, model, logger=None, plot_random=False, use_petit=False):
+def calc_scores_nonswag(model, train_all=False, logger=None, plot_random=False, use_petit=False):
     model.eval()
     model.cuda()
 
     path = 'plots/' + model.path()
-    if plot_random:
-        path += '_random'
     if use_petit:
         path = 'plots/petit'
+
+    if plot_random:
+        path += '_random'
+
+    print('path:', path)
 
     plt.switch_backend('agg')
 
@@ -676,7 +679,7 @@ def calc_scores_nonswag(args, model, logger=None, plot_random=False, use_petit=F
         if plot_random:
             assert model.ssX is not None
             tmp_ssX = copy(model.ssX)
-            if args.train_all:
+            if train_all:
                 model.make_dataloaders(
                     ssX=model.ssX,
                     train=True,
@@ -1184,4 +1187,4 @@ if __name__ == '__main__':
     model = spock_reg_model.load(version=24880, seed=0)
     if args.pysr_f2:
         model = spock_reg_model.load_with_pysr_f2(version=24880, seed=0, pysr_version=11003)
-    scores = calc_scores_nonswag(args, model, use_petit=args.petit)
+    scores = calc_scores_nonswag(model, use_petit=args.petit, plot_random=args.plot_random)

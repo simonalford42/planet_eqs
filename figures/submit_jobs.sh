@@ -1,7 +1,16 @@
 #!/usr/bin/env bash
 
-# sbatch -J eq_plot --partition gpu run.sh --paper-ready --version 24880 --pysr_version 11003
-# sbatch -J eq_plot_pysr --partition gpu run.sh --paper-ready --version 24880
+sbatch -J eq_plot_pysr1 --partition gpu run.sh --paper-ready --version 24880 --pysr_model_selection 1 --pysr_version 11003
+sbatch -J eq_plot_pysr3 --partition gpu run.sh --paper-ready --version 24880 --pysr_model_selection 3 --pysr_version 11003
+sbatch -J eq_plot_pysr5 --partition gpu run.sh --paper-ready --version 24880 --pysr_model_selection 5 --pysr_version 11003
+sbatch -J eq_plot_pysr7 --partition gpu run.sh --paper-ready --version 24880 --pysr_model_selection 7 --pysr_version 11003
+sbatch -J eq_plot_pysr9 --partition gpu run.sh --paper-ready --version 24880 --pysr_model_selection 9 --pysr_version 11003
+sbatch -J eq_plot_pysr11 --partition gpu run.sh --paper-ready --version 24880 --pysr_model_selection 11 --pysr_version 11003
+sbatch -J eq_plot_pysr14 --partition gpu run.sh --paper-ready --version 24880 --pysr_model_selection 14 --pysr_version 11003
+sbatch -J eq_plot_pysr18 --partition gpu run.sh --paper-ready --version 24880 --pysr_model_selection 18 --pysr_version 11003
+sbatch -J eq_plot_pysr20 --partition gpu run.sh --paper-ready --version 24880 --pysr_model_selection 20 --pysr_version 11003
+sbatch -J eq_plot_pysr27 --partition gpu run.sh --paper-ready --version 24880 --pysr_model_selection 27 --pysr_version 11003
+sbatch -J eq_plot_pysr29 --partition gpu run.sh --paper-ready --version 24880 --pysr_model_selection 29 --pysr_version 11003
 
 # sbatch -J p3 --partition gpu run.sh --Ngrid 1600 --petit --compute --parallel_ix 3 --parallel_total 80
 # sbatch -J p4 --partition gpu run.sh --Ngrid 1600 --petit --compute --parallel_ix 4 --parallel_total 80
