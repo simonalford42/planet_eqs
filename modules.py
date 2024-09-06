@@ -358,6 +358,7 @@ class PySRNet(nn.Module):
         self.filepath = filepath
         assert os.path.exists(filepath), f'filepath does not exist: {filepath}'
         self.module_list = load_pysr_module_list(filepath, model_selection)
+        self.model_selection = model_selection
 
     def forward(self, x):
         # input: [B, d]
@@ -369,7 +370,14 @@ class PySRNet(nn.Module):
             out = einops.repeat(torch.tensor(out, device=x.device), 'n -> B n', B=x.shape[0])
         else:
             out = einops.rearrange(out, 'n B -> B n')
+
         return out
+
+
+def get_pysr_regress_nn(version, model_selection='accuracy', results_dir='sr_results/'):
+    pysr_path = os.path.join(results_dir, f'{version}.pkl')
+    return PySRNet(pysr_path, model_selection)
+
 
 
 class PySRFeatureNN(torch.nn.Module):

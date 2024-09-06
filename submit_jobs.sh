@@ -1,15 +1,170 @@
 #!/usr/bin/env bash
 
+
+# Thu August 29
+
+model_selection_values=(5 7 9 11 14 18 20 27 29)
+# model_selection_values=(3)
+for val in "${model_selection_values[@]}"
+do
+    bash train.sh --load_f1 24880 --pysr_f2 "sr_results/11003.pkl" --pysr_f2_model_selection "$val" --eval
+done
+
+# sbatch -J eval7 --partition gpu train.sh --load_f1 24880 --pysr_f2 "sr_results/51897.pkl" --pysr_f2_model_selection accuracy --eval
+# sbatch -J eval3 --partition gpu train.sh --load_f1 24880 --pysr_f2 "sr_results/3535.pkl" --pysr_f2_model_selection accuracy --eval
+# sbatch -J eval7_2 --partition gpu train.sh --load_f1 24880 --pysr_f2 "sr_results/78515.pkl" --pysr_f2_model_selection accuracy --eval
+
+# sbatch -J sr7 --partition ellis --time 7-00:00:00 sr.sh --time_in_hours 160 --version 1021 --target f2 --max_size 60
+# sbatch -J sr7 --partition gpu --time 7-00:00:00 sr.sh --time_in_hours 160 --version 1021 --target f2 --max_size 60
+
+# Thu August 22
+
+# sbatch -J evaleqs --partition gpu train.sh --load_f1 24880 --pysr_f2 'sr_results/11003.pkl' --pysr_f2_model_selection accuracy --calc_scores
+# sbatch -J evaleqs --partition gpu train.sh --load_f1 24880 --pysr_f2 'sr_results/11003.pkl' --pysr_f2_model_selection 1 --calc_scores
+# sbatch -J evaleqs --partition gpu train.sh --load_f1 24880 --pysr_f2 'sr_results/11003.pkl' --pysr_f2_model_selection 3 --calc_scores
+# sbatch -J evaleqs --partition gpu train.sh --load_f1 24880 --pysr_f2 'sr_results/11003.pkl' --pysr_f2_model_selection 7 --calc_scores
+# sbatch -J evaleqs --partition gpu train.sh --load_f1 24880 --pysr_f2 'sr_results/11003.pkl' --pysr_f2_model_selection 14 --calc_scores
+# sbatch -J evaleqs --partition gpu train.sh --load_f1 24880 --pysr_f2 'sr_results/11003.pkl' --pysr_f2_model_selection 21 --calc_scores
+# sbatch -J evaleqs --partition gpu train.sh --load_f1 24880 --pysr_f2 'sr_results/11003.pkl' --pysr_f2_model_selection 28 --calc_scores
+# bash train.sh --load_f1 24880 --pysr_f2 'sr_results/11003.pkl' --pysr_f2_model_selection accuracy --calc_scores
+
+# Thu August 14
+
+# 3.35 # sbatch -J 50-1k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 50 --n 1000
+# 2.80 # sbatch -J 100-1k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 100 --n 1000
+
+# 2.31 # sbatch -J 50-5k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 50 --n 5000
+# 2.30 # sbatch -J 100-5k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 100 --n 5000
+# 2.36 sbatch -J 500-5k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 500 --n 5000
+# 2.28 sbatch -J 1000-5k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 1000 --n 5000
+
+# 2.36 # sbatch -J 50-10k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 50 --n 10000
+# 2.52 # sbatch -J 100-10k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 100 --n 10000
+# 2.30 # sbatch -J 500-10k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 500 --n 10000
+# 2.45 # sbatch -J 1k-10k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 1000 --n 10000
+
+# 2.32 # sbatch -J 100-20k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 100 --n 20000
+# 2.39 # sbatch -J 500-20k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 500 --n 20000
+# 2.31 # sbatch -J 1k-20k --partition gpu --time 12:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --batch_size 1000 --n 20000
+
+
+# sbatch -J f2_l2 --partition gpu f2_prune_train.sh --latent 10 --load_f1 24880 --prune_f2_topk 2
+# sbatch -J f2_l5 --partition gpu f2_prune_train.sh --latent 10 --load_f1 24880 --prune_f2_topk 5
+# sbatch -J f2_l10 --partition gpu f2_prune_train.sh --latent 10 --load_f1 24880 --prune_f2_topk 10
+# sbatch -J f2_l20 --partition gpu f2_prune_train.sh --latent 10 --load_f1 24880 --prune_f2_topk 20
+# sbatch -J f2_l30 --partition gpu f2_prune_train.sh --latent 10 --load_f1 24880 --prune_f2_topk 30
+
+# sbatch --partition gpu -J nzsimp_e0.001 train.sh --load_f1_f2 24880 --load_f1_feature_nn models/24880_feature_nn_simplified_v2_norm_nozero_eps=0.001.pt --freeze_f1 --latent 10
+# sbatch --partition gpu -J nzsimp_e0.005 train.sh --load_f1_f2 24880 --load_f1_feature_nn models/24880_feature_nn_simplified_v2_norm_nozero_eps=0.005.pt --freeze_f1 --latent 10
+# sbatch --partition gpu -J nzsimp_e0.01 train.sh --load_f1_f2 24880 --load_f1_feature_nn models/24880_feature_nn_simplified_v2_norm_nozero_eps=0.01.pt --freeze_f1 --latent 10
+# sbatch --partition gpu -J nzsimp_e0.05 train.sh --load_f1_f2 24880 --load_f1_feature_nn models/24880_feature_nn_simplified_v2_norm_nozero_eps=0.05.pt --freeze_f1 --latent 10
+# sbatch --partition gpu -J nzsimp_e0.1 train.sh --load_f1_f2 24880 --load_f1_feature_nn models/24880_feature_nn_simplified_v2_norm_nozero_eps=0.1.pt --freeze_f1 --latent 10
+
+# sbatch -J e0.1 --partition gpu --time 25:00:00 sr.sh --time_in_hours 24 --version 7652 --target f2
+# sbatch -J e0.01 --partition gpu --time 25:00:00 sr.sh --time_in_hours 24 --version 30941 --target f2
+# sbatch -J e0.001 --partition gpu --time 25:00:00 sr.sh --time_in_hours 24 --version 17401 --target f2
+
+# sbatch -J sr7 --partition ellis --time 7-00:00:00 sr.sh --time_in_hours 160 --version 24880 --target f2
+# sbatch -J sr3 --partition ellis --time 3-00:00:00 sr.sh --time_in_hours 65 --version 24880 --target f2
+
+
+# Wed August 14
+# sbatch --partition gpu -J nsimp_e0.001 train.sh --load_f1_f2 24880 --load_f1_feature_nn models/24880_feature_nn_simplified_v2_norm_eps=0.001.pt --freeze_f1 --latent 10
+# sbatch --partition gpu -J nsimp_e0.005 train.sh --load_f1_f2 24880 --load_f1_feature_nn models/24880_feature_nn_simplified_v2_norm_eps=0.005.pt --freeze_f1 --latent 10
+# sbatch --partition gpu -J nsimp_e0.01 train.sh --load_f1_f2 24880 --load_f1_feature_nn models/24880_feature_nn_simplified_v2_norm_eps=0.01.pt --freeze_f1 --latent 10
+# sbatch --partition gpu -J nsimp_e0.05 train.sh --load_f1_f2 24880 --load_f1_feature_nn models/24880_feature_nn_simplified_v2_norm_eps=0.05.pt --freeze_f1 --latent 10
+# sbatch --partition gpu -J nsimp_e0.1 train.sh --load_f1_f2 24880 --load_f1_feature_nn models/24880_feature_nn_simplified_v2_norm_eps=0.1.pt --freeze_f1 --latent 10
+
+
+# Mon August 12
+
+# comparing normalized vs unnormalized f1 features
+# sbatch --partition gpu -J norm train.sh --load_f1_f2 24880 --load_f1_feature_nn 24880_feature_nn_simplified_v2_norm_eps=0.pt --freeze_f1 --latent 10
+# sbatch --partition gpu -J norm_newf2 train.sh --load_f1 24880 --load_f1_feature_nn 24880_feature_nn_simplified_v2_norm_eps=0.pt --freeze_f1 --latent 10
+# sbatch --partition gpu -J unnorm train.sh --load_f1_f2 24880 --freeze_f1 --latent 10
+# sbatch --partition gpu -J unnorm_newf2 train.sh --load_f1 24880 --freeze_f1 --latent 10
+
+# trying the different epsilon values, normalized and unnormalized
+# unnormalized
+# sbatch --partition gpu -J simp_e0.01 train.sh --load_f1_f2 24880 --load_f1_feature_nn 24880_feature_nn_simplified_v2_eps=0.01.pt --freeze_f1 --latent 10
+# sbatch --partition gpu -J simp_e0.1 train.sh --load_f1_f2 24880 --load_f1_feature_nn 24880_feature_nn_simplified_v2_eps=0.1.pt --freeze_f1 --latent 10
+# sbatch --partition gpu -J simp_e0.5 train.sh --load_f1_f2 24880 --load_f1_feature_nn 24880_feature_nn_simplified_v2_eps=0.5.pt --freeze_f1 --latent 10
+# sbatch --partition gpu -J simp_e1 train.sh --load_f1_f2 24880 --load_f1_feature_nn 24880_feature_nn_simplified_v2_eps=1.pt --freeze_f1 --latent 10
+# sbatch --partition gpu -J simp_e2 train.sh --load_f1_f2 24880 --load_f1_feature_nn 24880_feature_nn_simplified_v2_eps=2.pt --freeze_f1 --latent 10
+# sbatch --partition gpu -J simp_e5 train.sh --load_f1_f2 24880 --load_f1_feature_nn 24880_feature_nn_simplified_v2_eps=5.pt --freeze_f1 --latent 10
+
+# normalized
+# sbatch --partition gpu -J nsimp_e0.001 train.sh --load_f1_f2 24880 --load_f1_feature_nn 24880_feature_nn_simplified_v2_norm_eps=0.001.pt --freeze_f1 --latent 10
+# sbatch --partition gpu -J nsimp_e0.01 train.sh --load_f1_f2 24880 --load_f1_feature_nn 24880_feature_nn_simplified_v2_norm_eps=0.01.pt --freeze_f1 --latent 10
+# sbatch --partition gpu -J nsimp_e0.1 train.sh --load_f1_f2 24880 --load_f1_feature_nn 24880_feature_nn_simplified_v2_norm_eps=0.1.pt --freeze_f1 --latent 10
+# sbatch --partition gpu -J nsimp_e0.5 train.sh --load_f1_f2 24880 --load_f1_feature_nn 24880_feature_nn_simplified_v2_norm_eps=0.5.pt --freeze_f1 --latent 10
+# sbatch --partition gpu -J nsimp_e1 train.sh --load_f1_f2 24880 --load_f1_feature_nn 24880_feature_nn_simplified_v2_norm_eps=1.pt --freeze_f1 --latent 10
+# sbatch --partition gpu -J nsimp_e2 train.sh --load_f1_f2 24880 --load_f1_feature_nn 24880_feature_nn_simplified_v2_norm_eps=2.pt --freeze_f1 --latent 10
+
+# didn't run, not worth it TODO still need to change the feature_nn versions before running
+# sbatch --partition gpu -J nsimp_e0.05 train.sh --load_f1_f2 24880 --load_f1_feature_nn fix24880_feature_nn_simplified_v2_eps=0.5.pt --freeze_f1 --latent 10
+# sbatch --partition gpu -J nsimp_e0.2 train.sh --load_f1_f2 24880 --load_f1_feature_nn fix24880_feature_nn_simplified_v2_eps=2.pt --freeze_f1 --latent 10
+# sbatch --partition gpu -J nsimp_e0.75 train.sh --load_f1_f2 24880 --load_f1_feature_nn fix24880_feature_nn_simplified_v2_norm_eps=5.pt --freeze_f1 --latent 10
+# sbatch --partition gpu -J nsimp_e0.95 train.sh --load_f1_f2 24880 --load_f1_feature_nn fix24880_feature_nn_simplified_v2_eps=5.pt --freeze_f1 --latent 10
+
+# didn't run, not worth it
+# sbatch --partition ellis -J simp_e0.75 train.sh --load_f1_f2 24880 --load_f1_feature_nn 24880_feature_nn_simplified_v2_eps=0.75.pt --freeze_f1 --latent 10
+# sbatch --partition ellis -J simp_e0.2 train.sh --load_f1_f2 24880 --load_f1_feature_nn 24880_feature_nn_simplified_v2_eps=0.2.pt --freeze_f1 --latent 10
+# sbatch --partition ellis -J simp_e0.05 train.sh --load_f1_f2 24880 --load_f1_feature_nn 24880_feature_nn_simplified_v2_eps=0.05.pt --freeze_f1 --latent 10
+
+
+# Friday August 9
+
+# sbatch --partition ellis -J eps0.1 train.sh --load_f1_f2 24880 --load_f1_feature_nn 24880_feature_nn_simplified_eps=0.1.pt --freeze_f1 --latent 10
+# sbatch --partition ellis -J eps0.2 train.sh --load_f1_f2 24880 --load_f1_feature_nn 24880_feature_nn_simplified_eps=0.2.pt --freeze_f1 --latent 10
+# sbatch --partition ellis -J eps0.5 train.sh --load_f1_f2 24880 --load_f1_feature_nn 24880_feature_nn_simplified_eps=0.5.pt --freeze_f1 --latent 10
+# sbatch --partition ellis -J eps1 train.sh --load_f1_f2 24880 --load_f1_feature_nn 24880_feature_nn_simplified_eps=1.pt --freeze_f1 --latent 10
+
+# sbatch -J sr --partition gpu --time 25:00:00 sr.sh --time_in_hours 24 --version 1021 --target f2
+# sbatch -J sr7 --partition gpu --time 7-00:00:00 sr.sh --time_in_hours 160 --version 1021 --target f2
+
+# ------------------------------- Thu August 8 -----------------------------------
+
+# sbatch -J f1simple train.sh --load_f1_feature_nn 24880_feature_nn_simplified.pt --freeze_f1 --latent 10
+# sbatch -J f1unsimple train.sh --load_f1 24880 --freeze_f1 --latent 10
+# sbatch -J f1_f2 train.sh --load_f1_f2 24880 --freeze_f1
+# sbatch -J f1simplef2 train.sh --load_f1_f2 24880 --load_f1_feature_nn 24880_feature_nn_simplified.pt --freeze_f1 --latent 10
+# sbatch -J f1_f2_unfrozen train.sh --load_f1_f2 24880
+
+# ------------------------------- Thu August 1 -----------------------------------
+
+
+# bash train.sh --load_f1_f2 24880 --calc_scores
+# bash train.sh --load_f1 24880 --pysr_f2 'sr_results/11003.pkl' --pysr_f2_model_selection best --calc_scores
+# bash train.sh --load_f1_f2 43139 --calc_scores
+# bash train.sh --load_f1 43139 --pysr_f2 'sr_results/33060.pkl' --pysr_f2_model_selection best --calc_scores
+
+# ------------------------------- Mon July 8 -----------------------------------
+
+# sbatch -J swag --partition ellis run_swag.sh --version 24880 --eval
+# bash run_swag.sh --version 24880 --eval
+
+# ------------------------------- Mon July 2 -----------------------------------
+
+# sbatch -J sr --partition gpu --time 2:00:00 sr.sh --time_in_hours 1 --version 24880 --target f2
+# sbatch -J sr --partition gpu --time 9:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2
+# sbatch -J sr --partition gpu --time 25:00:00 sr.sh --time_in_hours 24 --version 24880 --target f2
+
+# sbatch -J 14ft_f2froz --partition gpu train.sh --load_f1 24880 --pysr_f2 'sr_results/11003.pkl' --pysr_f2_model_selection 14 --freeze_f2 --total_steps 50000
+# bash train.sh --load_f1 24880 --pysr_f2 'sr_results/11003.pkl' --pysr_f2_model_selection 5 --freeze_f2 --total_steps 100
+# sbatch -J 14ft --partition gpu train.sh --load_f1 24880 --pysr_f2 'sr_results/11003.pkl' --pysr_f2_model_selection 14 --total_steps 50000
+# sbatch -J lincomp --partition ellis train.sh --load_f1 24880 --f2_variant linear --total_steps 50000
+
 # ------------------------------- Fri June 28 -----------------------------------
 
 # bash train.sh --load_f1 43139 --pysr_f2 'sr_results/33060.pkl' --pysr_f2_model_selection best --eval
 
-complexity_values=(1 3 4 5 7 9 10 11 12 13 14 15 20 25 30)
+# complexity_values=(1 3 4 5 7 9 10 11 12 13 14 15 20 25 30)
 
-for complexity in "${complexity_values[@]}"; do
-    echo "Running for complexity: $complexity"
-    bash train.sh --load_f1 43139 --pysr_f2 'sr_results/33060.pkl' --pysr_f2_model_selection "$complexity" --eval
-done
+# for complexity in "${complexity_values[@]}"; do
+#     echo "Running for complexity: $complexity"
+#     bash train.sh --load_f1 43139 --pysr_f2 'sr_results/33060.pkl' --pysr_f2_model_selection "$complexity" --eval
+# done
 
 
 # ------------------------------- Thu June 27 -----------------------------------

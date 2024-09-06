@@ -27,7 +27,7 @@ def parse():
     ########## basic run args ##########
     parser.add_argument('--total_steps', type=int, default=300000, help='default=300000')
     parser.add_argument('--hidden_dim', type=int, default=40, help='regress nn and feature nn hidden dim')
-    parser.add_argument('--latent', type=int, default=20, help='number of features f1 outputs')
+    parser.add_argument('--latent', type=int, default=10, help='number of features f1 outputs')
     parser.add_argument('--swa_steps', type=int, default=50000, help='default=50000')
     # remember that f2_depth = 1 is one hidden layer of (h, h) shape, plus the input and output dim layers.
     parser.add_argument('--batch_size', type=int, default=2000, help='swag batch size')
@@ -48,7 +48,12 @@ def parse():
     parser.add_argument('--tsurv', action='store_true')
     parser.add_argument('--n_predicates', default=10, type=int, help='number predictates for if then f2')
     parser.add_argument('--fix_variance', action='store_true', help='fix the variance prediction to be one')
-    parser.add_argument('--gradient_clip_val', default=0, type=int)
+    parser.add_argument('--K', type=int, default=30, help='run swag K choice')
+    parser.add_argument('--calc_scores', action='store_true')
+    parser.add_argument('--petit', action='store_true')
+    # example: 24880_feature_nn_simplified.pt
+    parser.add_argument('--load_f1_feature_nn', default=None, type=str)
+    parser.add_argument('--plot_random', action='store_true')
 
     ########## architecture variant args ##########
     parser.add_argument('--f1_variant', type=str, default='linear',
@@ -61,7 +66,7 @@ def parse():
     parser.add_argument('--l1_coeff', type=float, default=None)
 
     parser.add_argument('--prune_f1_topk', type=int, default=None, help='number of input features per latent feature')
-    parser.add_argument('--prune_f1_topn', type=int, default=None, help='number of latent features to prune to')
+    parser.add_argument('--prune_f2_topk', type=int, default=None, help='number of features to keep when pruning f2 linear')
 
     parser.add_argument('--freeze_f1', action='store_true')
     parser.add_argument('--freeze_f2', action='store_true')
@@ -71,7 +76,7 @@ def parse():
     parser.add_argument('--load_f1_f2', type=str, default=None, help='ckpt path to load f1 and f2, e.g. model.ckpt')
 
     parser.add_argument('--pysr_f1', type=str, default=None, help='PySR model to load and replace f1 with, e.g. sr_results/hall_of_fame_9723_0.pkl')
-    parser.add_argument('--pysr_f1_model_selection', type=str, default='best', help='best, accuracy, score, or complexity')
+    parser.add_argument('--pysr_f1_model_selection', type=str, default='accuracy', help='best, accuracy, score, or complexity')
 
     parser.add_argument('--pysr_f2', type=str, default=None) # PySR model to load and replace f2 with, e.g. 'sr_resuls/hall_of_fame_f2_21101_0_1.pkl'
     parser.add_argument('--pysr_f2_model_selection', type=str, default='best', help='"best", "accuracy", "score", or an integer of the "complexity"')

@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib
 import pandas as pd
 import seaborn as sns
+import matplotlib.colors as mcolors
 
 basedir_bayes = '.'
 colorstr = """*** Primary color:
@@ -54,8 +55,7 @@ for l in colorstr.replace(' ', '').split('\n'):
         shade = 0
 colors = np.array(colors)/255.0
 
-
-def make_plot(cleaned, version, t20=True):
+def make_plot(cleaned, version, pysr_version=None, t20=True, pysr_model_selection=None):
 # +
 # %matplotlib inline
     # plt.style.use('science')
@@ -117,7 +117,12 @@ def make_plot(cleaned, version, t20=True):
     plt.legend(loc='upper left',
                frameon=True, fontsize=8)
 
-    fig.savefig(basedir_bayes + '/' + f'comparison_v{version}' + '5planet.png')
+    s = '' if pysr_version is None else f'pysr={pysr_version}_'
+    if pysr_model_selection is not None:
+        s += f'ms={pysr_model_selection}_'
+    path = basedir_bayes + '/' + f'comparison_v{version}_' + s + '5planet.png'
+    fig.savefig(path)
+    print('Saved to', path)
 
 
 # -
@@ -146,9 +151,10 @@ def make_plot(cleaned, version, t20=True):
                          dpi=300,
                          constrained_layout=True)
 
+        color = mcolors.to_rgba(colors[2, 3])
         g = sns.jointplot(x=ppx, y=ppy,
                         alpha=1.0,# ax=ax,
-                        color=colors[2, 3],
+                        color=color,
                         s=5,
                         xlim=(3, 10),
                         ylim=(3, 10),
@@ -187,6 +193,9 @@ def make_plot(cleaned, version, t20=True):
         ax.set_ylabel('Predicted')
         plt.suptitle(title, y=1.0)
         plt.tight_layout()
-        plt.savefig(basedir_bayes + f'/comparison_v{version}_5planet_{key}.png', dpi=300)
+        s = '' if pysr_version is None else f'pysr={pysr_version}_'
+        path = basedir_bayes + f'/comparison_v{version}_{s}5planet_{key}.png'
+        plt.savefig(path, dpi=300)
+        print('Saved to', path)
 
 

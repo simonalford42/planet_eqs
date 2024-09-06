@@ -35,7 +35,7 @@ fi
 
 # Loop through and submit jobs
 for ix in $(seq 0 $((total_processes - 1))); do
-    sbatch -J "p${ix}_${Ngrid}" --partition gpu run.sh --Ngrid "$Ngrid" --ix "$ix" --total "$total_processes" $std_flag --compute
+    sbatch -J "p${ix}_${Ngrid}" --partition gpu run.sh --Ngrid "$Ngrid" --version 24880 --parallel_ix "$ix" --parallel_total "$total_processes" --compute
 done
 
 echo "Submitted $total_processes jobs with Ngrid=$Ngrid${std_flag:+ and --std flag}"

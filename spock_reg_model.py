@@ -43,6 +43,12 @@ def load(version, seed=None):
         return VarModel.load_from_checkpoint(f)
 
 
+def load_with_pysr_f2(version, pysr_version, pysr_model_selection='accuracy', seed=0):
+    model = load(version, seed)
+    model.regress_nn = modules.get_pysr_regress_nn(pysr_version, pysr_model_selection)
+    return model
+
+
 class BioLinear(nn.Module):
     # BioLinear is just Linear, but each neuron comes with coordinates.
     def __init__(self, in_dim, out_dim, in_fold=1, out_fold=1):
@@ -600,6 +606,9 @@ def get_data(
 def soft_clamp(x, lo, high):
     return 0.5*(torch.tanh(x)+1)*(high-lo) + lo
 
+def hard_clamp(x, lo, high):
+    return torch.max(torch.min(x, torch.tensor(high)), torch.tensor(lo))
+
 
 def safe_log_erf(x):
     base_mask = x < -1
@@ -712,6 +721,25 @@ class VarModel(pl.LightningModule):
             self.disable_optimization()
 
 
+    def path(self):
+        version = self.hparams['version']
+        if 'eval' in self.hparams and self.hparams['eval']:
+            if 'load_f1' in self.hparams and self.hparams['load_f1']:
+                version =  self.hparams['load_f1']
+            if 'load_f1_f2' in self.hparams and self.hparams['load_f1_f2']:
+                version =  self.hparams['load_f1_f2']
+
+        path = f'{version}_{self.hparams["seed"]}'
+
+        if self.hparams['pysr_f2'] or type(self.regress_nn) == modules.PySRNet:
+            # go from 'sr_results/11003.pkl' to 11003 by extracting the number from it
+            pysr_version = int(''.join(filter(str.isdigit, self.regress_nn.filepath)))
+            path += f'_pysr_f2_v={pysr_version}'
+            path += f'_ms={self.regress_nn.model_selection}'
+
+        return path
+
+
     def get_regress_nn(self, hparams, summary_dim):
         '''
         summary dim is
@@ -731,6 +759,11 @@ class VarModel(pl.LightningModule):
             model = load(load_version, seed=hparams['seed'])
             regress_nn = model.regress_nn
             summary_dim = model.summary_dim
+
+            if 'prune_f2_topk' in hparams and hparams['prune_f2_topk']:
+                assert isinstance(regress_nn, nn.Linear)
+                regress_nn = modules.pruned_linear(regress_nn, top_k=hparams['prune_f2_topk'])
+
         elif hparams['f1_variant'] == 'mean_cov':
             i = self.n_features
             if 'mean_var' in hparams and hparams['mean_var']:
@@ -819,8 +852,6 @@ class VarModel(pl.LightningModule):
             else:
                 regress_nn = modules.SumModule(regress_nn, residual_net)
 
-
-
         if 'freeze_f2' in hparams and hparams['freeze_f2']:
             utils.freeze_module(regress_nn)
 
@@ -831,12 +862,16 @@ class VarModel(pl.LightningModule):
         feature_nn = None
         out_dim = hparams['latent'] # certain f1 variants might change this
 
-        load_version = None
-        if 'load_f1' in hparams and hparams['load_f1']:
-            load_version = hparams['load_f1']
-        elif 'load_f1_f2' in hparams and hparams['load_f1_f2']:
-            load_version = hparams['load_f1_f2']
-        if load_version:
+        if 'load_f1_feature_nn' in hparams and hparams['load_f1_feature_nn']:
+            feature_nn = torch.load(hparams['load_f1_feature_nn'])
+            out_dim = feature_nn.linear.weight.shape[0]
+        elif any(p in hparams and hparams[p] for p in ['load_f1', 'load_f1_f2']):
+            load_version = None
+            if 'load_f1' in hparams and hparams['load_f1']:
+                load_version = hparams['load_f1']
+            else:
+                assert 'load_f1_f2' in hparams and hparams['load_f1_f2']
+                load_version = hparams['load_f1_f2']
             model = load(load_version, seed=hparams['seed'])
             feature_nn = model.feature_nn
             out_dim = model.feature_nn_out_dim
@@ -844,9 +879,9 @@ class VarModel(pl.LightningModule):
                 # hack in case f1 was a weird variant, like products2
                 if isinstance(feature_nn, nn.Sequential):
                     assert isinstance(feature_nn[1], nn.Linear)
-                    feature_nn[1] = modules.pruned_linear(feature_nn[1], top_k=hparams['prune_f1_topk'], top_n=hparams['prune_f1_topn'])
+                    feature_nn[1] = modules.pruned_linear(feature_nn[1], top_k=hparams['prune_f1_topk'])
                 else:
-                    feature_nn = modules.pruned_linear(feature_nn, top_k=hparams['prune_f1_topk'], top_n=hparams['prune_f1_topn'])
+                    feature_nn = modules.pruned_linear(feature_nn, top_k=hparams['prune_f1_topk'])
         elif 'pysr_f1' in hparams and hparams['pysr_f1']:
             # constants can still be optimized with SGD
             feature_nn = modules.PySRFeatureNN(hparams['pysr_f1'], model_selection=hparams['pysr_f1_model_selection'])
@@ -1034,9 +1069,17 @@ class VarModel(pl.LightningModule):
 
     def predict_instability(self, summary_stats):
         testy = self.regress_nn(summary_stats)
+
         # Outputs mu, std
-        mu = soft_clamp(testy[:, [0]], 4.0, 12.0)
-        std = soft_clamp(testy[:, [1]], self.lowest, 6.0)
+        if type(self.regress_nn) in [modules.PySRNet]:
+            mu = testy[:, [0]]
+            std = testy[:, [1]]
+            mu = hard_clamp(mu, 4.0, 12.0)
+            std = hard_clamp(std, self.lowest, 6.0)
+        else:
+            mu = soft_clamp(testy[:, [0]], 4.0, 12.0)
+            std = soft_clamp(testy[:, [1]], self.lowest, 6.0)
+
         return mu, std
 
     def add_input_noise(self, x):
@@ -1369,6 +1412,9 @@ class SWAGModel(VarModel):
         self.c = 2 if 'c' not in self.swa_params else self.swa_params['c']
         self.swa_params['c'] = self.c
         self.swa_params['K'] = self.K
+
+        if 'eval' in swa_params and swa_params['eval']:
+            self.disable_optimization()
 
         return self
 

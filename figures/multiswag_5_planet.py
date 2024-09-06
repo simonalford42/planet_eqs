@@ -17,6 +17,7 @@ os.environ['XLA_PYTHON_CLIENT_PREALLOCATE'] = 'false'
 import numpy as np
 
 # +
+import spock_reg_model
 import numpy as np
 import rebound
 import matplotlib.pyplot as plt
@@ -26,9 +27,14 @@ import dill
 import sys
 import pandas as pd
 import spock
-from spock import FeatureRegressor, FeatureRegressorXGB
+from spock import FeatureRegressor, FeatureRegressorXGB, NonSwagFeatureRegressor
 from icecream import ic
 import utils
+import utils2
+import argparse
+import modules
+
+from multiswag_5_planet_plot import make_plot
 
 try:
     plt.style.use('paper')
@@ -36,21 +42,46 @@ except:
     pass
 
 spockoutfile = '../data/spockprobstesttrio.npz'
-version = int(sys.argv[1])
+# version = int(sys.argv[1]) if len(sys.argv) > 1 else 24880
 # Paper-ready is 5000:
-N = int(sys.argv[2]) if len(sys.argv) > 2 else 50
+# N = int(sys.argv[2]) if len(sys.argv) > 2 else 50
 # Paper-ready is 10000
-samples = int(sys.argv[3]) if len(sys.argv) > 3 else 100
+# samples = int(sys.argv[3]) if len(sys.argv) > 3 else 100
 
-from multiswag_5_planet_plot import make_plot
 
-try:
-    cleaned = pd.read_csv('cur_plot_dataset_1604437382.10866.csv')#'cur_plot_dataset_1604339344.2705607.csv')
-    # make_plot(cleaned, version)
-    make_plot(cleaned, version, t20=False)
-    exit(0)
-except FileNotFoundError:
-    ...
+def get_args():
+    print(utils2.get_script_execution_command())
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--N', type=int, default=50)
+    parser.add_argument('--samples', type=int, default=100)
+    parser.add_argument('--version', '-v', type=int, default=24880)
+
+    parser.add_argument('--paper-ready', '-p', action='store_true')
+
+    parser.add_argument('--pysr_version', type=int, default=None)
+    parser.add_argument('--pysr_dir', type=str, default='../sr_results/')  # folder containing pysr results pkl
+    parser.add_argument('--pysr_model_selection', type=str, default='accuracy', help='"best", "accuracy", "score", or an integer of the pysr equation complexity. If not provided, will do all complexities. If plotting, has to be an integer complexity')
+
+    args = parser.parse_args()
+
+    if args.paper_ready:
+        args.N = 5000
+        args.samples = 10000
+
+    return args
+
+args = get_args()
+N = args.N
+samples = args.samples
+version = args.version
+
+# try:
+#     cleaned = pd.read_csv('cur_plot_dataset_1604437382.10866.csv')#'cur_plot_dataset_1604339344.2705607.csv')
+#     # make_plot(cleaned, version)
+#     make_plot(cleaned, args.version, t20=False)
+#     exit(0)
+# except FileNotFoundError:
+#     ...
 
 stride = 1
 nsim_list = np.arange(0, 17500)
@@ -63,12 +94,17 @@ used_axes = np.linspace(0, 17500-1, N).astype(np.int32)#np.arange(17500//3, 1750
 nsim_list = nsim_list[used_axes]
 
 
-model = FeatureRegressor(
-    cuda=True,
-    filebase='../' + utils.ckpt_path(version, glob=True) +  '*output.pkl'
-    # filebase='*' + 'v30' + '*output.pkl'
-    #'long_zero_megno_with_angles_power_v14_*_output.pkl'
-)
+# model = FeatureRegressor(
+#     cuda=True,
+#     filebase='../' + utils.ckpt_path(version, glob=True) +  '*output.pkl'
+#     # filebase='*' + 'v30' + '*output.pkl'
+#     #'long_zero_megno_with_angles_power_v14_*_output.pkl'
+# )
+
+model = spock_reg_model.load(args.version, seed=0)
+if args.pysr_version:
+    model.regress_nn = modules.PySRNet(os.path.join(args.pysr_dir, f'{args.pysr_version}.pkl'), args.pysr_model_selection)
+model = NonSwagFeatureRegressor(model=model)
 
 xgbmodel = FeatureRegressorXGB()
 
@@ -259,7 +295,8 @@ X = np.array(pool.map(
 
 # -
 
-allmeg = X[..., model.swag_ensemble[0].megno_location].ravel()
+# allmeg = X[..., model.swag_ensemble[0].megno_location].ravel()
+allmeg = X[..., model.model.megno_location].ravel()
 
 # +
 # from plotnine import *
@@ -513,7 +550,7 @@ from matplotlib import ticker
 
 
 # +
-cleaned['petit'] = np.log10(pd.Series([Tsurv(
+cleaned['petitf'] = np.log10(pd.Series([Tsurv(
         *list(cleaned[['p12', 'p23']].iloc[i]),
         [m_planet, m_planet, m_planet],
         res=False,
@@ -522,7 +559,7 @@ cleaned['petit'] = np.log10(pd.Series([Tsurv(
     )
     for i in range(len(cleaned))]))
 
-cleaned['petitf'] = np.log10(pd.Series([Tsurv(
+cleaned['pperiodetitf'] = np.log10(pd.Series([Tsurv(
         *list(cleaned[['p12', 'p23']].iloc[i]),
         [m_planet, m_planet, m_planet],
         res=False,
@@ -547,5 +584,5 @@ cleaned['petitf'] = np.log10(pd.Series([Tsurv(
 
 import time
 cleaned.to_csv(f'cur_plot_dataset_{time.time()}.csv')
-make_plot(cleaned, version)
+make_plot(cleaned, version, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection)
 print('made plot')
