@@ -31,9 +31,6 @@ import sys
 sys.path.append('..')
 
 import spock_reg_model
-from pytorch_lightning import Trainer
-from pytorch_lightning.loggers import TensorBoardLogger
-from pytorch_lightning.callbacks import LearningRateLogger, ModelCheckpoint
 from icecream import ic
 
 import torch
@@ -158,7 +155,8 @@ for dataset in datasets:
             print(np.log10(cdata[['instability_time', 'shadow_instability_time']]).describe().to_markdown())
             print(cdata.iloc[0])
         data.append(cdata)
-    except:
+    except Exception as e:
+        print('Exception: ', e)
         print(f"Skipping {dataset}")
 
 if random:
@@ -513,14 +511,16 @@ for cmodelstr in ['Obertas+17', 'Petit+20', 'XGBoost', 'XGBoost_classifier', 'Id
     #colors[2, 3]
     main_shade = 3
     main_color = colors[2, main_shade]
+    main_color = main_color.tolist()
     print(f"Total number of plotted points: {len(ppx)}")
     g = sns.jointplot(ppx, ppy,
                     alpha=1.0,# ax=ax,
-                      color=main_color,
+                    color=main_color,
                     s=0.0,
                     xlim=(3+0.9, 10-0.9),
                     ylim=(3+0.9, 10-0.9),
-                    marginal_kws=dict(bins=15, binrange=(4, 9)),
+                    # marginal_kws=dict(bins=15, binrange=(4, 9)),
+                    marginal_kws=dict(bins=15),
                    )
 
     ax = g.ax_joint

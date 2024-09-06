@@ -676,6 +676,11 @@ class VarModel(pl.LightningModule):
 
         self.input_noise_logvar = nn.Parameter(torch.zeros(self.n_features)-2)
         self.summary_noise_logvar = nn.Parameter(torch.zeros(summary_dim) - 2) # add to summaries, not direct latents
+
+        # disable optimization for the noise logvars
+        self.input_noise_logvar.requires_grad = False
+        self.summary_noise_logvar.requires_grad = False
+
         self.lowest = 0.5
         if 'lower_std' in hparams and hparams['lower_std']:
             self.lowest = 0.1
@@ -801,6 +806,12 @@ class VarModel(pl.LightningModule):
                     print('Initializing new network to predict std')
                     base_f2 = modules.mlp(summary_dim, 2, hparams['hidden_dim'], hparams['f2_depth'])
                 regress_nn = modules.PySRRegressNN(regress_nn, base_f2)
+
+            if 'nn_pred_std' in hparams and hparams['nn_pred_std']:
+                print('Using a neural network to predict std')
+                base_f2 = modules.mlp(summary_dim, 2, hparams['hidden_dim'], hparams['f2_depth'])
+                utils.freeze_module(regress_nn)
+                regress_nn = modules.PySRRegressNN(regress_nn, base_f2)
         else:
             regress_nn = modules.mlp(summary_dim, 2, hparams['hidden_dim'], hparams['f2_depth'])
 
@@ -826,6 +837,9 @@ class VarModel(pl.LightningModule):
             return torch.cat([summary_stats, additional_features_tensor], dim=-1)
 
         if 'f2_residual' in hparams and hparams['f2_residual'] or 'pysr_f2_residual' in hparams and hparams['pysr_f2_residual']:
+            if 'pysr_f2' in hparams and hparams['pysr_f2']:
+                utils.freeze_module(regress_nn)
+
             if hparams['f2_residual'] == 'mlp':
                 residual_net = modules.mlp(summary_dim, 2, hparams['hidden_dim'], hparams['f2_depth'])
             else:
@@ -1032,7 +1046,7 @@ class VarModel(pl.LightningModule):
         return clatent
 
 
-    def compute_summary_stats(self, x):
+    def compute_summary_stats(self, x, deterministic=False):
         if self.hparams['f1_variant'] == 'mean_cov':
             # no f1 needed, take the inputs straight
             return self.compute_mean_cov_stats(x)
@@ -1051,6 +1065,11 @@ class VarModel(pl.LightningModule):
         # Take a "sample" of the average/variance of the learned features
         mu_sample =  torch.randn_like(sample_mu) *std_in_mu  + sample_mu
         var_sample = torch.randn_like(sample_var)*std_in_var + sample_var
+
+        # if deterministic, just use the mean mu/vawr
+        if deterministic or 'determinisic_summary_stats' in self.hparams and self.hparams['deterministic_summary_stats']:
+            mu_sample = sample_mu
+            var_sample = sample_var
 
         # Get to same unit
         std_sample = torch.sqrt(torch.abs(var_sample) + EPSILON)
@@ -1135,11 +1154,11 @@ class VarModel(pl.LightningModule):
 
         return torch.cat([megno_avg, megno_std], dim=1)
 
-    def forward(self, x, noisy_val=True, return_intermediates=False):
+    def forward(self, x, noisy_val=True, return_intermediates=False, deterministic=False):
         '''
         noisy_val: if True, add noise to the inputs and summaries
         '''
-
+        assert x is not None
         if self.fix_megno or self.fix_megno2:
             if self.fix_megno:
                 megno_avg_std = self.summarize_megno(x)
@@ -1164,7 +1183,7 @@ class VarModel(pl.LightningModule):
         if noisy_val:
             x = self.add_input_noise(x)
 
-        summary_stats = self.compute_summary_stats(x)
+        summary_stats = self.compute_summary_stats(x, deterministic=deterministic)
 
         if self.fix_megno:
             summary_stats = torch.cat([summary_stats, megno_avg_std], dim=1)
@@ -1193,11 +1212,11 @@ class VarModel(pl.LightningModule):
             # useful for running pysr to distill parts of the calculation
             d = {
                 'inputs': x,
-                'f1_output': self.feature_nn(x),
+                # 'f1_output': self.feature_nn(x),  # note: should use summary stats usually!
                 'summary_stats': summary_stats,
                 'prediction': pred,
                 'mean': mu,
-                'std': std
+                'std': std,
             }
             if 'ifthen' in self.hparams['f2_variant']:
                 d['ifthen_preds'] = self.regress_nn.preds(summary_stats)

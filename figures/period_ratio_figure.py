@@ -46,6 +46,9 @@ python period_ratio_figure.py --Ngrid 400 --version 24880 --collate
 python period_ratio_figure.py --Ngrid 4 --petit --compute
 python period_ratio_figure.py --Ngrid 4 --petit --plot
 
+# create input cache for Ngrid=4
+python period_ratio_figure.py --Ngrid 4 --input_cache
+
 # copy needed files to local so we can plot
 scopy bnn_chaos_model/figures/period_results/v=43139_ngrid=6_pysr_f2_v=33060/ ~/code/bnn_chaos_model/figures/period_results/
 scopy bnn_chaos_model/figures/period_results/v=43139_ngrid=6.pkl ~/code/bnn_chaos_model/figures/period_results/
@@ -61,6 +64,7 @@ def get_args():
     parser.add_argument('--compute', action='store_true')
     parser.add_argument('--collate', action='store_true')
     parser.add_argument('--petit', action='store_true')
+    parser.add_argument('--create_input_cache', action='store_true')
 
     parser.add_argument('--pysr_version', type=str, default=None) # sr_results/33060.pkl
     parser.add_argument('--pysr_dir', type=str, default='../sr_results/')  # folder containing pysr results pkl
@@ -78,6 +82,9 @@ def get_args():
         args.pysr_path = os.path.join(args.pysr_dir, f'{args.pysr_version}.pkl')
     else:
         args.pysr_path = None
+
+    if args.create_input_cache and not args.collate:
+        args.compute = True
 
 
     return args
@@ -125,28 +132,33 @@ def get_simulation(par):
     return sim
 
 
-def get_model_prediction(sim, model, use_petit=False):
+def get_model_prediction(sim, model, use_petit=False, create_input_cache=False):
+    '''
+    cache: maps simulation id to X.
+    '''
     sim = sim.copy()
     sim.dt = 0.05
     sim.init_megno()
     sim.exit_max_distance = 20.
-    try:
-        out_dict = model.predict(sim, use_petit=use_petit)
-        if use_petit:
-            assert_equal(out_dict['petit'].shape, (1,))
-            return {
-                'petit': out_dict['petit'][0].detach().cpu().numpy(),
-            }
-        else:
-            return {
-                'mean': out_dict['mean'][0,0].detach().cpu().numpy(),
-                'std': out_dict['std'][0,0].detach().cpu().numpy(),
-                'f1': out_dict['summary_stats'][0].detach().cpu().numpy(),
-            }
 
+    try:
+        if create_input_cache:
+            return model.predict_up_to_cached_input(sim)
+        else:
+            out_dict = model.predict(sim, use_petit=use_petit)
+            if use_petit:
+                assert_equal(out_dict['petit'].shape, (1,))
+                return {
+                    'petit': out_dict['petit'][0].detach().cpu().numpy(),
+                }
+            else:
+                return {
+                    'mean': out_dict['mean'][0,0].detach().cpu().numpy(),
+                    'std': out_dict['std'][0,0].detach().cpu().numpy(),
+                    'f1': out_dict['summary_stats'][0].detach().cpu().numpy(),
+                }
     except rebound.Escape:
         return None
-
     except Exception as e:
         print(e)
         import traceback
@@ -183,11 +195,20 @@ def get_parameters(P12s, P23s):
     return parameters
 
 
-def compute_results_for_parameters(parameters, model, use_petit=False):
+def compute_results_for_parameters(parameters, model, use_petit=False, create_input_cache=False):
     simulations = [get_simulation(par) for par in parameters]
-
-    results = [get_model_prediction(sim, model, use_petit=use_petit) for sim in simulations]
+    results = [get_model_prediction(sim, model, use_petit=use_petit, create_input_cache=create_input_cache) for sim in simulations]
     return results
+
+
+def load_input_cache(Ngrid):
+    path = get_results_path(Ngrid, input_cache=True)
+
+    if os.path.exists(path):
+        with open(path, 'rb') as f:
+            return pickle.load(f)
+    else:
+        return None
 
 
 def get_list_chunk(lst, ix, total):
@@ -204,17 +225,44 @@ def get_list_chunk(lst, ix, total):
     return lst[start:end]
 
 
+def predict_from_cached_input(model, cached_input):
+    if cached_input is None:
+        # the simulation messed up somehow, return None just like in get_model_prediction
+        return None
+    out_dict = model.model(cached_input, noisy_val=False, return_intermediates=True, deterministic=True)
+
+    return {
+        'mean': out_dict['mean'][0,0].detach().cpu().numpy(),
+        'std': out_dict['std'][0,0].detach().cpu().numpy(),
+        'f1': out_dict['summary_stats'][0].detach().cpu().numpy(),
+    }
+
+
 def compute_results(args):
     model = load_model(args.version)
     P12s, P23s = get_period_ratios(args.Ngrid)
     parameters = get_parameters(P12s, P23s)
+
+    input_cache = load_input_cache(args.Ngrid)
+    if input_cache:
+        assert len(input_cache) == len(parameters), f'Input cache length {len(input_cache)} does not match parameters length {len(parameters)}'
+        input_cache = {params: input for params, input in zip(parameters, input_cache)}
+
     if args.parallel_ix is not None:
         parameters = get_list_chunk(parameters, args.parallel_ix, args.parallel_total)
 
-    results = compute_results_for_parameters(parameters, model, use_petit=args.petit)
+    if input_cache and not args.petit:
+        print('Computing using cached input')
+
+        for par in parameters:
+            assert par in input_cache, f'Input cache missing for {par}'
+
+        results = [predict_from_cached_input(model, input_cache[par]) for par in parameters]
+    else:
+        results = compute_results_for_parameters(parameters, model, use_petit=args.petit, create_input_cache=args.create_input_cache)
 
     # save the results
-    path = get_results_path(args.Ngrid, args.version, args.parallel_ix, args.parallel_total, args.pysr_version, args.pysr_model_selection, args.petit)
+    path = get_results_path(args.Ngrid, args.version, args.parallel_ix, args.parallel_total, args.pysr_version, args.pysr_model_selection, args.petit, input_cache=args.create_input_cache)
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
     with open(path, 'wb') as f:
@@ -224,9 +272,11 @@ def compute_results(args):
     return results
 
 
-def get_results_path(Ngrid, version=None, parallel_ix=None, parallel_total=None, pysr_version=None, pysr_model_selection=None, use_petit=False):
+def get_results_path(Ngrid, version=None, parallel_ix=None, parallel_total=None, pysr_version=None, pysr_model_selection=None, use_petit=False, input_cache=False):
     if use_petit:
         path = f'period_results/petit_ngrid={Ngrid}'
+    elif input_cache:
+        path = f'period_results/cache_ngrid={Ngrid}'
     else:
         path = f'period_results/v={version}_ngrid={Ngrid}'
 
@@ -257,7 +307,11 @@ def collate_parallel_results(args):
     results = []
     if args.parallel_total is None:
         # try to detect the total
-        files = os.listdir(get_results_path(args.Ngrid, args.version, use_petit=args.petit)[:-4])
+        path = get_results_path(args.Ngrid, args.version, use_petit=args.petit, input_cache=args.create_input_cache)
+
+        print(path)
+        files = os.listdir(get_results_path(args.Ngrid, args.version, use_petit=args.petit, input_cache=args.create_input_cache)[:-4])
+        print(f'files={files}')
         # filter to those of form f'{ix}-{total}.pkl'
         files = [file for file in files if file.endswith('.pkl')]
         # get the total. use the largest possible total
@@ -269,7 +323,7 @@ def collate_parallel_results(args):
 
     missing = False
     for ix in range(total):
-        path = get_results_path(args.Ngrid, args.version, ix, total, use_petit=args.petit)
+        path = get_results_path(args.Ngrid, args.version, ix, total, use_petit=args.petit, input_cache=args.create_input_cache)
         try:
             sub_results = load_results(path)
         except FileNotFoundError:
@@ -493,6 +547,14 @@ def calculate_mse(Ngrid, version, pysr_version):
 
 if __name__ == '__main__':
     args = get_args()
+
+    if args.create_input_cache:
+        # check if cache already exists for this size!
+        path = get_results_path(args.Ngrid, input_cache=True)
+        if os.path.exists(path):
+            print('Input cache already exists for this size!')
+            import sys; sys.exit(0)
+
 
     if args.compute:
         if args.pysr_path:

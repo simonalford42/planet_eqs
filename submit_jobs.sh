@@ -1,14 +1,42 @@
 #!/usr/bin/env bash
 
 
+# Wed Sep 4
+
+sbatch -J eval --partition gpu eval_eqs.sh --version 10290 --pysr_version 69083
+
+# compare model trained deterministically vs normally.
+# sbatch -J det0 --partition gpu train.sh --deterministic_summary_stats --seed 0
+# sbatch -J det1 --partition gpu train.sh --deterministic_summary_stats --seed 1
+# sbatch -J det2 --partition gpu train.sh --deterministic_summary_stats --seed 2
+# sbatch -J nondet0 --partition gpu train.sh --seed 0
+# sbatch -J nondet1 --partition gpu train.sh --seed 1
+# sbatch -J nondet2 --partition gpu train.sh --seed 2
+
+# evaluate the autosimplified pysr equations
+
+
+# Mon September 2
+
+# sbatch -J autosimp0.001 --partition gpu --time 25:00:00 sr.sh --time_in_hours 23 --version 10290 --target f2 --max_size 60
+# sbatch -J autosimp0.1 --partition gpu --time 25:00:00 sr.sh --time_in_hours 23 --version 9259 --target f2 --max_size 60
+
+# sbatch -J sr3 --partition ellis --mem 300G --time 3-00:00:00 sr.sh --time_in_hours 70 --version 24880 --target f2 --max_size 60
+
+# TODO need to avoid NaN's
+# sbatch -J f2res --partition gpu train.sh --load_f1 24880 --pysr_f2 'sr_results/11003.pkl' --pysr_f2_model_selection accuracy --f2_residual mlp --freeze_f1
+# sbatch -J nn_pred_std --partition gpu train.sh --load_f1 24880 --pysr_f2 'sr_results/11003.pkl' --pysr_f2_model_selection accuracy --nn_pred_std --freeze_f1
+
+# sbatch -J sr7 --partition ellis --time 7-00:00:00 sr.sh --time_in_hours 160 --version 1021 --target f2 --max_size 60
+
 # Thu August 29
 
-model_selection_values=(5 7 9 11 14 18 20 27 29)
-# model_selection_values=(3)
-for val in "${model_selection_values[@]}"
-do
-    bash train.sh --load_f1 24880 --pysr_f2 "sr_results/11003.pkl" --pysr_f2_model_selection "$val" --eval
-done
+# model_selection_values=(5 7 9 11 14 18 20 27 29)
+# # model_selection_values=(3)
+# for val in "${model_selection_values[@]}"
+# do
+#     bash train.sh --load_f1 24880 --pysr_f2 "sr_results/11003.pkl" --pysr_f2_model_selection "$val" --eval
+# done
 
 # sbatch -J eval7 --partition gpu train.sh --load_f1 24880 --pysr_f2 "sr_results/51897.pkl" --pysr_f2_model_selection accuracy --eval
 # sbatch -J eval3 --partition gpu train.sh --load_f1 24880 --pysr_f2 "sr_results/3535.pkl" --pysr_f2_model_selection accuracy --eval

@@ -35,9 +35,7 @@ import fit_trunc_dist
 
 profile = lambda _: _
 
-
 class NonSwagFeatureRegressor():
-    # def __init__(self, model, cuda=True):
     def __init__(self, model, cuda=True):
         pwd = os.path.dirname(__file__)
         self.cuda = cuda
@@ -77,6 +75,58 @@ class NonSwagFeatureRegressor():
                    5.08607199e-03])
         ssX.var_ = ssX.scale_**2
         self.ssX = ssX
+
+    def predict_up_to_cached_input(self, sim, indices=None):
+        """Estimate instability time for a given simulation.
+
+        :sim: The rebound simulation.
+        :indices: The list of planets to consider.
+        """
+        if sim.N_real < 4:
+            raise AttributeError("SPOCK Error: SPOCK only works for systems with 3 or more planets")
+        if indices:
+            if len(indices) != 3:
+                raise AttributeError("SPOCK Error: indices must be a list of 3 particle indices")
+            trios = [indices] # always make it into a list of trios to test
+        else:
+            trios = [[i,i+1,i+2] for i in range(1,sim.N_real-2)] # list of adjacent trios
+
+        kwargs = OrderedDict()
+        kwargs['Norbits'] = int(1e4)
+        kwargs['Nout'] = 1000
+        kwargs['trios'] = trios
+        args = list(kwargs.values())
+        # These are the .npy.
+        # In the other file, we concatenate (restseries, orbtseries, mass_array)
+        tseries, stable = get_extended_tseries(sim, args)
+
+        if not stable:
+            return None
+
+        tseries = np.array(tseries)
+        simt = sim.copy()
+        alltime = []
+        allpetit = []
+        for i, trio in enumerate(trios):
+            sim = simt.copy()
+            # These are the .npy.
+            # In the other file, we concatenate (restseries, orbtseries, mass_array)
+            cur_tseries = tseries[None, i, ::10]
+            mass_array = np.array([sim.particles[j].m/sim.particles[0].m for j in trio])
+            X = data_setup_kernel(mass_array, cur_tseries)
+            X = self.ssX.transform(X.reshape(-1, X.shape[-1])).reshape(X.shape)
+            X = torch.tensor(X).float()
+            if self.cuda:
+                X = X.cuda()
+
+            # out = self.model(X, noisy_val=False, return_intermediates=True)
+            out = X
+            alltime.append(out)
+
+        # keeping the old code above in case we ever want to do more than one...
+        assert len(alltime) == 1, 'current implementation only made for one calculation'
+        out = alltime[0]
+        return out
 
     def predict(self, sim, indices=None, use_petit=False):
         """Estimate instability time for a given simulation.
@@ -126,7 +176,7 @@ class NonSwagFeatureRegressor():
                 if self.cuda:
                     X = X.cuda()
 
-                out = self.model(X, noisy_val=False, return_intermediates=True)
+                out = self.model(X, noisy_val=False, return_intermediates=True, deterministic=True)
                 alltime.append(out)
 
         # keeping the old code above in case we ever want to do more than one...

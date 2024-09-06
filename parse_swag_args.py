@@ -54,6 +54,7 @@ def parse():
     # example: 24880_feature_nn_simplified.pt
     parser.add_argument('--load_f1_feature_nn', default=None, type=str)
     parser.add_argument('--plot_random', action='store_true')
+    parser.add_argument('--deterministic_summary_stats', action='store_true', help='deterministic summary stats')
 
     ########## architecture variant args ##########
     parser.add_argument('--f1_variant', type=str, default='linear',
@@ -78,7 +79,8 @@ def parse():
     parser.add_argument('--pysr_f1', type=str, default=None, help='PySR model to load and replace f1 with, e.g. sr_results/hall_of_fame_9723_0.pkl')
     parser.add_argument('--pysr_f1_model_selection', type=str, default='accuracy', help='best, accuracy, score, or complexity')
 
-    parser.add_argument('--pysr_f2', type=str, default=None) # PySR model to load and replace f2 with, e.g. 'sr_resuls/hall_of_fame_f2_21101_0_1.pkl'
+    parser.add_argument('--pysr_f2', type=str, default=None) # PySR model to load and replace f2 with, e.g. 'sr_results/hall_of_fame_f2_21101_0_1.pkl'
+    parser.add_argument('--pysr_version', type=int, default=None) # PySR version for main_figures, e.g. 11003
     parser.add_argument('--pysr_f2_model_selection', type=str, default='best', help='"best", "accuracy", "score", or an integer of the "complexity"')
 
     parser.add_argument('--f2_residual', type=str, default=None, choices=[None, 'pysr', 'mlp'])

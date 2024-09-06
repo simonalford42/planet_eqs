@@ -1184,7 +1184,10 @@ def calc_scores_nonswag(model, train_all=False, logger=None, plot_random=False, 
 
 if __name__ == '__main__':
     args = parse()
-    model = spock_reg_model.load(version=24880, seed=0)
-    if args.pysr_f2:
-        model = spock_reg_model.load_with_pysr_f2(version=24880, seed=0, pysr_version=11003)
-    scores = calc_scores_nonswag(model, use_petit=args.petit, plot_random=args.plot_random)
+
+    if args.pysr_version:
+        model = spock_reg_model.load_with_pysr_f2(version=args.version, seed=args.seed, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection)
+    else:
+        model = spock_reg_model.load(verison=args.version, seed=args.seed)
+
+    calc_scores_nonswag(model, use_petit=args.petit, plot_random=args.plot_random)
