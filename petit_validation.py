@@ -98,7 +98,7 @@ no_op_scaler = StandardScaler(with_mean=False, with_std=False)
 model.make_dataloaders(ssX=no_op_scaler, train_ssX=True)
 tsurv_validation_set = model.val_dataloader()
 # remake the dataloaders with data of correct scaling for NN
-model = load(12646)
+model = load(22040)
 model.make_dataloaders()
 model_validation_set = model.val_dataloader()
 

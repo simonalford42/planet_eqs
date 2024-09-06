@@ -1,3 +1,4 @@
+import pysr
 import torch
 import torch.nn as nn
 import utils
@@ -8,7 +9,6 @@ import spock_reg_model
 import numpy as np
 import torch.nn.functional as F
 from petit20_survival_time import Tsurv
-import pysr
 
 
 class Products(nn.Module):
