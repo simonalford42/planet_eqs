@@ -22,7 +22,6 @@ import glob
 from matplotlib import pyplot as plt
 import os
 
-from torchviz import make_dot
 
 
 def load(version, seed=None):

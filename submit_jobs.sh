@@ -3,8 +3,8 @@
 # Mon Sep 10
 
 # debug NaN's when training nn for residual/variance prediction
-bash train.sh --load_f1 24880 --pysr_f2 'sr_results/11003.pkl' --pysr_f2_model_selection best --freeze_f1 --total_steps 100
-bash train.sh --total_steps 100
+# bash train.sh --load_f1 24880 --pysr_f2 'sr_results/11003.pkl' --pysr_f2_model_selection best --freeze_f1 --total_steps 100
+# bash train.sh --total_steps 100
 
 # Fri Sep 6
 

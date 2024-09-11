@@ -40,6 +40,7 @@ if parse_args.eval:
 
 command = utils.get_script_execution_command()
 print(command)
+print(f'Training for {epochs} epochs')
 
 args = {
     'seed': parse_args.seed,

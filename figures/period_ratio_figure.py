@@ -47,7 +47,7 @@ python period_ratio_figure.py --Ngrid 4 --petit --compute
 python period_ratio_figure.py --Ngrid 4 --petit --plot
 
 # create input cache for Ngrid=4
-python period_ratio_figure.py --Ngrid 4 --input_cache
+python period_ratio_figure.py --Ngrid 4 --create_input_cache
 
 # copy needed files to local so we can plot
 scopy bnn_chaos_model/figures/period_results/v=43139_ngrid=6_pysr_f2_v=33060/ ~/code/bnn_chaos_model/figures/period_results/
@@ -317,6 +317,11 @@ def collate_parallel_results(args):
         assert len(files) > 0
         total = int(files[0].split('-')[1].split('.')[0])
         print('Detected parallel total as', total)
+        print(f'Found {len(files)} files to collate')
+        if len(files) != total:
+            ixs_present = [int(file.split('-')[0]) for file in files]
+            missing = sorted(list(set(range(total)) - set(ixs_present)))
+            print('Missing files:', missing)
     else:
         total = args.parallel_total
 
@@ -586,7 +591,6 @@ if __name__ == '__main__':
         if os.path.exists(path):
             print('Input cache already exists for this size!')
             import sys; sys.exit(0)
-
 
     if args.compute:
         if args.pysr_path:

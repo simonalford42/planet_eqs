@@ -89,7 +89,6 @@ def load_inputs_and_targets(config):
         x = torch.cat([x, next_x], dim=0)
         y = torch.cat([y, next_y], dim=0)
 
-    # we use noisy val bc it is used during training the NN too
     out_dict = model.forward(x, return_intermediates=True, noisy_val=False)
 
     if config['target'] == 'f1':
