@@ -127,8 +127,9 @@ logger.log_hyperparams(params=args)
 
 logger.experiment.config['val_loss'] = checkpointer.best_model_score.item()
 
-import main_figures
-main_figures.calc_scores_nonswag(model, logger=logger, plot_random=args['plot_random'], train_all=args['train_all'])
+if not ('no_plot' in args and args['no_plot']):
+    import main_figures
+    main_figures.calc_scores_nonswag(model, logger=logger, plot_random=args['plot_random'], train_all=args['train_all'])
 
 logger.save()
 logger.finalize('success')
@@ -139,10 +140,16 @@ model.load_state_dict(torch.load(checkpointer.best_model_path)['state_dict'])
 model.make_dataloaders()
 
 # loading models with pt lightning sometimes doesnt work, so lets also save the feature_nn and regress_nn directly
-torch.save(model.feature_nn, f'models/{args["version"]}_feature_nn.pt')
-torch.save(model.regress_nn, f'models/{args["version"]}_regress_nn.pt')
+try:
+    torch.save(model.feature_nn, f'models/{args["version"]}_feature_nn.pt')
+    torch.save(model.regress_nn, f'models/{args["version"]}_regress_nn.pt')
+except Exception as e:
+    print('Failed to save feature_nn and regress_nn')
+    print(e)
+
 if args['f2_variant'] == 'pysr_residual':
     torch.save(model.regress_nn.module1, f'models/{args["version"]}_pysr_nn.pt')
     torch.save(model.regress_nn.module2, f'models/{args["version"]}_base_nn.pt')
+
 
 print('Finished running')

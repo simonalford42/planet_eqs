@@ -21,6 +21,7 @@ def parse():
 
     ########## logging, etc ##########
     parser.add_argument('--no_log', action='store_true', default=False, help='disable wandb logging')
+    parser.add_argument('--no_plot', action='store_true', default=False, help='disable plotting after training')
     parser.add_argument('--version', type=int, help='', default=1278)
     parser.add_argument('--seed', type=int, default=0, help='default=0')
 
@@ -54,8 +55,8 @@ def parse():
     # example: 24880_feature_nn_simplified.pt
     parser.add_argument('--load_f1_feature_nn', default=None, type=str)
     parser.add_argument('--deterministic_summary_stats', action='store_true', help='deterministic summary stats')
-    parser.add_argument('--disable_mu_grad', action='store_true')
     parser.add_argument('--nn_pred_std', action='store_true')
+    parser.add_argument('--disable_grad', action='store_true')
 
     ########## architecture variant args ##########
     parser.add_argument('--f1_variant', type=str, default='linear',
@@ -73,9 +74,9 @@ def parse():
     parser.add_argument('--freeze_f1', action='store_true')
     parser.add_argument('--freeze_f2', action='store_true')
 
-    parser.add_argument('--load_f1', type=str, default=None, help='ckpt path to load f1, e.g. model.ckpt')
-    parser.add_argument('--load_f2', type=str, default=None, help='ckpt path to load f2, e.g. model.ckpt')
-    parser.add_argument('--load_f1_f2', type=str, default=None, help='ckpt path to load f1 and f2, e.g. model.ckpt')
+    parser.add_argument('--load_f1', type=int, default=None, help='version for loading f1')
+    parser.add_argument('--load_f2', type=int, default=None, help='version for loading f2')
+    parser.add_argument('--load_f1_f2', type=int, default=None, help='version for loading both f1 and f2')
 
     parser.add_argument('--pysr_f1', type=str, default=None, help='PySR model to load and replace f1 with, e.g. sr_results/hall_of_fame_9723_0.pkl')
     parser.add_argument('--pysr_f1_model_selection', type=str, default='accuracy', help='best, accuracy, score, or complexity')

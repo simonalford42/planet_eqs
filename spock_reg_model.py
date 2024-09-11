@@ -679,10 +679,6 @@ class VarModel(pl.LightningModule):
         self.input_noise_logvar = nn.Parameter(torch.zeros(self.n_features)-2)
         self.summary_noise_logvar = nn.Parameter(torch.zeros(summary_dim) - 2) # add to summaries, not direct latents
 
-        # disable optimization for the noise logvars
-        self.input_noise_logvar.requires_grad = False
-        self.summary_noise_logvar.requires_grad = False
-
         self.lowest = 0.5
         if 'lower_std' in hparams and hparams['lower_std']:
             self.lowest = 0.1
@@ -727,6 +723,11 @@ class VarModel(pl.LightningModule):
         if 'eval' in hparams and hparams['eval']:
             self.disable_optimization()
 
+        if 'freeze_f1' in hparams and hparams['freeze_f1']:
+            utils.freeze_module(self.feature_nn)
+        if 'freeze_f2' in hparams and hparams['freeze_f2']:
+            utils.freeze_module(self.regress_nn)
+
 
     def path(self):
         version = self.hparams['version']
@@ -754,6 +755,7 @@ class VarModel(pl.LightningModule):
             - the dimension of the summary statistics
             - typically two times the output dim of the f1 network
         '''
+
         if 'f2_variant' not in hparams:
             hparams['f2_variant'] = 'mlp'
 
@@ -869,9 +871,6 @@ class VarModel(pl.LightningModule):
             else:
                 regress_nn = modules.SumModule(regress_nn, residual_net)
 
-        if 'freeze_f2' in hparams and hparams['freeze_f2']:
-            utils.freeze_module(regress_nn)
-
         return regress_nn, summary_dim
 
 
@@ -899,6 +898,7 @@ class VarModel(pl.LightningModule):
                     feature_nn[1] = modules.pruned_linear(feature_nn[1], top_k=hparams['prune_f1_topk'])
                 else:
                     feature_nn = modules.pruned_linear(feature_nn, top_k=hparams['prune_f1_topk'])
+
         elif 'pysr_f1' in hparams and hparams['pysr_f1']:
             # constants can still be optimized with SGD
             feature_nn = modules.PySRFeatureNN(hparams['pysr_f1'], model_selection=hparams['pysr_f1_model_selection'])
@@ -950,9 +950,6 @@ class VarModel(pl.LightningModule):
             self.inputs_mask = modules.MaskLayer(self.n_features)
             feature_nn = torch.nn.Sequential(self.inputs_mask,
                                              self.feature_nn)
-
-        if 'freeze_f1' in hparams and hparams['freeze_f1']:
-            utils.freeze_module(feature_nn)
 
         return feature_nn, out_dim
 
@@ -1058,6 +1055,7 @@ class VarModel(pl.LightningModule):
             return self.compute_summary_stats2(x)
 
         x = self.feature_nn(x)
+
         sample_mu = torch.mean(x, dim=1)
         sample_var = torch.std(x, dim=1)**2
         n = x.shape[1]
@@ -1251,9 +1249,6 @@ class VarModel(pl.LightningModule):
         #  initial system
         # so we just sum over the loss for both of them.
         mu = testy[:, [0]]
-        if 'disable_mu_grad' in self.hparams and self.hparams['disable_mu_grad']:
-            mu = mu.detach()
-
         std = testy[:, [1]]
 
         var = std**2
@@ -1293,9 +1288,13 @@ class VarModel(pl.LightningModule):
         testy = self(x, noisy_val=noisy_val)
         loss = self._lossfnc(testy, y).sum()
 
-        dot = make_dot(loss, params=dict(self.regress_nn.named_parameters()))
-        dot.render("debug_graph_undetached",format='png')
-        assert 0
+        # if torch.is_grad_enabled():
+        #     dot = make_dot(loss, params=dict(self.regress_nn.named_parameters()))
+        #     import datetime
+        #     current_time = datetime.datetime.now().strftime("%H:%M:%S")
+        #     dot.render("debug_graph_" + current_time,format='png')
+        #     print('saved debug graph', current_time)
+        #     assert 0
 
         if include_reg:
             if self.l1_reg_inputs:
