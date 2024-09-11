@@ -326,27 +326,25 @@ def load_pysr_module_list(filepath, model_selection):
         return nn.ModuleList(modules)
 
 
-class PySRRegressNN(nn.Module):
+class AddStdPredNN(nn.Module):
     '''
-    Loads pysr equation module for predicting the mean, and uses base_f2_module to predict the std.
+    Uses one NN to predict the mean, and another NN for predicting the std.
     '''
-    def __init__(self, pysr_net, base_f2_module):
+    def __init__(self, mean_net, std_net):
         super().__init__()
-        self.pysr_net = pysr_net
-        self.base_f2_module = base_f2_module
+        self.mean_net = mean_net
+        self.std_net = std_net
 
     def forward(self, x):
         B = x.shape[0]
-        out = self.pysr_net(x)
-        # if out.shape[-1] == 1:
-        # mean = out  # [B, 1]
+        out = self.mean_net(x)
         mean = out[:, 0:1]
-        base = self.base_f2_module(x)  # [B, 2]
         utils.assert_equal(mean.shape, (B, 1))
-        utils.assert_equal(base.shape, (B, 2))
-        # utils.assert_equal(base.shape, (B, 1))
-        # out = einops.rearrange([mean[:, 0], base[:, 0]], 'two B -> B two')
-        out = einops.rearrange([mean[:, 0], base[:, 1]], 'two B -> B two')
+        std = self.std_net(x)
+        utils.assert_equal(std.shape, (B, 2))
+        std = std[:, 1:]
+        utils.assert_equal(std.shape, (B, 1))
+        out = einops.rearrange([mean[:, 0], std[:, 0]], 'two B -> B two')
         utils.assert_equal(out.shape, (B, 2))
         return out
 

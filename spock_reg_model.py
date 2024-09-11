@@ -810,13 +810,15 @@ class VarModel(pl.LightningModule):
                 else:
                     print('Initializing new network to predict std')
                     base_f2 = modules.mlp(summary_dim, 2, hparams['hidden_dim'], hparams['f2_depth'])
-                regress_nn = modules.PySRRegressNN(regress_nn, base_f2)
+                assert 0, 'need to debug this part too; does addstdprednn do the shapes right?'
+                regress_nn = modules.AddStdPredNN(regress_nn, base_f2)
 
             if 'nn_pred_std' in hparams and hparams['nn_pred_std']:
                 print('Using a neural network to predict std')
-                base_f2 = modules.mlp(summary_dim, 2, hparams['hidden_dim'], hparams['f2_depth'])
+                std_nn = modules.mlp(summary_dim, 2, hparams['hidden_dim'], hparams['f2_depth'])
+                # regress_nn is the pysr module
                 utils.freeze_module(regress_nn)
-                regress_nn = modules.PySRRegressNN(regress_nn, base_f2)
+                regress_nn = modules.AddStdPredNN(regress_nn, std_nn)
         else:
             regress_nn = modules.mlp(summary_dim, 2, hparams['hidden_dim'], hparams['f2_depth'])
 
@@ -860,7 +862,8 @@ class VarModel(pl.LightningModule):
                     else:
                         print('Initializing new network to predict std')
                         base_f2 = modules.mlp(summary_dim, 2, hparams['hidden_dim'], hparams['f2_depth'])
-                    residual_net = modules.PySRRegressNN(residual_net, base_f2)
+                    assert 0, 'need to fix this commented out code'
+                    # residual_net = modules.PySRRegressNN(residual_net, base_f2)
 
             if 'pysr_f2_residual' in hparams and hparams['pysr_f2_residual']:
                 def combined_predict_instability(summary_stats):
