@@ -22,6 +22,8 @@ import glob
 from matplotlib import pyplot as plt
 import os
 
+from torchviz import make_dot
+
 
 def load(version, seed=None):
     path = utils.ckpt_path(version, seed)
@@ -798,6 +800,7 @@ class VarModel(pl.LightningModule):
                 print('PySR only predicts mean. Adding a new network to predict std.')
                 if 'load_f1' in hparams and hparams['load_f1']:
                     print('Using --load_f1 network regress_nn to predict std')
+                    assert 0, 'plz debug this before using it, something seems off'
                     base_f2 = load(hparams['load_f1'], seed=hparams['seed']).regress_nn
                     regress_nn = base_f2
                     # base_f2 = modules.PySRNet('sr_results/29741.pkl', 'best')
@@ -1248,6 +1251,9 @@ class VarModel(pl.LightningModule):
         #  initial system
         # so we just sum over the loss for both of them.
         mu = testy[:, [0]]
+        if 'disable_mu_grad' in self.hparams and self.hparams['disable_mu_grad']:
+            mu = mu.detach()
+
         std = testy[:, [1]]
 
         var = std**2
@@ -1286,6 +1292,10 @@ class VarModel(pl.LightningModule):
     def lossfnc(self, x, y, samples=1, noisy_val=True, include_reg=True):
         testy = self(x, noisy_val=noisy_val)
         loss = self._lossfnc(testy, y).sum()
+
+        dot = make_dot(loss, params=dict(self.regress_nn.named_parameters()))
+        dot.render("debug_graph_undetached",format='png')
+        assert 0
 
         if include_reg:
             if self.l1_reg_inputs:

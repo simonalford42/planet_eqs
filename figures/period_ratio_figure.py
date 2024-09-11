@@ -57,7 +57,7 @@ scopy bnn_chaos_model/figures/period_results/v=43139_ngrid=6.pkl ~/code/bnn_chao
 def get_args():
     print(utils2.get_script_execution_command())
     parser = argparse.ArgumentParser()
-    parser.add_argument('--Ngrid', '-n', type=int, required=True)
+    parser.add_argument('--Ngrid', '-n', type=int, default=1600)
     parser.add_argument('--version', '-v', type=int, default=43139)
 
     parser.add_argument('--plot', '-p', action='store_true')
@@ -290,6 +290,7 @@ def get_results_path(Ngrid, version=None, parallel_ix=None, parallel_total=None,
 
             path += f'_pysr_f2_v={pysr_version}/{pysr_model_selection}'
 
+
     if parallel_ix is not None:
         path += f'/{parallel_ix}-{parallel_total}'
 
@@ -309,9 +310,7 @@ def collate_parallel_results(args):
         # try to detect the total
         path = get_results_path(args.Ngrid, args.version, use_petit=args.petit, input_cache=args.create_input_cache)
 
-        print(path)
         files = os.listdir(get_results_path(args.Ngrid, args.version, use_petit=args.petit, input_cache=args.create_input_cache)[:-4])
-        print(f'files={files}')
         # filter to those of form f'{ix}-{total}.pkl'
         files = [file for file in files if file.endswith('.pkl')]
         # get the total. use the largest possible total
@@ -323,13 +322,18 @@ def collate_parallel_results(args):
 
     missing = False
     for ix in range(total):
+        print(ix)
         path = get_results_path(args.Ngrid, args.version, ix, total, use_petit=args.petit, input_cache=args.create_input_cache)
         try:
             sub_results = load_results(path)
+
+            if args.create_input_cache:
+                sub_results = [t.cpu() if t is not None else None for t in sub_results]
         except FileNotFoundError:
             sub_results = None
             print('Missing results for ix', ix)
             missing = True
+
         results.append(sub_results)
 
     if not missing:
@@ -373,8 +377,14 @@ def plot_results(args, metric=None):
         results = [d['petit'] if d is not None else np.nan for d in results]
     elif metric == 'mean':
         results = [d['mean'] if d is not None else np.nan for d in results]
+    elif metric == 'mean2':
+        pysr_results = results
+        base_results = load_results(get_results_path(args.Ngrid, args.version))
+        results = [(pysr_d['mean'] - d['mean'])**2 if d is not None and pysr_d is not None else np.nan for pysr_d, d in zip(pysr_results, base_results)]
     elif metric == 'std':
         results = [d['std'] if d is not None else np.nan for d in results]
+    elif metric == 'std2':
+        results = [d['std'] / d['mean'] if d is not None else np.nan for d in results]
 
     results = np.array(results)
     X,Y,Z = get_centered_grid(P12s, P23s, results)
@@ -387,12 +397,18 @@ def plot_results(args, metric=None):
     elif metric == 'std':
         cmap = plt.cm.inferno.copy().reversed()
         cmap.set_bad(color='white')
-        im = ax.pcolormesh(X, Y, Z, vmin=0, vmax=6, cmap=cmap)
+        m = Z[~np.isnan(Z)].max()
+        im = ax.pcolormesh(X, Y, Z, vmin=0, vmax=m, cmap=cmap)
         label = "std(log(T_unstable))"
-    elif metric == 'mean':
+    elif metric == 'mean' or metric == 'mean2':
         cmap = plt.cm.inferno.copy().reversed()
         cmap.set_bad(color='white')
-        im = ax.pcolormesh(X, Y, Z, vmin=4, vmax=12, cmap=cmap)
+        # zmax = Z[~np.isnan(Z)].max()
+        # zmin = Z[~np.isnan(Z)].min()
+        zmax = 12
+        zmin = 4
+
+        im = ax.pcolormesh(X, Y, Z, vmin=zmin, vmax=zmax, cmap=cmap)
         label = "log(T_unstable)"
 
     cb = plt.colorbar(im, ax=ax)
@@ -407,6 +423,10 @@ def plot_results(args, metric=None):
 
     if metric == 'std':
         path += '_std'
+    if metric == 'std2':
+        path += '_std2'
+    if metric == 'mean2':
+        path += '_mean2'
 
     if args.pysr_model_selection is not None:
         path += f'_pysr_f2_v={args.pysr_version}/{args.pysr_model_selection}'
@@ -431,7 +451,12 @@ def get_pysr_module(sr_results_path, residual_sr_results_path=None, model_select
 
 
 def compute_pysr_f2_results(args):
-    results = load_results(get_results_path(args.Ngrid, args.version))
+    try:
+        results = load_results(get_results_path(args.Ngrid, args.version))
+    except FileNotFoundError:
+        print('Results not found. Make sure you run --compute with the same --version, but without --pysr, before you compute with pysr f2')
+        import sys
+        sys.exit(0)
 
     if args.pysr_model_selection is None:
         reg = pickle.load(open(args.pysr_path, 'rb'))
@@ -443,9 +468,14 @@ def compute_pysr_f2_results(args):
     good_ixs = np.array([i for i in range(len(f1_results)) if f1_results[i] is not None])
 
     batch = np.array([d for d in f1_results if d is not None])
+    # if cuda is not available, quit
+    if not torch.cuda.is_available():
+        print('CUDA not available, do this on the cluster!')
+        return
     batch = torch.tensor(batch).float().cuda()
 
     for model_selection in model_selections:
+        print(model_selection)
         regress_nn = modules.PySRNet(args.pysr_path, model_selection).cuda()
         pred = regress_nn(batch).detach().cpu().numpy()
         results = np.full((len(f1_results), pred.shape[1]), np.NaN)
@@ -487,6 +517,7 @@ def plot_results_pysr_f2(args):
 
     # go from f'{model_selection}.pkl' to model_selection
     model_selections = sorted([int(f.split('.')[0]) for f in files])
+    model_selections = [1, 3, 5, 7, 9, 11, 14, 18, 20, 27, 29]
 
     # if model selection is provided, filter to those
     if args.pysr_model_selection is not None:
@@ -499,6 +530,7 @@ def plot_results_pysr_f2(args):
     original_model_selection = args.pysr_model_selection
     for model_selection in model_selections:
         args.pysr_model_selection = model_selection
+        args.title = f'Equation complexity = {model_selection}'
         plot_results(args)
     args.pysr_model_selection = original_model_selection
 
@@ -568,7 +600,9 @@ if __name__ == '__main__':
     if args.plot:
         if args.pysr_path:
             plot_results_pysr_f2(args)
+            # pysr_error_analysis(args)
         else:
             plot_results(args)
+            # plot_summary_stats(args)
 
     print('Done')

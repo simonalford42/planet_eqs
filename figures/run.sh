@@ -20,8 +20,5 @@ source /home/sca63/mambaforge/etc/profile.d/conda.sh
 # Enable errexit (exit on error)
 set -e
 
-# conda activate bnn_period
-# python period_ratio_figure.py "$@"
-
-conda activate bnn_chaos_model
-python multiswag_5_planet.py "$@"
+conda activate bnn_period
+python period_ratio_figure.py "$@"

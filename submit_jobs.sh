@@ -1,9 +1,47 @@
 #!/usr/bin/env bash
 
+# Mon Sep 10
+
+# debug NaN's when training nn for residual/variance prediction
+bash train.sh --load_f1 24880 --pysr_f2 'sr_results/11003.pkl' --pysr_f2_model_selection best --freeze_f1 --total_steps 100
+
+# Fri Sep 6
+
+# learning a sparse linear f1, given that f2 is linear
+# sbatch -J linf2 --partition gpu f2_prune_train.sh
+# much simpler f2 linear comparison: just load 24880 for f1 and then train a sparse linear f2
+# sbatch -J linf22 --partition gpu f2_prune_train2.sh
+
+# eval the new pysr equations from sr 3 days
+# sbatch -J evalsr3 eval_eqs.sh --version 24880 --pysr_version 51173
+
+# fine tune f2 with autosimplified f1
+# sbatch --partition gpu -J e.001 train.sh --load_f1_f2 24880 --load_f1_feature_nn models/24880_feature_nn_simplified_v3_eps=0.001.pt --freeze_f1
+# sbatch --partition gpu -J e.1 train.sh --load_f1_f2 24880 --load_f1_feature_nn models/24880_feature_nn_simplified_v3_eps=0.1.pt --freeze_f1
+
+# try a regular prune train, make sure things are still working?
+# sbatch --partition gpu -J debug prune_train.sh
+
+# nn pred std
+# sbatch -J nn_pred_std --partition gpu train.sh --load_f1 24880 --pysr_f2 'sr_results/11003.pkl' --pysr_f2_model_selection accuracy --nn_pred_std --freeze_f1 --total_steps 500
+# bash train.sh --load_f1 24880 --pysr_f2 'sr_results/11003.pkl' --pysr_f2_model_selection accuracy --nn_pred_std --freeze_f1 --total_steps 500
+
+# once those are done, learn pysr equations for them.
+# sbatch -J as.001 --partition gpu --time 25:00:00 sr.sh --time_in_hours 23 --version 10290 --target f2 --max_size 60
+# sbatch -J as.1 --partition gpu --time 25:00:00 sr.sh --time_in_hours 23 --version 9259 --target f2 --max_size 60
+
+
+# sbatch -J f2_l2 --partition gpu f2_prune_train.sh --latent 10 --load_f1 24880 --prune_f2_topk 2 --freeze_f1 --total_steps 500
+# bash f2_prune_train.sh --latent 10 --load_f1 24880 --prune_f2_topk 2 --freeze_f1 --total_steps 500
+# sbatch -J f2_l5 --partition gpu f2_prune_train.sh --latent 10 --load_f1 24880 --prune_f2_topk 5 --freeze_f1
+# sbatch -J f2_l10 --partition gpu f2_prune_train.sh --latent 10 --load_f1 24880 --prune_f2_topk 10 --freeze_f1
+# sbatch -J f2_l20 --partition gpu f2_prune_train.sh --latent 10 --load_f1 24880 --prune_f2_topk 20 --freeze_f1
+# sbatch -J f2_l30 --partition gpu f2_prune_train.sh --latent 10 --load_f1 24880 --prune_f2_topk 30 --freeze_f1
 
 # Wed Sep 4
 
-sbatch -J eval --partition gpu eval_eqs.sh --version 10290 --pysr_version 69083
+# sbatch -J eval --partition gpu eval_eqs.sh --version 10290 --pysr_version 69083
+
 
 # compare model trained deterministically vs normally.
 # sbatch -J det0 --partition gpu train.sh --deterministic_summary_stats --seed 0

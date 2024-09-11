@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
+import argparse
 from custom_cmap import custom_cmap
 from copy import deepcopy as copy
 import einops
@@ -1182,11 +1183,23 @@ def calc_scores_nonswag(model, train_all=False, logger=None, plot_random=False, 
     return rmse, snr_rmse, roc, weight_roc
 
 
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--version', '-v', type=int, default=24880)
+    parser.add_argument('--pysr_version', type=int, default=None)
+    parser.add_argument('--petit', action='store_true')
+    parser.add_argument('--plot_random', action='store_true')
+    parser.add_argument('--pysr_model_selection', type=str, default='accuracy', help='"best", "accuracy", "score", or an integer of the pysr equation complexity.')
+
+    args = parser.parse_args()
+    return args
+
+
 if __name__ == '__main__':
-    args = parse()
+    args = get_args()
 
     if args.pysr_version:
-        model = spock_reg_model.load_with_pysr_f2(version=args.version, seed=args.seed, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection)
+        model = spock_reg_model.load_with_pysr_f2(version=args.version, seed=0, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection)
     else:
         model = spock_reg_model.load(verison=args.version, seed=args.seed)
 

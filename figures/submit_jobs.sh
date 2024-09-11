@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
 
-sbatch -J as_eq_plot1 --partition gpu run.sh --paper-ready --version 9259 --pysr_version 89776
-sbatch -J as_eq_plot2 --partition gpu run.sh --paper-ready --version 10290 --pysr_version 69083
+# sbatch -J as_eq_plot1 --partition gpu run.sh --paper-ready --version 9259 --pysr_version 89776
+# sbatch -J as_eq_plot2 --partition gpu run.sh --paper-ready --version 10290 --pysr_version 69083
 
 # sbatch -J eq_plot_pysr1 --partition gpu run.sh --paper-ready --version 24880 --pysr_model_selection 1 --pysr_version 11003
 # sbatch -J eq_plot_pysr3 --partition gpu run.sh --paper-ready --version 24880 --pysr_model_selection 3 --pysr_version 11003
