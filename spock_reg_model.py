@@ -22,6 +22,7 @@ import glob
 from matplotlib import pyplot as plt
 import os
 
+# from torchviz import make_dot
 
 
 def load(version, seed=None):
@@ -656,6 +657,9 @@ class VarModel(pl.LightningModule):
 
         self.n_features = hparams['time_series_features'] * (1 + int(hparams['include_derivatives']))
 
+        if 'combined_mass_feature' in hparams and hparams['combined_mass_feature']:
+            self.n_features += 1
+
         self.l1_reg_inputs = 'l1_reg' in hparams and hparams['l1_reg'] == 'inputs'
         self.l1_reg_weights = 'l1_reg' in hparams and hparams['l1_reg'] in ['weights', 'both_weights']
         self.l1_reg_f2_weights = 'l1_reg' in hparams and hparams['l1_reg'] in ['f2_weights', 'both_weights']
@@ -724,6 +728,9 @@ class VarModel(pl.LightningModule):
 
         if 'freeze_f1' in hparams and hparams['freeze_f1']:
             utils.freeze_module(self.feature_nn)
+            self.input_noise_logvar.requires_grad = False
+            self.summary_noise_logvar.requires_grad = False
+
         if 'freeze_f2' in hparams and hparams['freeze_f2']:
             utils.freeze_module(self.regress_nn)
 
@@ -1092,7 +1099,10 @@ class VarModel(pl.LightningModule):
     def predict_instability(self, summary_stats):
         testy = self.regress_nn(summary_stats)
 
-        # Outputs mu, std
+        if type(self.regress_nn) in [modules.MaskedLinear]:
+            # no clamp
+            mu = testy[:, [0]]
+            std = testy[:, [1]]
         if type(self.regress_nn) in [modules.PySRNet]:
             mu = testy[:, [0]]
             std = testy[:, [1]]
@@ -1117,6 +1127,13 @@ class VarModel(pl.LightningModule):
             mask = torch.zeros_like(x)
             mask[..., self.megno_location] = x[..., self.megno_location].clone()
             x = x - mask
+        return x
+
+    def add_combined_mass_feature(self, x):
+        with torch.no_grad():
+            m1_ix, m2_ix, m3_ix = 35, 36, 37
+            combined_mass = x[..., m1_ix] + x[..., m2_ix] + x[..., m3_ix]
+            x = torch.cat([x, combined_mass.unsqueeze(-1)], dim=-1)
         return x
 
     def zero_theta(self, x):
@@ -1179,6 +1196,9 @@ class VarModel(pl.LightningModule):
 
         if 'zero_theta' in self.hparams and self.hparams['zero_theta'] != 0:
             x = self.zero_theta(x)
+
+        if 'combined_mass_feature' in self.hparams and self.hparams['combined_mass_feature']:
+            x = self.add_combined_mass_feature(x)
 
         if self.random_sample:
             x = self.augment(x)
@@ -1291,12 +1311,16 @@ class VarModel(pl.LightningModule):
         loss = self._lossfnc(testy, y).sum()
 
         # if torch.is_grad_enabled():
-        #     dot = make_dot(loss, params=dict(self.regress_nn.named_parameters()))
-        #     import datetime
-        #     current_time = datetime.datetime.now().strftime("%H:%M:%S")
-        #     dot.render("debug_graph_" + current_time,format='png')
-        #     print('saved debug graph', current_time)
-        #     assert 0
+            # import pdb; pdb.set_trace()
+            # print([p.requires_grad for p in self.feature_nn.parameters()])
+            # print([p.requires_grad for p in self.regress_nn.parameters()])
+            # print([p.requires_grad for p in self.parameters()])
+            # dot = make_dot(loss, params=dict(self.regress_nn.named_parameters()))
+            # import datetime
+            # current_time = datetime.datetime.now().strftime("%H:%M:%S")
+            # dot.render("debug_graph_" + current_time,format='png')
+            # print('saved debug graph', current_time)
+            # assert 0
 
         if include_reg:
             if self.l1_reg_inputs:

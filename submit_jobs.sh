@@ -1,5 +1,54 @@
 #!/usr/bin/env bash
 
+# Friday Oct 16
+
+# evaluate the linear comparisons
+sbatch -J eval2 --partition gpu eval_eqs.sh --version 64336
+sbatch -J eval5 --partition gpu eval_eqs.sh --version 47272
+sbatch -J eval10 --partition gpu eval_eqs.sh --version 94348
+sbatch -J eval15 --partition gpu eval_eqs.sh --version 51791
+sbatch -J eval20 --partition gpu eval_eqs.sh --version 53392
+
+# Friday Oct 4
+# to see how much results are affected by seed
+# sbatch -J copy --partition gpu prune_train.sh --seed 10
+# sbatch -J copy --partition gpu prune_train.sh --seed 11
+
+# f2 linear comparison
+# sbatch -J nc_linf2_k2 --partition gpu f2_prune_train.sh --prune_f2_topk 2
+# sbatch -J nc_linf2_k5 --partition gpu f2_prune_train.sh --prune_f2_topk 5
+# sbatch -J nc_linf2_k10 --partition gpu f2_prune_train.sh --prune_f2_topk 10
+# sbatch -J nc_linf2_k15 --partition gpu f2_prune_train.sh --prune_f2_topk 15
+# sbatch -J nc_linf2_k20 --partition gpu f2_prune_train.sh --prune_f2_topk 20
+
+# Friday Sep 26
+#
+# sbatch -J M --partition gpu prune_train.sh --combined_mass_feature
+# sbatch -J k3 --partition gpu prune_train.sh --prune_f1_topk 3
+# sbatch -J k4 --partition gpu prune_train.sh --prune_f1_topk 4
+# sbatch -J k5 --partition gpu prune_train.sh --prune_f1_topk 5
+# sbatch -J M-3 --partition gpu prune_train.sh --combined_mass_feature --prune_f1_topk 3
+# sbatch -J M-4 --partition gpu prune_train.sh --combined_mass_feature --prune_f1_topk 4
+# sbatch -J M-5 --partition gpu prune_train.sh --combined_mass_feature --prune_f1_topk 5
+
+# sbatch -J k3s --partition gpu --time 25:00:00 sr.sh --time_in_hours 24 --version 74649 --target f2 --max_size 60
+# sbatch -J k4s --partition gpu --time 25:00:00 sr.sh --time_in_hours 24 --version 11566 --target f2 --max_size 60
+# sbatch -J k5s --partition gpu --time 25:00:00 sr.sh --time_in_hours 24 --version 72646 --target f2 --max_size 60
+# sbatch -J Ms --partition gpu --time 25:00:00 sr.sh --time_in_hours 22 --version 21622 --target f2 --max_size 60
+# accidentally killed the M job :(
+# sbatch -J M --partition gpu train.sh --version 21622 --total_steps 150000 --load_f1_f2 31796 --prune_f1_topk 2 --combined_mass_feature
+
+# Friday Sep 13
+
+# compare model trained deterministically vs normally.
+# sbatch -J det0 --partition gpu train.sh --deterministic_summary_stats --seed 0
+# sbatch -J det1 --partition gpu train.sh --deterministic_summary_stats --seed 1
+# sbatch -J nondet0 --partition gpu train.sh --seed 0
+# sbatch -J nondet1 --partition gpu train.sh --seed 1
+
+
+# try fine-tuning
+
 # Mon Sep 10
 
 # debug NaN's when training nn for residual/variance prediction

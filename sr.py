@@ -323,23 +323,6 @@ def run_pysr(config):
     print(f"Saved to path: {config['equation_file']}")
 
 
-def spock_features(X):
-    features = ['a1', 'a2', 'a3']
-
-    def x(f):
-        return X[:, LABEL_TO_IX[f]]
-
-    def e_cross_inner(x):
-        return (x('a2') - x('a1')) / x('a1')
-
-    def e_cross_outer(x):
-        return (x('a3') - x('a2')) / x('a2')
-
-    y = [e_cross_inner(x), e_cross_outer(x)]
-    y = einops.rearrange(y, 'n B -> B n')
-    return y
-
-
 def parse_args():
     # Instantiate the parser
     parser = argparse.ArgumentParser(description='Optional app description')

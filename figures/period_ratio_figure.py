@@ -18,6 +18,7 @@ import utils2
 import pickle
 from utils2 import assert_equal
 import argparse
+import time
 
 import warnings
 warnings.filterwarnings("ignore", category=ResourceWarning)
@@ -46,6 +47,10 @@ python period_ratio_figure.py --Ngrid 400 --version 24880 --collate
 python period_ratio_figure.py --Ngrid 4 --petit --compute
 python period_ratio_figure.py --Ngrid 4 --petit --plot
 
+# compute and plot for megno predictions
+python period_ratio_figure.py --Ngrid 4 --megno --compute
+python period_ratio_figure.py --Ngrid 4 --megno --plot
+
 # create input cache for Ngrid=4
 python period_ratio_figure.py --Ngrid 4 --create_input_cache
 
@@ -64,6 +69,7 @@ def get_args():
     parser.add_argument('--compute', action='store_true')
     parser.add_argument('--collate', action='store_true')
     parser.add_argument('--petit', action='store_true')
+    parser.add_argument('--megno', action='store_true')
     parser.add_argument('--create_input_cache', action='store_true')
 
     parser.add_argument('--pysr_version', type=str, default=None) # sr_results/33060.pkl
@@ -96,28 +102,6 @@ def load_model(version):
     return spock.NonSwagFeatureRegressor(version)
 
 
-def simulation(par):
-    P12, P23 = par # unpack parameters
-    sim = rebound.Simulation()
-    sim.integrator = "whfast"
-    sim.ri_whfast.safe_mode = 0
-    sim.add(m=1.) # Star
-    sim.add(m=1e-4, P=1, theta='uniform')
-    sim.add(m=1e-4, P=1/P12, theta='uniform')
-    sim.add(m=1e-4, P=1/P12/P23, theta='uniform')
-    sim.move_to_com()
-
-    sim.dt = 0.05
-    sim.init_megno()
-    sim.exit_max_distance = 20.
-    try:
-        sim.integrate(1e4)
-        megno = sim.megno()
-        return megno
-    except rebound.Escape:
-        return 10. # At least one particle got ejected, returning large MEGNO.
-
-
 def get_simulation(par):
     P12, P23 = par # unpack parameters
     sim = rebound.Simulation()
@@ -132,7 +116,7 @@ def get_simulation(par):
     return sim
 
 
-def get_model_prediction(sim, model, use_petit=False, create_input_cache=False):
+def get_model_prediction(sim, model, use_petit=False, use_megno=False, create_input_cache=False):
     '''
     cache: maps simulation id to X.
     '''
@@ -140,6 +124,14 @@ def get_model_prediction(sim, model, use_petit=False, create_input_cache=False):
     sim.dt = 0.05
     sim.init_megno()
     sim.exit_max_distance = 20.
+
+    if use_megno:
+        try:
+            sim.integrate(1e4)
+            megno = sim.calculate_megno()
+            return {'megno': megno}
+        except rebound.Escape:
+            return None
 
     try:
         if create_input_cache:
@@ -195,9 +187,9 @@ def get_parameters(P12s, P23s):
     return parameters
 
 
-def compute_results_for_parameters(parameters, model, use_petit=False, create_input_cache=False):
+def compute_results_for_parameters(parameters, model, use_petit=False, use_megno=False, create_input_cache=False):
     simulations = [get_simulation(par) for par in parameters]
-    results = [get_model_prediction(sim, model, use_petit=use_petit, create_input_cache=create_input_cache) for sim in simulations]
+    results = [get_model_prediction(sim, model, use_petit=use_petit, use_megno=use_megno, create_input_cache=create_input_cache) for sim in simulations]
     return results
 
 
@@ -251,18 +243,25 @@ def compute_results(args):
     if args.parallel_ix is not None:
         parameters = get_list_chunk(parameters, args.parallel_ix, args.parallel_total)
 
-    if input_cache and not args.petit:
+    if input_cache and not args.petit and not args.megno:
         print('Computing using cached input')
 
         for par in parameters:
             assert par in input_cache, f'Input cache missing for {par}'
 
+        # results = [predict_from_cached_input(model, input_cache[par]) for par in parameters]
+
+        # compute results, but time it
+        start = time.time()
         results = [predict_from_cached_input(model, input_cache[par]) for par in parameters]
+        print('Time taken:', time.time() - start)
+        print('Num results: ', len(results))
+
     else:
-        results = compute_results_for_parameters(parameters, model, use_petit=args.petit, create_input_cache=args.create_input_cache)
+        results = compute_results_for_parameters(parameters, model, use_petit=args.petit, use_megno=args.megno, create_input_cache=args.create_input_cache)
 
     # save the results
-    path = get_results_path(args.Ngrid, args.version, args.parallel_ix, args.parallel_total, args.pysr_version, args.pysr_model_selection, args.petit, input_cache=args.create_input_cache)
+    path = get_results_path(args.Ngrid, args.version, args.parallel_ix, args.parallel_total, args.pysr_version, args.pysr_model_selection, args.petit, args.megno, input_cache=args.create_input_cache)
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
     with open(path, 'wb') as f:
@@ -272,9 +271,11 @@ def compute_results(args):
     return results
 
 
-def get_results_path(Ngrid, version=None, parallel_ix=None, parallel_total=None, pysr_version=None, pysr_model_selection=None, use_petit=False, input_cache=False):
+def get_results_path(Ngrid, version=None, parallel_ix=None, parallel_total=None, pysr_version=None, pysr_model_selection=None, use_petit=False, use_megno=False, input_cache=False):
     if use_petit:
         path = f'period_results/petit_ngrid={Ngrid}'
+    elif use_megno:
+        path = f'period_results/megno_ngrid={Ngrid}'
     elif input_cache:
         path = f'period_results/cache_ngrid={Ngrid}'
     else:
@@ -367,12 +368,12 @@ def collate_parallel_results(args):
 
 
 def plot_results(args, metric=None):
-    if not args.petit and metric is None:
+    if not args.petit and not args.megno and metric is None:
         for metric in ['mean', 'std']:
             plot_results(args, metric)
         return
 
-    results = load_results(get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection, use_petit=args.petit))
+    results = load_results(get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection, use_petit=args.petit, use_megno=args.megno))
     P12s, P23s = get_period_ratios(args.Ngrid)
 
     fig, ax = plt.subplots(figsize=(8,6))
@@ -380,6 +381,8 @@ def plot_results(args, metric=None):
     # get the results for the specific metric
     if args.petit:
         results = [d['petit'] if d is not None else np.nan for d in results]
+    elif args.megno:
+        results = [d['megno'] if d is not None else np.nan for d in results]
     elif metric == 'mean':
         results = [d['mean'] if d is not None else np.nan for d in results]
     elif metric == 'mean2':
@@ -399,6 +402,11 @@ def plot_results(args, metric=None):
         cmap.set_bad(color='white')
         im = ax.pcolormesh(X, Y, Z, cmap=cmap)
         label = "Petit 2020 log(T_unstable)"
+    if args.megno:
+        Zfilt = Z
+        Zfilt[Zfilt < 2] = 2.01
+        im = ax.pcolormesh(X, Y, np.log10(Zfilt-2), vmin=-4, vmax=4, cmap='seismic')
+        label = "log(MEGNO-2)"
     elif metric == 'std':
         cmap = plt.cm.inferno.copy().reversed()
         cmap.set_bad(color='white')
@@ -421,7 +429,7 @@ def plot_results(args, metric=None):
     ax.set_xlabel("P1/P2")
     ax.set_ylabel("P2/P3")
 
-    path = get_results_path(args.Ngrid, args.version, use_petit=args.petit)
+    path = get_results_path(args.Ngrid, args.version, use_petit=args.petit, use_megno=args.megno)
     # get rid of .pkl
     path = path[:-4]
     path += '_plot'

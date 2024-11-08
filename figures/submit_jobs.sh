@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+# sbatch -J cache100 --partition gpu run.sh --create_input_cache --Ngrid 100
+# sbatch -J cache200 --partition gpu run.sh --create_input_cache --Ngrid 200
+# sbatch -J cache400 --partition gpu run.sh --create_input_cache --Ngrid 400
+# sbatch -J cache800 --partition gpu run.sh --create_input_cache --Ngrid 800
 
 # sbatch -J as_eq_plot1 --partition gpu run.sh --paper-ready --version 9259 --pysr_version 89776
 # sbatch -J as_eq_plot2 --partition gpu run.sh --paper-ready --version 10290 --pysr_version 69083
@@ -103,43 +107,43 @@
 # sbatch -J p79 --partition gpu run.sh --Ngrid 1600 --create_input_cache --parallel_ix 79 --parallel_total 80
 # sbatch -J p80 --partition gpu run.sh --Ngrid 1600 --create_input_cache --parallel_ix 80 --parallel_total 80
 
-# # sbatch -J p0 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 0 --parallel_total 40
-# # sbatch -J p1 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 1 --parallel_total 40
-# # sbatch -J p2 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 2 --parallel_total 40
-# # sbatch -J p3 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 3 --parallel_total 40
-# # sbatch -J p4 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 4 --parallel_total 40
-# # sbatch -J p5 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 5 --parallel_total 40
-# # sbatch -J p6 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 6 --parallel_total 40
-# # sbatch -J p7 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 7 --parallel_total 40
-# # sbatch -J p8 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 8 --parallel_total 40
-# # sbatch -J p9 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 9 --parallel_total 40
-# # sbatch -J p10 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 10 --parallel_total 40
-# # sbatch -J p11 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 11 --parallel_total 40
-# # sbatch -J p12 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 12 --parallel_total 40
-# # sbatch -J p13 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 13 --parallel_total 40
-# # sbatch -J p14 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 14 --parallel_total 40
-# # sbatch -J p15 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 15 --parallel_total 40
-# # sbatch -J p16 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 16 --parallel_total 40
-# # sbatch -J p17 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 17 --parallel_total 40
-# # sbatch -J p18 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 18 --parallel_total 40
-# # sbatch -J p19 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 19 --parallel_total 40
-# # sbatch -J p20 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 20 --parallel_total 40
-# # sbatch -J p21 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 21 --parallel_total 40
-# # sbatch -J p22 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 22 --parallel_total 40
-# # sbatch -J p23 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 23 --parallel_total 40
-# # sbatch -J p24 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 24 --parallel_total 40
-# # sbatch -J p25 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 25 --parallel_total 40
-# # sbatch -J p26 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 26 --parallel_total 40
-# # sbatch -J p27 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 27 --parallel_total 40
-# # sbatch -J p28 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 28 --parallel_total 40
-# # sbatch -J p29 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 29 --parallel_total 40
-# # sbatch -J p30 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 30 --parallel_total 40
-# # sbatch -J p31 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 31 --parallel_total 40
-# # sbatch -J p32 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 32 --parallel_total 40
-# # sbatch -J p33 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 33 --parallel_total 40
-# # sbatch -J p34 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 34 --parallel_total 40
-# # sbatch -J p35 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 35 --parallel_total 40
-# # sbatch -J p36 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 36 --parallel_total 40
-# # sbatch -J p37 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 37 --parallel_total 40
-# # sbatch -J p38 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 38 --parallel_total 40
-# # sbatch -J p39 --partition gpu run.sh --Ngrid 1600 --compute --petit --parallel_ix 39 --parallel_total 40
+sbatch -J p0 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 0 --parallel_total 40
+sbatch -J p1 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 1 --parallel_total 40
+sbatch -J p2 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 2 --parallel_total 40
+sbatch -J p3 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 3 --parallel_total 40
+sbatch -J p4 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 4 --parallel_total 40
+sbatch -J p5 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 5 --parallel_total 40
+sbatch -J p6 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 6 --parallel_total 40
+sbatch -J p7 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 7 --parallel_total 40
+sbatch -J p8 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 8 --parallel_total 40
+sbatch -J p9 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 9 --parallel_total 40
+sbatch -J p10 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 10 --parallel_total 40
+sbatch -J p11 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 11 --parallel_total 40
+sbatch -J p12 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 12 --parallel_total 40
+sbatch -J p13 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 13 --parallel_total 40
+sbatch -J p14 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 14 --parallel_total 40
+sbatch -J p15 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 15 --parallel_total 40
+sbatch -J p16 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 16 --parallel_total 40
+sbatch -J p17 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 17 --parallel_total 40
+sbatch -J p18 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 18 --parallel_total 40
+sbatch -J p19 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 19 --parallel_total 40
+sbatch -J p20 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 20 --parallel_total 40
+sbatch -J p21 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 21 --parallel_total 40
+sbatch -J p22 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 22 --parallel_total 40
+sbatch -J p23 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 23 --parallel_total 40
+sbatch -J p24 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 24 --parallel_total 40
+sbatch -J p25 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 25 --parallel_total 40
+sbatch -J p26 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 26 --parallel_total 40
+sbatch -J p27 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 27 --parallel_total 40
+sbatch -J p28 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 28 --parallel_total 40
+sbatch -J p29 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 29 --parallel_total 40
+sbatch -J p30 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 30 --parallel_total 40
+sbatch -J p31 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 31 --parallel_total 40
+sbatch -J p32 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 32 --parallel_total 40
+sbatch -J p33 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 33 --parallel_total 40
+sbatch -J p34 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 34 --parallel_total 40
+sbatch -J p35 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 35 --parallel_total 40
+sbatch -J p36 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 36 --parallel_total 40
+sbatch -J p37 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 37 --parallel_total 40
+sbatch -J p38 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 38 --parallel_total 40
+sbatch -J p39 --partition gpu run.sh --Ngrid 1600 --compute --megno --parallel_ix 39 --parallel_total 40

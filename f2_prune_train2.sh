@@ -23,7 +23,10 @@ set -e
 
 # gets the next available version number
 version=$(python versions.py)
-python -u find_minima.py --version $version --total_steps 150000 --l1_reg weights --l1_coeff 2 "$@"
+
+# now apply l2 reg to f2, freezing f1
+python -u find_minima.py --version $version --total_steps 150000 --f2_variant linear --l1_reg f2_weights --l1_coeff 2 --load_f1_f2 24880 --freeze_f1 "$@"
 version2=$(python versions.py)
-python -u find_minima.py --version $version2 --total_steps 150000 --load_f1_f2 $version --prune_f1_topk 2 "$@"
-# python -u run_swag.py --version $version2 --total_steps 150000 "$@"
+# prune topk from f2, then continue training for a bit
+python -u find_minima.py --version $version2 --total_steps 150000 --load_f1_f2 $version --prune_f2_topk 2 --freeze_f1 "$@"
+
