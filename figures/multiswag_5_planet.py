@@ -24,17 +24,36 @@ import matplotlib.pyplot as plt
 import matplotlib
 import random
 import dill
+import torch
 import sys
+from functools import partial
+from multiprocessing import Pool
 import pandas as pd
+import time
 import spock
 from spock import FeatureRegressor, FeatureRegressorXGB, NonSwagFeatureRegressor
 from icecream import ic
 import utils
+import seaborn as sns
 import utils2
 import argparse
 import modules
+import numpy as jnp
+from time import time as ttime
+from petit20_survival_time import Tsurv
+from scipy.integrate import quad
+from scipy.interpolate import interp1d
+import einops
+import glob
+from matplotlib import ticker
+import seaborn as sns
+from oldsimsetup import init_sim_parameters
+from collections import OrderedDict
+import sys
+sys.path.append('spock')
+from tseries_feature_functions import get_extended_tseries
 
-from multiswag_5_planet_plot import make_plot
+from multiswag_5_planet_plot import make_plot, make_plot_separate
 
 try:
     plt.style.use('paper')
@@ -57,10 +76,13 @@ def get_args():
     parser.add_argument('--version', '-v', type=int, default=24880)
 
     parser.add_argument('--paper-ready', '-p', action='store_true')
+    parser.add_argument('--turbo', action='store_true', help='skips some sampling stuff for experimentation')
 
-    parser.add_argument('--pysr_version', type=int, default=None)
+    parser.add_argument('--pysr_version', type=int, default=11003)
     parser.add_argument('--pysr_dir', type=str, default='../sr_results/')  # folder containing pysr results pkl
     parser.add_argument('--pysr_model_selection', type=str, default='accuracy', help='"best", "accuracy", "score", or an integer of the pysr equation complexity. If not provided, will do all complexities. If plotting, has to be an integer complexity')
+
+    parser.add_argument('--extrapolate', action='store_true', help='disables prior for >= 9')
 
     args = parser.parse_args()
 
@@ -94,26 +116,19 @@ used_axes = np.linspace(0, 17500-1, N).astype(np.int32)#np.arange(17500//3, 1750
 nsim_list = nsim_list[used_axes]
 
 
-# model = FeatureRegressor(
-#     cuda=True,
-#     filebase='../' + utils.ckpt_path(version, glob=True) +  '*output.pkl'
-#     # filebase='*' + 'v30' + '*output.pkl'
-#     #'long_zero_megno_with_angles_power_v14_*_output.pkl'
-# )
-
 model = spock_reg_model.load(args.version, seed=0)
+bnn_model = None
 if args.pysr_version:
-    model.regress_nn = modules.PySRNet(os.path.join(args.pysr_dir, f'{args.pysr_version}.pkl'), args.pysr_model_selection)
+    eq_pred_net = modules.PySRNet(os.path.join(args.pysr_dir, f'{args.pysr_version}.pkl'), args.pysr_model_selection)
+
+    model.regress_nn = eq_pred_net
+    # also load the original model so we can plot bnn & equations at the same time
+    bnn_model = spock_reg_model.load(args.version)
+    bnn_model = NonSwagFeatureRegressor(model=bnn_model)
+
 model = NonSwagFeatureRegressor(model=model)
 
-xgbmodel = FeatureRegressorXGB()
-
-
-# -
-
 # # read initial condition file
-
-# +
 infile_delta_2_to_10 = '../data/initial_conditions_delta_2_to_10.npz'
 infile_delta_10_to_13 = '../data/initial_conditions_delta_10_to_13.npz'
 
@@ -166,15 +181,7 @@ t_exit = t_exit[used_axes]
 df = pd.DataFrame(np.array([nsim_list, delta, t_exit]).T, columns=['nsim', 'delta', 't_exit'])
 df.head()
 
-# -
-
-# Generate features for the model:
-
-# +
-from oldsimsetup import init_sim_parameters
-
 sims = []
-sims_for_xgb = []
 for nsim in nsim_list:
     # From Dan's fig 5
     sim = rebound.Simulation()
@@ -186,9 +193,6 @@ for nsim in nsim_list:
 
     init_sim_parameters(sim)
     sims.append(sim)
-    sims_for_xgb.append(sim.copy())
-
-# +
 
 
 def data_setup_kernel(mass_array, cur_tseries):
@@ -204,18 +208,14 @@ def data_setup_kernel(mass_array, cur_tseries):
 
     old_X[..., :] = np.nan_to_num(old_X[..., :], posinf=0.0, neginf=0.0)
 
-    # axis_labels = []
     X = []
 
     for j in range(old_X.shape[-1]):#: #, label in enumerate(old_axis_labels):
         if j in [11, 12, 13, 17, 18, 19, 23, 24, 25]: #if 'Omega' in label or 'pomega' in label or 'theta' in label:
             X.append(np.cos(old_X[:, :, [j]]))
             X.append(np.sin(old_X[:, :, [j]]))
-            # axis_labels.append('cos_'+label)
-            # axis_labels.append('sin_'+label)
         else:
             X.append(old_X[:, :, [j]])
-            # axis_labels.append(label)
     X = np.concatenate(X, axis=2)
     if X.shape[-1] != 41:
         raise NotImplementedError("Need to change indexes above for angles, replace ssX.")
@@ -223,15 +223,6 @@ def data_setup_kernel(mass_array, cur_tseries):
     return X
 
 
-# +
-
-from collections import OrderedDict
-import sys
-sys.path.append('spock')
-from tseries_feature_functions import get_extended_tseries
-
-
-# +
 
 def get_features_for_sim(sim_i, indices=None):
     sim = sims[sim_i]
@@ -269,23 +260,8 @@ def get_features_for_sim(sim_i, indices=None):
 
     return Xs
 
-def get_xgb_prediction(sim_i):
-    sim = sims_for_xgb[sim_i].copy()
-    return xgbmodel.predict(sim)
-
-# +
-
-from functools import partial
-
-from multiprocessing import Pool
 
 pool = Pool(7)
-
-xgb_predictions = np.array(pool.map(
-    get_xgb_prediction,
-    range(len(sims))
-))
-
 
 X = np.array(pool.map(
     get_features_for_sim,
@@ -298,22 +274,8 @@ X = np.array(pool.map(
 # allmeg = X[..., model.swag_ensemble[0].megno_location].ravel()
 allmeg = X[..., model.model.megno_location].ravel()
 
-# +
-# from plotnine import *
-
-# +
-import seaborn as sns
-
-# sns.distplot(
-    # x=allmeg[allmeg<5][::10],
-    # kde=True, hist=False,
-    # label='5-planet')
-
-# plt.legend()
-# -
 
 # Computationally heavy bit:
-
 # Calculate samples:
 
 a_init_p = a_init[:, used_axes]
@@ -324,7 +286,6 @@ Xp = (model.ssX
       .reshape(X.shape)
 )
 
-import torch
 
 Xpp = torch.tensor(Xp).float()
 
@@ -334,156 +295,135 @@ if model.cuda:
     Xflat = Xflat.cuda()
 
 
-time = torch.cat([
-    torch.cat([model.sample_full_swag(Xpart).detach().cpu() for Xpart in torch.chunk(Xflat, chunks=10)])[None]
-    for _ in range(samples)
-], dim=0).reshape(samples, X.shape[0], X.shape[1], 2).numpy()
-# -
+def get_predictions(model, samples, turbo=False):
 
-import numpy as jnp
+    if turbo:
+        # our model is basically deterministic, so to speed up, we can just sample once
+        swag_samples = 1
+    else:
+        swag_samples = samples
 
+    time = torch.cat([
+        torch.cat([model.sample_full_swag(Xpart).detach().cpu() for Xpart in torch.chunk(Xflat, chunks=10)])[None]
+        for _ in range(swag_samples)
+    ], dim=0).reshape(swag_samples, X.shape[0], X.shape[1], 2).numpy()
 
-# +
+    if turbo:
+        # copy back out into (samples, X.shape[0], X.shape[1], 2)
+        time = einops.repeat(time, '1 i j k -> samples i j k', samples=samples)
 
-def fast_truncnorm(
-        loc, scale, left=jnp.inf, right=jnp.inf,
-        d=10000, nsamp=50, seed=0):
-    """Fast truncnorm sampling.
+    def fast_truncnorm(
+            loc, scale, left=jnp.inf, right=jnp.inf,
+            d=10000, nsamp=50, seed=0):
+        """Fast truncnorm sampling.
 
-    Assumes scale and loc have the desired shape of output.
-    length is number of elements.
-    Select nsamp based on expecting at minimum one sample of a Gaussian
-        to fit within your (left, right) range.
-    Select d based on memory considerations - need to operate on
-        a (d, nsamp) array.
-    """
-    oldscale = scale
-    oldloc = loc
+        Assumes scale and loc have the desired shape of output.
+        length is number of elements.
+        Select nsamp based on expecting at minimum one sample of a Gaussian
+            to fit within your (left, right) range.
+        Select d based on memory considerations - need to operate on
+            a (d, nsamp) array.
+        """
+        oldscale = scale
+        oldloc = loc
 
-    scale = scale.reshape(-1)
-    loc = loc.reshape(-1)
-    samples = jnp.zeros_like(scale)
-    start = 0
-    try:
-        rng = PRNGKey(seed)
-    except:
-        rng = 0
-
-    for start in range(0, scale.shape[0], d):
-
-        end = start + d
-        if end > scale.shape[0]:
-            end = scale.shape[0]
-
-        cd = end-start
+        scale = scale.reshape(-1)
+        loc = loc.reshape(-1)
+        samples = jnp.zeros_like(scale)
+        start = 0
         try:
-            rand_out = normal(
-                rng,
-                (nsamp, cd)
-            )
+            rng = PRNGKey(seed)
         except:
-            rand_out = np.random.normal(size=(nsamp, cd))
-        rng += 1
+            rng = 0
 
-        rand_out = (
-            rand_out * scale[None, start:end]
-            + loc[None, start:end]
+        for start in range(0, scale.shape[0], d):
+
+            end = start + d
+            if end > scale.shape[0]:
+                end = scale.shape[0]
+
+            cd = end-start
+            try:
+                rand_out = normal(
+                    rng,
+                    (nsamp, cd)
+                )
+            except:
+                rand_out = np.random.normal(size=(nsamp, cd))
+            rng += 1
+
+            rand_out = (
+                rand_out * scale[None, start:end]
+                + loc[None, start:end]
+            )
+
+            #rand_out is (nsamp, cd)
+            if right == jnp.inf:
+                mask = (rand_out > left)
+            elif left == jnp.inf:
+                mask = (rand_out < right)
+            else:
+                mask = (rand_out > left) & (rand_out < right)
+
+            first_good_val = rand_out[
+                mask.argmax(0), jnp.arange(cd)
+            ]
+
+            try:
+                samples = jax.ops.index_update(
+                    samples, np.s_[start:end], first_good_val
+                )
+            except:
+                samples[start:end] = first_good_val
+
+        return samples.reshape(*oldscale.shape)
+
+    samps_time = np.array(fast_truncnorm(
+            time[..., 0], time[..., 1],
+            left=4, d=10000, nsamp=40,
+            seed=int((ttime()*1e6) % 1e10)
+        ))
+
+    #Resample with prior:
+    if not args.extrapolate:
+        stable_past_9 = samps_time >= 9
+
+        _prior = lambda logT: (
+            3.27086190404742*np.exp(-0.424033970670719 * logT) -
+            10.8793430454878*np.exp(-0.200351029031774 * logT**2)
         )
+        normalization = quad(_prior, a=9, b=np.inf)[0]
 
-        #rand_out is (nsamp, cd)
-        if right == jnp.inf:
-            mask = (rand_out > left)
-        elif left == jnp.inf:
-            mask = (rand_out < right)
-        else:
-            mask = (rand_out > left) & (rand_out < right)
+        prior = lambda logT: _prior(logT)/normalization
 
-        first_good_val = rand_out[
-            mask.argmax(0), jnp.arange(cd)
-        ]
+        # Let's generate random samples of that prior:
+        n_samples = stable_past_9.sum()
+        bins = n_samples*4
+        top = 100.
+        bin_edges = np.linspace(9, top, num=bins)
+        cum_values = [0] + list(np.cumsum(prior(bin_edges)*(bin_edges[1] - bin_edges[0]))) + [1]
+        bin_edges = [9.] +list(bin_edges)+[top]
+        inv_cdf = interp1d(cum_values, bin_edges)
+        r = np.random.rand(n_samples)
+        samples = inv_cdf(r)
 
-        try:
-            samples = jax.ops.index_update(
-                samples, np.s_[start:end], first_good_val
-            )
-        except:
-            samples[start:end] = first_good_val
+        samps_time[stable_past_9] = samples
 
-    return samples.reshape(*oldscale.shape)
+    #min of samples of sampled mu
+    outs = np.min(samps_time, 2).T
 
-from time import time as ttime
-# -
+    log_t_exit = np.log10(t_exit)
 
+    return delta, a_init_p, m_planet, outs, log_t_exit
 
 
+delta, a_init_p, m_planet, outs, log_t_exit = get_predictions(model, samples, turbo=args.turbo)
+if bnn_model:
+    _, _, _, bnn_outs, _ = get_predictions(bnn_model, samples, turbo=args.turbo)
 
-
-# +
-
-from petit20_survival_time import Tsurv
-# -
-
-
-
-# +
-
-samps_time = np.array(fast_truncnorm(
-        time[..., 0], time[..., 1],
-        left=4, d=10000, nsamp=40,
-        seed=int((ttime()*1e6) % 1e10)
-    ))
-
-
-#Resample with prior:
-stable_past_9 = samps_time >= 9
-
-from scipy.integrate import quad
-
-_prior = lambda logT: (
-    3.27086190404742*np.exp(-0.424033970670719 * logT) -
-    10.8793430454878*np.exp(-0.200351029031774 * logT**2)
-)
-normalization = quad(_prior, a=9, b=np.inf)[0]
-
-prior = lambda logT: _prior(logT)/normalization
-
-# Let's generate random samples of that prior:
-
-from scipy.interpolate import interp1d
-
-n_samples = stable_past_9.sum()
-bins = n_samples*4
-top = 100.
-bin_edges = np.linspace(9, top, num=bins)
-cum_values = [0] + list(np.cumsum(prior(bin_edges)*(bin_edges[1] - bin_edges[0]))) + [1]
-bin_edges = [9.] +list(bin_edges)+[top]
-inv_cdf = interp1d(cum_values, bin_edges)
-r = np.random.rand(n_samples)
-samples = inv_cdf(r)
-
-samps_time[stable_past_9] = samples
-
-#min of sampled mu
-# outs = np.min(time, 2)[..., 0].T
-
-#min of samples of sampled mu
-outs = np.min(samps_time, 2).T
-
-#weighted samples
-# chosen_samp = np.min(time[..., 0], 2)
-# outs_std = np.array(
-    # [[time[i, j, np.argmin(time[i, j, :, 0]), 0]
-     # for j in range(time.shape[1])]
-     # for i in range(time.shape[0])])
-# outs_avg = np.average(chosen_samp, 0, weights=1/outs_std**2)
-
-log_t_exit = np.log10(t_exit)
-
-import seaborn as sns
 
 cleaned = dict(
     median=[],
-    xgb=[],
     average=[],
     l=[],
     u=[],
@@ -496,7 +436,17 @@ cleaned = dict(
     m1=[],
     m2=[],
     m3=[],
+    bnn_average=[],
+    bnn_median=[],
+    bnn_l=[],
+    bnn_u=[],
+    bnn_ll=[],
+    bnn_uu=[],
 )
+
+if not bnn_model:
+    bnn_outs = outs
+
 for i in range(len(outs)):
     cleaned['true'].append(log_t_exit[i])
     cleaned['delta'].append(delta[i])
@@ -513,7 +463,6 @@ for i in range(len(outs)):
     cleaned['m1'].append(m1)
     cleaned['m2'].append(m2)
     cleaned['m3'].append(m3)
-    cleaned['xgb'].append(xgb_predictions[i])
 
     if log_t_exit[i] <= 4.0:
         cleaned['average'].append(log_t_exit[i])
@@ -537,16 +486,33 @@ for i in range(len(outs)):
         cleaned['ll'].append(4.)
         cleaned['uu'].append(4.)
 
+    if bnn_model:
+        if log_t_exit[i] <= 4.0:
+            cleaned['bnn_average'].append(log_t_exit[i])
+            cleaned['bnn_median'].append(log_t_exit[i])
+            cleaned['bnn_l'].append(log_t_exit[i])
+            cleaned['bnn_u'].append(log_t_exit[i])
+            cleaned['bnn_ll'].append(log_t_exit[i])
+            cleaned['bnn_uu'].append(log_t_exit[i])
+        elif bnn_outs[i] is not None:
+            cleaned['bnn_average'].append(np.average(bnn_outs[i]))
+            cleaned['bnn_median'].append(np.median(bnn_outs[i]))
+            cleaned['bnn_l'].append(np.percentile(bnn_outs[i], 50+68/2))
+            cleaned['bnn_u'].append(np.percentile(bnn_outs[i], 50-68/2))
+            cleaned['bnn_ll'].append(np.percentile(bnn_outs[i], 50+95/2))
+            cleaned['bnn_uu'].append(np.percentile(bnn_outs[i], 50-95/2))
+        else:
+            cleaned['bnn_average'].append(4.)
+            cleaned['bnn_median'].append(4.)
+            cleaned['bnn_l'].append(4.)
+            cleaned['bnn_u'].append(4.)
+            cleaned['bnn_ll'].append(4.)
+            cleaned['bnn_uu'].append(4.)
+
 cleaned = pd.DataFrame(cleaned)
 
 for key in 'average median l u ll uu'.split(' '):
     cleaned.loc[cleaned['true']<=4.0, key] = cleaned.loc[cleaned['true']<=4.0, 'true']
-
-
-import glob
-
-from matplotlib import ticker
-
 
 
 # +
@@ -578,11 +544,23 @@ cleaned['pperiodetitf'] = np.log10(pd.Series([Tsurv(
 # -
 
 
+filename = f'cur_plot_datasets/{time.time()}.csv'
+cleaned.to_csv(filename)
+print('saved data to', filename)
 
+path = f'five_planet_v{args.version}_pysr{args.pysr_version}'
+if args.pysr_model_selection != 'accuracy':
+    path += f'_ms={args.pysr_model_selection}'
 
+path += f'_N={N}_samps={samples}'
 
+if args.turbo:
+    path += '_turbo'
+if args.extrapolate:
+    path += '_extrapolate'
 
-import time
-cleaned.to_csv(f'cur_plot_dataset_{time.time()}.csv')
-make_plot(cleaned, version, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection)
+path += '.png'
+
+make_plot_separate(cleaned, path=path)
+
 print('made plot')

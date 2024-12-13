@@ -34,10 +34,10 @@ def tsurv(x):
     x = x[:, :] # [B, 41]
     preds = [Tsurv(*tsurv_inputs(xi)) for xi in x]
     preds = np.array(preds)
-    preds = np.nan_to_num(preds, posinf=1e9, neginf=1e9, nan=1e9)
+    preds = np.nan_to_num(preds, posinf=1e12, neginf=1e12, nan=1e12)
 
-    # also threshold at 1e4 and 1e9
-    preds = np.clip(preds, 1e4, 1e9)
+    # also threshold at 1e4 and 1e12
+    preds = np.clip(preds, 1e4, 1e12)
 
     preds = np.log10(preds)
     return torch.tensor(preds)

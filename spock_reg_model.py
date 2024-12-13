@@ -734,6 +734,14 @@ class VarModel(pl.LightningModule):
         if 'freeze_f2' in hparams and hparams['freeze_f2']:
             utils.freeze_module(self.regress_nn)
 
+        if 'predict_eq_uncertainty' in hparams and hparams['predict_eq_uncertainty']:
+            # load old model + pysr equations, but hide it so it's not a submodule
+            model = load_with_pysr_f2(version=24880, pysr_version=11003, pysr_model_selection='accuracy')
+            model = model.cuda()
+            self.eq_model = [model]
+            for param in self.eq_model[0].parameters():
+                param.requires_grad = False
+
 
     def path(self):
         version = self.hparams['version']
@@ -771,11 +779,11 @@ class VarModel(pl.LightningModule):
         elif 'load_f1_f2' in hparams and hparams['load_f1_f2']:
             load_version = hparams['load_f1_f2']
         if load_version is not None:
-            model = load(load_version, seed=hparams['seed'])
+            model = load(load_version, seed=0)
             regress_nn = model.regress_nn
             summary_dim = model.summary_dim
 
-            if 'prune_f2_topk' in hparams and hparams['prune_f2_topk']:
+            if 'prune_f2_topk' in hparams and hparams['prune_f2_topk'] is not None:
                 assert isinstance(regress_nn, nn.Linear)
                 regress_nn = modules.pruned_linear(regress_nn, top_k=hparams['prune_f2_topk'])
 
@@ -809,7 +817,7 @@ class VarModel(pl.LightningModule):
                 if 'load_f1' in hparams and hparams['load_f1']:
                     print('Using --load_f1 network regress_nn to predict std')
                     assert 0, 'plz debug this before using it, something seems off'
-                    base_f2 = load(hparams['load_f1'], seed=hparams['seed']).regress_nn
+                    base_f2 = load(hparams['load_f1'], seed=0).regress_nn
                     regress_nn = base_f2
                     # base_f2 = modules.PySRNet('sr_results/29741.pkl', 'best')
                     utils.freeze_module(base_f2)
@@ -864,7 +872,7 @@ class VarModel(pl.LightningModule):
                     print('PySR only predicts mean. Adding a new network to predict std.')
                     if 'load_f1' in hparams and hparams['load_f1']:
                         print('Using --load_f1 network regress_nn to predict std')
-                        base_f2 = load(hparams['load_f1'], seed=hparams['seed']).regress_nn
+                        base_f2 = load(hparams['load_f1'], seed=0).regress_nn
                     else:
                         print('Initializing new network to predict std')
                         base_f2 = modules.mlp(summary_dim, 2, hparams['hidden_dim'], hparams['f2_depth'])
@@ -888,7 +896,7 @@ class VarModel(pl.LightningModule):
         out_dim = hparams['latent'] # certain f1 variants might change this
 
         if 'load_f1_feature_nn' in hparams and hparams['load_f1_feature_nn']:
-            feature_nn = torch.load(hparams['load_f1_feature_nn'])
+            feature_nn = torch.load(hparams['load_f1_feature_nn'], seed=0)
             out_dim = feature_nn.linear.weight.shape[0]
         elif any(p in hparams and hparams[p] for p in ['load_f1', 'load_f1_f2']):
             load_version = None
@@ -897,7 +905,7 @@ class VarModel(pl.LightningModule):
             else:
                 assert 'load_f1_f2' in hparams and hparams['load_f1_f2']
                 load_version = hparams['load_f1_f2']
-            model = load(load_version, seed=hparams['seed'])
+            model = load(load_version, seed=0)
             feature_nn = model.feature_nn
             out_dim = model.feature_nn_out_dim
             if 'prune_f1_topk' in hparams and hparams['prune_f1_topk'] is not None:
@@ -1103,7 +1111,7 @@ class VarModel(pl.LightningModule):
             # no clamp
             mu = testy[:, [0]]
             std = testy[:, [1]]
-        if type(self.regress_nn) in [modules.PySRNet]:
+        if type(self.regress_nn) in [modules.PySRNet, modules.PySREQBoundsNet]:
             mu = testy[:, [0]]
             std = testy[:, [1]]
             mu = hard_clamp(mu, 4.0, 12.0)
@@ -1307,20 +1315,31 @@ class VarModel(pl.LightningModule):
         return -total_loss.sum(1)
 
     def lossfnc(self, x, y, samples=1, noisy_val=True, include_reg=True):
-        testy = self(x, noisy_val=noisy_val)
-        loss = self._lossfnc(testy, y).sum()
 
-        # if torch.is_grad_enabled():
-            # import pdb; pdb.set_trace()
-            # print([p.requires_grad for p in self.feature_nn.parameters()])
-            # print([p.requires_grad for p in self.regress_nn.parameters()])
-            # print([p.requires_grad for p in self.parameters()])
-            # dot = make_dot(loss, params=dict(self.regress_nn.named_parameters()))
-            # import datetime
-            # current_time = datetime.datetime.now().strftime("%H:%M:%S")
-            # dot.render("debug_graph_" + current_time,format='png')
-            # print('saved debug graph', current_time)
-            # assert 0
+        # change the predicted mean to the eq_model's predicted mean
+        # this way the nn learns to predict the std of the eq_model's predictions
+        if 'predict_eq_uncertainty' in self.hparams and self.hparams['predict_eq_uncertainty']:
+
+            testy = self(x, noisy_val=noisy_val)
+            with torch.no_grad():
+                eq_testy = self.eq_model[0](x, noisy_val=noisy_val)
+                eq_testy[0, 0] = hard_clamp(eq_testy[0, 0], 4.0, 12.0)
+
+                # sometimes the equations predict nan; get rid of those.
+                # [B] tensor of indices of eq_testy that are nan
+                nan_ixs = torch.isnan(eq_testy).any(dim=1)
+                # exclude nan indices; we know those are highly uncertain already!
+                x = x[~nan_ixs]
+                y = y[~nan_ixs]
+                testy = testy[~nan_ixs]
+                eq_testy = eq_testy[~nan_ixs]
+
+            # needs to be outside the no_grad otherwise pytorch complains
+            testy[:, 0] = eq_testy[:, 0]
+        else:
+            testy = self(x, noisy_val=noisy_val)
+
+        loss = self._lossfnc(testy, y).sum()
 
         if include_reg:
             if self.l1_reg_inputs:

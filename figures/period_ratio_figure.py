@@ -23,6 +23,9 @@ import time
 import warnings
 warnings.filterwarnings("ignore", category=ResourceWarning)
 
+INSTABILITY_TIME_LABEL = r"$\log_{10}(T_{\rm inst})$"
+MEGNO_LABEL = r"$\log_{10}(\rm MEGNO-2)$"
+
 '''
 Example commands:
 
@@ -63,7 +66,7 @@ def get_args():
     print(utils2.get_script_execution_command())
     parser = argparse.ArgumentParser()
     parser.add_argument('--Ngrid', '-n', type=int, default=1600)
-    parser.add_argument('--version', '-v', type=int, default=43139)
+    parser.add_argument('--version', '-v', type=int, default=24880)
 
     parser.add_argument('--plot', '-p', action='store_true')
     parser.add_argument('--compute', action='store_true')
@@ -72,7 +75,7 @@ def get_args():
     parser.add_argument('--megno', action='store_true')
     parser.add_argument('--create_input_cache', action='store_true')
 
-    parser.add_argument('--pysr_version', type=str, default=None) # sr_results/33060.pkl
+    parser.add_argument('--pysr_version', type=str, default=None) # sr_results/11003.pkl
     parser.add_argument('--pysr_dir', type=str, default='../sr_results/')  # folder containing pysr results pkl
 
     parser.add_argument('--pysr_model_selection', type=str, default=None, help='"best", "accuracy", "score", or an integer of the pysr equation complexity. If not provided, will do all complexities. If plotting, has to be an integer complexity')
@@ -81,6 +84,8 @@ def get_args():
     # ix should be in [0, total)
     parser.add_argument('--parallel_ix', '-i', type=int, default=None)
     parser.add_argument('--parallel_total', '-t', type=int, default=None)
+
+    parser.add_argument('--equation_bounds', '-e', action='store_true')
 
     args = parser.parse_args()
 
@@ -273,24 +278,23 @@ def compute_results(args):
 
 def get_results_path(Ngrid, version=None, parallel_ix=None, parallel_total=None, pysr_version=None, pysr_model_selection=None, use_petit=False, use_megno=False, input_cache=False):
     if use_petit:
-        path = f'period_results/petit_ngrid={Ngrid}'
+        path = f'period_results/petit/petit_ngrid={Ngrid}'
     elif use_megno:
-        path = f'period_results/megno_ngrid={Ngrid}'
+        path = f'period_results/megno/megno_ngrid={Ngrid}'
     elif input_cache:
-        path = f'period_results/cache_ngrid={Ngrid}'
+        path = f'period_results/caches/cache_ngrid={Ngrid}'
     else:
-        path = f'period_results/v={version}_ngrid={Ngrid}'
+        path = f'period_results/v={version}/v={version}_ngrid={Ngrid}'
 
         if pysr_model_selection is not None:
             if pysr_model_selection == 'accuracy':
-                # get the best (highest accuracy) model selection
-                files = os.listdir(path + f'_pysr_f2_v={pysr_version}')
-                files = [file for file in files if file.endswith('.pkl')]
-                model_selections = [int(file.split('.')[0]) for file in files]
-                pysr_model_selection = max(model_selections)
+                model = pickle.load(open(f'../sr_results/{pysr_version}.pkl', 'rb'))
+                if type(model.equations_) == list:
+                    pysr_model_selection = max(model.equations_[0]['complexity'])
+                else:
+                    pysr_model_selection = max(model.equations_['complexity'])
 
             path += f'_pysr_f2_v={pysr_version}/{pysr_model_selection}'
-
 
     if parallel_ix is not None:
         path += f'/{parallel_ix}-{parallel_total}'
@@ -309,9 +313,9 @@ def collate_parallel_results(args):
     results = []
     if args.parallel_total is None:
         # try to detect the total
-        path = get_results_path(args.Ngrid, args.version, use_petit=args.petit, input_cache=args.create_input_cache)
+        path = get_results_path(args.Ngrid, args.version, use_petit=args.petit, input_cache=args.create_input_cache, use_megno=args.megno)
 
-        files = os.listdir(get_results_path(args.Ngrid, args.version, use_petit=args.petit, input_cache=args.create_input_cache)[:-4])
+        files = os.listdir(get_results_path(args.Ngrid, args.version, use_petit=args.petit, input_cache=args.create_input_cache, use_megno=args.megno)[:-4])
         # filter to those of form f'{ix}-{total}.pkl'
         files = [file for file in files if file.endswith('.pkl')]
         # get the total. use the largest possible total
@@ -329,7 +333,8 @@ def collate_parallel_results(args):
     missing = False
     for ix in range(total):
         print(ix)
-        path = get_results_path(args.Ngrid, args.version, ix, total, use_petit=args.petit, input_cache=args.create_input_cache)
+        path = get_results_path(args.Ngrid, args.version, ix, total, use_petit=args.petit, input_cache=args.create_input_cache, use_megno=args.megno)
+
         try:
             sub_results = load_results(path)
 
@@ -361,14 +366,14 @@ def collate_parallel_results(args):
 
     # concatenate into one big list of results, maintaining ordering
     results = [result for sub_results in results for result in sub_results]
-    path = get_results_path(args.Ngrid, args.version, use_petit=args.petit)
+    path = get_results_path(args.Ngrid, args.version, use_petit=args.petit, use_megno=args.megno)
     with open(path, 'wb') as f:
         pickle.dump(results, f)
     print('Saved results to', path)
 
 
 def plot_results(args, metric=None):
-    if not args.petit and not args.megno and metric is None:
+    if not args.petit and not args.megno and not args.equation_bounds and metric is None:
         for metric in ['mean', 'std']:
             plot_results(args, metric)
         return
@@ -383,6 +388,8 @@ def plot_results(args, metric=None):
         results = [d['petit'] if d is not None else np.nan for d in results]
     elif args.megno:
         results = [d['megno'] if d is not None else np.nan for d in results]
+    elif args.equation_bounds:
+        results = [d['bound'] if d is not None else np.nan for d in results]
     elif metric == 'mean':
         results = [d['mean'] if d is not None else np.nan for d in results]
     elif metric == 'mean2':
@@ -401,18 +408,26 @@ def plot_results(args, metric=None):
         cmap = plt.cm.inferno.copy().reversed()
         cmap.set_bad(color='white')
         im = ax.pcolormesh(X, Y, Z, cmap=cmap)
-        label = "Petit 2020 log(T_unstable)"
+        label = INSTABILITY_TIME_LABEL
     if args.megno:
         Zfilt = Z
-        Zfilt[Zfilt < 2] = 2.01
-        im = ax.pcolormesh(X, Y, np.log10(Zfilt-2), vmin=-4, vmax=4, cmap='seismic')
-        label = "log(MEGNO-2)"
+        Zfilt[Zfilt <= 2] = 2.01
+        cmap = plt.cm.inferno.copy()
+        cmap.set_bad(color='white')
+        im = ax.pcolormesh(X, Y, np.log10(Zfilt-2), vmin=-4, vmax=4, cmap=cmap)
+        label = MEGNO_LABEL
     elif metric == 'std':
         cmap = plt.cm.inferno.copy().reversed()
         cmap.set_bad(color='white')
         m = Z[~np.isnan(Z)].max()
         im = ax.pcolormesh(X, Y, Z, vmin=0, vmax=m, cmap=cmap)
-        label = "std(log(T_unstable))"
+        label = "std(" + INSTABILITY_TIME_LABEL + ")"
+    elif args.equation_bounds:
+        cmap = plt.cm.inferno.copy().reversed()
+        cmap.set_bad(color='white')
+        im = ax.pcolormesh(X, Y, Z, vmin=0, vmax=1, cmap=cmap)
+        label = 'Equation bounds'
+
     elif metric == 'mean' or metric == 'mean2':
         cmap = plt.cm.inferno.copy().reversed()
         cmap.set_bad(color='white')
@@ -422,12 +437,13 @@ def plot_results(args, metric=None):
         zmin = 4
 
         im = ax.pcolormesh(X, Y, Z, vmin=zmin, vmax=zmax, cmap=cmap)
-        label = "log(T_unstable)"
+        label = INSTABILITY_TIME_LABEL
 
     cb = plt.colorbar(im, ax=ax)
     cb.set_label(label)
     ax.set_xlabel("P1/P2")
     ax.set_ylabel("P2/P3")
+    plt.tight_layout()
 
     path = get_results_path(args.Ngrid, args.version, use_petit=args.petit, use_megno=args.megno)
     # get rid of .pkl
@@ -494,17 +510,30 @@ def compute_pysr_f2_results(args):
         results = np.full((len(f1_results), pred.shape[1]), np.NaN)
         results[good_ixs] = pred
 
-        assert_equal(results.shape[1], 2)
-        # convert back to dictionary of 'mean': mean, 'std': std, for compatibility with the other results
-        results2 = []
-        for result in results:
-            if np.isnan(result).any():
-                results2.append(None)
-            else:
-                results2.append({
-                    'mean': result[0],
-                    'std': result[1]
-                })
+        if args.equation_bounds:
+            assert_equal(results.shape[1], 1)
+            # convert back to dictionary of 'mean': mean, 'std': std, for compatibility with the other results
+            results2 = []
+            for result in results:
+                if np.isnan(result).any():
+                    results2.append(None)
+                else:
+                    results2.append({
+                        'bound': result[0],
+                    })
+        else:
+            assert_equal(results.shape[1], 2)
+            # convert back to dictionary of 'mean': mean, 'std': std, for compatibility with the other results
+            results2 = []
+            for result in results:
+                if np.isnan(result).any():
+                    results2.append(None)
+                else:
+                    results2.append({
+                        'mean': result[0],
+                        'std': result[1]
+                    })
+
 
         results = results2
 
@@ -527,14 +556,18 @@ def plot_results_pysr_f2(args):
 
     # filter to those of form f'{i}.pkl'
     files = [file for file in files if file.endswith('.pkl')]
+    print(f'files={files}')
 
     # go from f'{model_selection}.pkl' to model_selection
     model_selections = sorted([int(f.split('.')[0]) for f in files])
-    model_selections = [1, 3, 5, 7, 9, 11, 14, 18, 20, 27, 29]
+    # model_selections = [1, 3, 5, 7, 9, 11, 14, 18, 20, 27, 29]
 
     # if model selection is provided, filter to those
     if args.pysr_model_selection is not None:
-        files = [file for file in files if file.startswith(args.pysr_model_selection)]
+        if args.pysr_model_selection == 'accuracy':
+            model_selections = [model_selections[-1]]
+        else:
+            files = [file for file in files if file.startswith(args.pysr_model_selection)]
 
     # go from f'{model_selection}.pkl' to model_selection
     model_selections = [int(f.split('.')[0]) for f in files]
@@ -546,6 +579,130 @@ def plot_results_pysr_f2(args):
         args.title = f'Equation complexity = {model_selection}'
         plot_results(args)
     args.pysr_model_selection = original_model_selection
+
+
+def plot_nn_eq_petit_megno_4way_comparison(args):
+    # Create the figure and axes
+    fig, axs = plt.subplots(2, 2, figsize=(12, 10))
+    axs = axs.flatten()
+
+    nn_results = load_results(get_results_path(args.Ngrid, args.version))
+    eq_results = load_results(get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection='accuracy'))
+    petit_results = load_results(get_results_path(args.Ngrid, use_petit=True))
+    megno_results = load_results(get_results_path(args.Ngrid, use_megno=True))
+
+    model_results = [nn_results, eq_results, petit_results, megno_results]
+    names = ['nn', 'eq', 'petit', 'megno']
+
+    for i in range(4):
+        results = model_results[i]
+        name = names[i]
+
+        P12s, P23s = get_period_ratios(args.Ngrid)
+
+        # get the results for the specific metric
+        if name == 'petit':
+            results = [d['petit'] if d is not None else np.nan for d in results]
+        elif name == 'megno':
+            results = [d['megno'] if d is not None else np.nan for d in results]
+        else:
+            results = [d['mean'] if d is not None else np.nan for d in results]
+
+        results = np.array(results)
+        X,Y,Z = get_centered_grid(P12s, P23s, results)
+
+        if name == 'petit':
+            cmap = plt.cm.inferno.copy().reversed()
+            cmap.set_bad(color='white')
+            im = axs[i].pcolormesh(X, Y, Z, cmap=cmap)
+            label = INSTABILITY_TIME_LABEL
+        elif name == 'megno':
+            Zfilt = Z
+            Zfilt[Zfilt <= 2] = 2.01
+            cmap = plt.cm.inferno.copy()
+            cmap.set_bad(color='white')
+            im = axs[i].pcolormesh(X, Y, np.log10(Zfilt-2), vmin=-4, vmax=4, cmap=cmap)
+            label = MEGNO_LABEL
+        else:
+            cmap = plt.cm.inferno.copy().reversed()
+            cmap.set_bad(color='white')
+            zmax = 12
+            zmin = 4
+            im = axs[i].pcolormesh(X, Y, Z, vmin=zmin, vmax=zmax, cmap=cmap)
+            label = INSTABILITY_TIME_LABEL
+
+        cb = plt.colorbar(im, ax=axs[i])
+        cb.set_label(label)
+        axs[i].set_xlabel("P1/P2")
+        axs[i].set_ylabel("P2/P3")
+        title = ['Neural network', 'Distilled equations', 'Petit 2020', 'MEGNO'][i]
+        axs[i].set_title(title)
+        plt.tight_layout()
+
+
+    # fig.set_constrained_layout(True)
+
+    path = get_results_path(args.Ngrid, args.version)[:-4] + '_comparison'
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    plt.savefig(path + '.png', dpi=800)
+    print('Saved figure to', path + '.png')
+    plt.close(fig)
+
+
+def plot_pysr_4way_comparison(args):
+    # get the model selections by grepping for the files
+    path = get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection='*')
+    files = os.listdir(os.path.dirname(path))
+
+    # filter to those of form f'{i}.pkl'
+    files = [file for file in files if file.endswith('.pkl')]
+
+    # go from f'{model_selection}.pkl' to model_selection
+    model_selections = sorted([int(f.split('.')[0]) for f in files])
+
+    # Define the complexities you want to plot
+    desired_complexities = [3, 5, 14, 29]
+
+    # Filter the model_selections to only include the desired complexities
+    model_selections = [ms for ms in model_selections if ms in desired_complexities]
+
+    # Create the figure and axes
+    fig, axs = plt.subplots(2, 2, figsize=(12, 10))
+    axs = axs.flatten()
+
+    for i, model_selection in enumerate(model_selections):
+        args.pysr_model_selection = model_selection
+        results = load_results(get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection=str(model_selection)))
+
+        P12s, P23s = get_period_ratios(args.Ngrid)
+
+        # get the results for the mean
+        results = [d['mean'] if d is not None else np.nan for d in results]
+
+        X,Y,Z = get_centered_grid(P12s, P23s, results)
+
+        cmap = plt.cm.inferno.copy().reversed()
+        cmap.set_bad(color='white')
+        zmax = 12
+        zmin = 4
+        im = axs[i].pcolormesh(X, Y, Z, vmin=zmin, vmax=zmax, cmap=cmap)
+        axs[i].set_title(f'Complexity {model_selection}')
+        axs[i].set_xlabel("P1/P2")
+        axs[i].set_ylabel("P2/P3")
+
+    # Create a single colorbar
+    cb = fig.colorbar(im, ax=axs.ravel().tolist(), shrink=0.6)
+    cb.set_label(INSTABILITY_TIME_LABEL)
+    fig.set_constrained_layout(True)
+    # fig.subplots_adjust(wspace=0.05, hspace=0.05)
+
+    path = get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection='comparison')[:-4]
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    plt.savefig(path + '.png', dpi=800)
+    print('Saved figure to', path + '.png')
+    plt.close(fig)
+
+
 
 
 def calculate_mse(Ngrid, version, pysr_version):
@@ -592,6 +749,10 @@ def calculate_mse(Ngrid, version, pysr_version):
 
 if __name__ == '__main__':
     args = get_args()
+
+    # plot_nn_eq_petit_megno_4way_comparison(args)
+    # plot_pysr_4way_comparison(args)
+    # assert 0
 
     if args.create_input_cache:
         # check if cache already exists for this size!

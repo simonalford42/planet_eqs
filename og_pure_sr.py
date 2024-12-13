@@ -1,51 +1,34 @@
 import pickle as pkl
+from pure_sr import load_data as load_data2
 
-import numpy as np
 import click
+import einops as E
+import numpy as np
 from pysr import PySRRegressor, jl
-import os
-import wandb
-import subprocess
-import random
-import spock_reg_model
-import torch
-import einops
 
 
-def load_data(n):
-    # use input data that's the same as the neural network (already normalized, etc)
-    # this makes it easier to evaluate and compare to my other approaches
-    model = spock_reg_model.load(24880)
-    model.make_dataloaders()
-    model.eval()
+def load_data():
+    data = pkl.load(open("./data/combined.pkl", "rb"))
+    X = data["X"]  # (N, 100, 41)
+    y = data["y"]  # (N, 2)
 
-    data_iterator = iter(model.train_dataloader())
-    x, y = next(data_iterator)
-    while x.shape[0] < n:
-        next_x, next_y = next(data_iterator)
-        x = torch.cat([x, next_x], dim=0)
-        y = torch.cat([y, next_y], dim=0)
+    rng = np.random.RandomState(0)
+    factor = 0.005
 
-    x = x.cuda()
-    model = model.cuda()
-    out_dict = model.forward(x, return_intermediates=True, noisy_val=False)
-    # inputs to SR are the inputs to the whole system
-    X = out_dict['inputs']  # [B, T, N]
+    mask = rng.choice(a=[False, True], size=X.shape[0], p=[1 - factor, factor])
 
-    # take every 10th sample on the time axis
-    X = X[:, ::10, :]
+    X = X[mask, ::10]
+    y = y[mask]
+    # (1142, 10, 41)
 
-    # there are two ground truth predictions. create a data point for each
-    X = einops.repeat(X, 'B ... -> (B two) ...', two=2)
-    y = einops.rearrange(y, 'B two -> (B two)')
+    X = E.repeat(X, "batch time feature -> (batch shadow) time feature", shadow=2)
+    y = E.rearrange(y, "batch shadow -> (batch shadow)", shadow=2)
 
-    ixs = np.random.choice(X.shape[0], size=n, replace=False)
-    X, y, = X[ixs], y[ixs]
-
-    Xflat = einops.rearrange(X, "B T f -> (B T) f")
-    yflat = einops.repeat(y, "B  -> (B T)", T=X.shape[1])
-
-    Xflat, yflat = Xflat.cpu().numpy(), yflat.cpu().numpy()
+    Xflat = E.rearrange(
+        X,
+        "batch time feature -> (batch time) feature",
+    )
+    yflat = E.repeat(y, "batch -> (batch time)", time=X.shape[1])
 
     return X, Xflat, yflat
 
@@ -54,21 +37,19 @@ def option(*param_decls, **attrs):
     attrs.setdefault("show_default", True)
     return click.option(*param_decls, **attrs)
 
+
 @click.command()
 @option("--procs", type=int, default=1)
-@option("--niterations", type=int, default=100000)
-@option("--populations", type=int, default=1)
+@option("--niterations", type=int, default=None)
+@option("--populations", type=int, default=None)
 @option("--population-size", type=int, default=33)
 @option("--ncycles-per-iteration", type=int, default=550)
-@option("--distributed/--no-distributed", default=True)
+@option("--distributed/--no-distributed", default=False)
 @option("--multithreading/--no-multithreading", default=False)
 @option("--weight-optimize", type=float, default=0.001)
 @option("--parsimony", type=float, default=0.01)
 @option("--maxsize", type=int, default=50)
-@option("--no-log", default=False)
-@option("--time-in-hours", type=float, default=240)
 @option("--heap-size-hint-in-bytes", type=int, default=300_000_000)
-@option("--n", type=int, default=1000)
 @option(
     "--binary-operators",
     type=str,
@@ -95,16 +76,20 @@ def main(
     parsimony,
     binary_operators,
     unary_operators,
-    no_log,
-    time_in_hours,
-    n,
 ):
 
-    # split into lists
-    unary_operators = unary_operators.split(';')
-    binary_operators = binary_operators.split(';')
+    if niterations is None:
+        niterations = int(1e12)
+    if populations is None:
+        if procs is not None:
+            populations = 3 * procs
+        else:
+            populations = 15
 
-    X, Xflat, yflat = load_data(n)
+    binary_operators = binary_operators.split(";")
+    unary_operators = unary_operators.split(";")
+
+    X, Xflat, yflat, labels = load_data()
 
     jl.seval(
         """
@@ -205,7 +190,7 @@ def main(
         return loss
     end
     """.replace(
-            "NUM_TIMES", str(X.shape[1])  # T
+            "NUM_TIMES", str(X.shape[1])
         )
     )
 
@@ -227,78 +212,33 @@ def main(
             if nest_op in unary_operators
         }
 
-    id = random.randint(0, 100000)
-    while os.path.exists(f'sr_results/{id}.pkl'):
-        id = random.randint(0, 100000)
+    model = PySRRegressor(
+        niterations=niterations,
+        populations=populations,
+        population_size=population_size,
+        ncycles_per_iteration=ncycles_per_iteration,
+        procs=procs,
+        multithreading=multithreading,
+        # cluster_manager="slurm" if distributed else None,
+        binary_operators=binary_operators,
+        unary_operators=unary_operators,
+        maxsize=maxsize,
+        weight_optimize=weight_optimize,
+        parsimony=parsimony,
+        adaptive_parsimony_scaling=1000.0,
+        turbo=True,
+        bumper=True,
+        nested_constraints=nested_constraints,
+        loss_function="my_loss",
+        heap_size_hint_in_bytes=heap_size_hint_in_bytes,
+    )
 
-    config = {
-        'equation_file': f'sr_results/{id}.csv',
-        'id': id,
-        'pure_sr': True,
-        'slurm_id': os.environ.get('SLURM_JOB_ID', None),
-        'slurm_name': os.environ.get('SLURM_JOB_NAME', None),
-        'time_in_hours': time_in_hours,
-    }
+    labels = pkl.load(open("./data/combined.pkl", "rb"))["labels"]
+    clean_variables = list(
+        map(lambda label: label.replace("+", "p").replace("-", "m"), labels)
+    )
 
-    try:
-        if not no_log:
-            wandb.init(
-                entity='bnn-chaos-model',
-                project='planets-sr',
-                config=config,
-            )
-
-        model = PySRRegressor(
-            equation_file=config['equation_file'],
-            niterations=niterations,
-            populations=populations,
-            population_size=population_size,
-            ncycles_per_iteration=ncycles_per_iteration,
-            procs=procs,
-            multithreading=multithreading,
-            # cluster_manager="slurm" if distributed else None,
-            binary_operators=binary_operators,
-            unary_operators=unary_operators,
-            maxsize=maxsize,
-            weight_optimize=weight_optimize,
-            parsimony=parsimony,
-            adaptive_parsimony_scaling=1000.0,
-            # turbo=False,
-            # bumper=False,
-            nested_constraints=nested_constraints,
-            loss_function="my_loss",
-            heap_size_hint_in_bytes=heap_size_hint_in_bytes,
-            timeout_in_seconds=int(60*60*time_in_hours),
-        )
-
-        labels = pkl.load(open("./data/combined.pkl", "rb"))["labels"]
-        clean_variables = list(
-            map(lambda label: label.replace("+", "p").replace("-", "m"), labels)
-        )
-
-        model.fit(Xflat, yflat, variable_names=clean_variables)
-
-        losses = [min(eqs['loss']) for eqs in model.equation_file_contents_]
-        if not no_log:
-            wandb.log({'avg_loss': sum(losses)/len(losses),
-                       'losses': losses,
-                       })
-        wandb.log({'avg_loss': 0})
-
-        print(f"Saved to path: {config['equation_file']}")
-
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        # print the stack trace
-        import traceback
-        traceback.print_exc()
-
-    finally:
-        try:
-            # delete julia files: julia-1911988-17110333239-0016.out
-            subprocess.run(f'rm julia*.out', shell=True, check=True)
-        except subprocess.CalledProcessError as e:
-            pass
+    model.fit(Xflat, yflat, variable_names=clean_variables)
 
 
 if __name__ == "__main__":

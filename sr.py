@@ -58,6 +58,33 @@ function elementwise_loss(prediction, target)
 end
 """
 
+### predicting < 0 is a -1
+### predicting >= 0 is a +1
+
+### imbalanced/conservative loss
+MODIFIED_PERCEPTRON_LOSS ='''
+function elementwise_loss(x, y)
+    if y == 1
+        return x < 0 ? 1.0 : 0.0
+    elseif y == -1
+        return x < 0 ? 0.0 : -y * x + 1
+    else
+        error("y must be 1 or -1")
+    end
+end
+'''
+
+MODIFIED_ZEROONE_LOSS = '''
+function elementwise_loss(x, y)
+    if x == 0
+        return y == -1 ? 1.0 : 0.0
+    else
+        return y * x < 0 ? 1.0 : 0.0
+    end
+end
+'''
+
+
 
 LABELS = ['time', 'e+_near', 'e-_near', 'max_strength_mmr_near', 'e+_far', 'e-_far', 'max_strength_mmr_far', 'megno', 'a1', 'e1', 'i1', 'cos_Omega1', 'sin_Omega1', 'cos_pomega1', 'sin_pomega1', 'cos_theta1', 'sin_theta1', 'a2', 'e2', 'i2', 'cos_Omega2', 'sin_Omega2', 'cos_pomega2', 'sin_pomega2', 'cos_theta2', 'sin_theta2', 'a3', 'e3', 'i3', 'cos_Omega3', 'sin_Omega3', 'cos_pomega3', 'sin_pomega3', 'cos_theta3', 'sin_theta3', 'm1', 'm2', 'm3', 'nan_mmr_near', 'nan_mmr_far', 'nan_megno']
 
@@ -90,6 +117,10 @@ def load_inputs_and_targets(config):
         y = torch.cat([y, next_y], dim=0)
 
     out_dict = model.forward(x, return_intermediates=True, noisy_val=False)
+    # save out_dict to pickle called f{version}_out_dict.pkl
+    # with open(f'f{config["version"]}_out_dict.pkl', 'wb') as f:
+        # pickle.dump(out_dict, f)
+    # assert 0
 
     if config['target'] == 'f1':
         # inputs to SR are the inputs to f1 neural network
@@ -157,9 +188,6 @@ def load_inputs_and_targets(config):
             # 4
             y = y - previous_prediction
 
-
-
-
     elif config['target'] == 'f2_ifthen':
         # inputs to SR are the inputs to f2 neural network
         X = out_dict['summary_stats']  # [B, 40]
@@ -171,7 +199,8 @@ def load_inputs_and_targets(config):
 
         n = X.shape[1] // 2
         variable_names = [f'm{i}' for i in range(n)] + [f's{i}' for i in range(n)]
-    elif config['target'] == 'f2_direct':
+
+    elif config['target'] in ['f2_direct', 'equation_bounds']:
         # inputs to SR are the inputs to f2 neural network
         X = out_dict['summary_stats']  # [B, 40]
         # target for SR is the ground truth mean, which we already have
@@ -213,6 +242,34 @@ def load_inputs_and_targets(config):
 
             in_dim = model.summary_dim + additional_features.shape[1]
 
+        elif config['target'] == 'equation_bounds':
+            # for predicting whether or not an equation applies, learn equations
+            # that predict when error is low
+
+            model = pickle.load(open(config['previous_sr_path'], 'rb'))
+
+            # get the highest complexity equation
+            max_complexity_idx = model.equations_[0]['complexity'].argmax()
+            mean_equation = model.equations_[0].iloc[max_complexity_idx]
+
+            # get the lambda eq for it, and evaluate on X
+            X, y = X.detach().numpy(), y.detach().numpy()
+            y_pred = mean_equation['lambda_format'](X)
+
+            # calculate the error
+            assert_equal(y_pred.shape, (X.shape[0], ))
+            assert_equal(y.shape, (X.shape[0], 1))
+            mse = (y - y_pred[:, None])**2
+            assert_equal(mse.shape, y.shape)
+
+            # predict with binary classification whether equation applies or not
+            # to use ZeroOneLoss, need +/- 1 targets
+            # https://astroautomata.com/SymbolicRegression.jl/dev/losses/
+            y = np.zeros_like(mse)
+            y[mse > config['eq_bound_mse_threshold']] = -1
+            y[mse <= config['eq_bound_mse_threshold']] = 1
+            print(f'Equation bound data has {(y == -1).sum()} oob targets and {(y == 1).sum()} good-predicting targets')
+
     else:
         raise ValueError(f"Unknown target: {config['target']}")
 
@@ -247,9 +304,7 @@ def get_config(args):
     while os.path.exists(f'sr_results/{id}.pkl'):
         id = random.randint(0, 100000)
 
-    path = f'sr_results/{id}.pkl'
-    # replace '.pkl' with '.csv'
-    path = path[:-3] + 'csv'
+    path = f'sr_results/{id}.csv'
 
     # https://stackoverflow.com/a/57474787/4383594
     num_cpus = int(os.environ.get('SLURM_CPUS_ON_NODE')) * int(os.environ.get('SLURM_JOB_NUM_NODES'))
@@ -275,6 +330,11 @@ def get_config(args):
     if args.loss_fn == 'll':
         assert args.target == 'f2_direct', 'log likelihood loss only useful for f2_direct'
         pysr_config['elementwise_loss'] = LL_LOSS
+
+    if args.target == 'equation_bounds':
+        pysr_config['elementwise_loss'] = MODIFIED_ZEROONE_LOSS
+        if args.loss_fn == 'perceptron':
+            pysr_config['elementwise_loss'] = MODIFIED_PERCEPTRON_LOSS
 
     config = vars(args)
     config.update(pysr_config)
@@ -333,22 +393,19 @@ def parse_args():
     parser.add_argument('--time_in_hours', type=float, default=1)
     parser.add_argument('--niterations', type=float, default=500000) # by default, use time in hours as limit
     parser.add_argument('--max_size', type=int, default=30)
-    parser.add_argument('--target', type=str, default='f2_direct', choices=['f1', 'f2', 'f2_ifthen', 'f2_direct', 'f2_2'])
+    parser.add_argument('--target', type=str, default='f2_direct', choices=['f1', 'f2', 'f2_ifthen', 'f2_direct', 'f2_2', 'equation_bounds'])
     parser.add_argument('--residual', action='store_true', help='do residual training of your target')
     parser.add_argument('--n', type=int, default=10000, help='number of data points for the SR problem')
     parser.add_argument('--batch_size', type=int, default=1000, help='number of data points for the SR problem')
     parser.add_argument('--sr_residual', action='store_true', help='do residual training of your target with previous sr run as base')
-    parser.add_argument('--loss_fn', type=str, choices=['mse', 'll'], help='choose "ll" to use loglikelidhood loss')
+    parser.add_argument('--loss_fn', type=str, choices=['mse', 'll', 'perceptron'])
     parser.add_argument('--previous_sr_path', type=str, default='sr_results/92985.pkl')
+
+    parser.add_argument('--eq_bound_mse_threshold', type=float, default=1, help='mse threshold below which to consider an equation good')
+
 
     args = parser.parse_args()
     return args
-
-
-def load_results(id):
-    path = 'sr_results/id.pkl'
-    results: PySRRegressor = pickle.load(open(path, 'rb'))
-    return results
 
 
 def plot_pareto(path):
@@ -363,6 +420,24 @@ def plot_pareto(path):
     plt.title('pareto frontier for' + path)
     # save the plot
     plt.savefig('pareto.png')
+
+
+def run():
+    config = {
+        'version': 24880,
+        'previous_sr_path': 'sr_results/11003.pkl',
+        'sr_residual': False,
+        'residual': False,
+        'target': 'equation_bounds',
+        'eq_bound_mse_threshold': 5,
+        'n': 1000,
+    }
+    results_path = f'sr_results/33936.pkl'
+    reg = pickle.load(open(results_path, 'rb'))
+    X, y, _ = load_inputs_and_targets(config)
+    return X, y, reg
+
+# X, y, reg = run()
 
 
 if __name__ == '__main__':

@@ -88,6 +88,7 @@ def parse():
     parser.add_argument('--pysr_f2_residual', type=str, default=None)# PySR model to load for f2 residual , e.g. 'sr_resuls/hall_of_fame_f2_21101_0_1.pkl'
     parser.add_argument('--pysr_f2_residual_model_selection', type=str, default=None)# PySR model to load for f2 residual , e.g. 'sr_resuls/hall_of_fame_f2_21101_0_1.pkl'
     parser.add_argument('--combined_mass_feature', action='store_true')  # add M = m1 + m2 + m3 as input feature
+    parser.add_argument('--predict_eq_uncertainty', action='store_true')  # load pysr net separately and predict uncertainty of that.
 
     args = parser.parse_args()
 

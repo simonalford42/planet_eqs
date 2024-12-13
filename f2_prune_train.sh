@@ -24,17 +24,22 @@ set -e
 # gets the next available version number
 version=$(python versions.py)
 
-# first train a sparse linear f1, using f2 as linear
-python -u find_minima.py --version $version --total_steps 150000 --l1_reg weights --l1_coeff 2 --f2_variant linear "$@"
-version2=$(python versions.py)
-python -u find_minima.py --version $version2 --total_steps 150000 --load_f1_f2 $version --prune_f1_topk 2 "$@"
+# train linear f2, using 24880 as sparse linear f1
+python -u find_minima.py --version $version --total_steps 150000 --f2_variant linear --load_f1 24880 --freeze_f1 --l1_reg f2_weights --l1_coeff 2 "$@"
+# now apply prune and fine tune f2
+python -u find_minima.py --version $version --total_steps 150000 --f2_variant linear --load_f1 24880 --prune_f2_topk 10 "$@"
 
-version3=$(python versions.py)
-# now apply l2 reg to f2, freezing f1
-python -u find_minima.py --version $version3 --total_steps 150000 --f2_variant linear --l1_reg f2_weights --l1_coeff 2 --load_f1_f2 $version2 --freeze_f1 "$@"
+# # first train a sparse linear f1, using f2 as linear
+# python -u find_minima.py --version $version --total_steps 150000 --l1_reg weights --l1_coeff 2 --f2_variant linear "$@"
+# version2=$(python versions.py)
+# python -u find_minima.py --version $version2 --total_steps 150000 --load_f1_f2 $version --prune_f1_topk 2 "$@"
 
-version4=$(python versions.py)
+# version3=$(python versions.py)
+# # now apply l2 reg to f2, freezing f1
+# python -u find_minima.py --version $version3 --total_steps 150000 --f2_variant linear --l1_reg f2_weights --l1_coeff 2 --load_f1_f2 $version2 --freeze_f1 "$@"
 
-# prune topk from f2, then continue training for a bit
-python -u find_minima.py --version $version4 --total_steps 150000 --load_f1_f2 $version3 --prune_f2_topk 2 "$@"
+# version4=$(python versions.py)
+
+# # prune topk from f2, then continue training for a bit
+# python -u find_minima.py --version $version4 --total_steps 150000 --load_f1_f2 $version3 --prune_f2_topk 2 "$@"
 

@@ -1,13 +1,107 @@
 #!/usr/bin/env bash
 
+# Thursday December 12
+# sbatch -J k3s --partition gpu --time 9:00:00 sr.sh --time_in_hours 8 --version 74649 --target f2 --max_size 30
+# sbatch -J k4s --partition gpu --time 9:00:00 sr.sh --time_in_hours 8 --version 11566 --target f2 --max_size 30
+# sbatch -J k5s --partition gpu --time 9:00:00 sr.sh --time_in_hours 8 --version 72646 --target f2 --max_size 30
+# sbatch -J k0_f2lin train.sh --load_f1_f2 25646 --total_steps 150000 --f2_variant linear --prune_f2_topk 0
+# sbatch -J k1_f2lin train.sh --load_f1_f2 25646 --total_steps 150000 --f2_variant linear --prune_f2_topk 1
+
+# Wednesday December 11
+# sbatch -J id_sr --partition gpu -t 02:00:00 sr.sh --time_in_hours 2 --version 12370 --target f2
+# sbatch -J f2lin --partition train.sh --load_f1 24880 --f2_variant linear --freeze_f1
+
+# f1+f2 linear comparison
+# sbatch -J f2lin train.sh --total_steps 150000 --f2_variant linear --load_f1 24880 --l1_reg f2_weights --l1_coeff 2
+
+# now apply prune and fine tune f2
+# sbatch -J k20_f2lin train.sh --load_f1_f2 25646 --total_steps 150000 --f2_variant linear
+# sbatch -J k10_f2lin train.sh --load_f1_f2 25646 --total_steps 150000 --f2_variant linear --prune_f2_topk 10
+# sbatch -J k5_f2lin train.sh --load_f1_f2 25646 --total_steps 150000 --f2_variant linear --prune_f2_topk 5
+# sbatch -J k2_f2lin train.sh --load_f1_f2 25646 --total_steps 150000 --f2_variant linear --prune_f2_topk 2
+# sbatch -J k0_f2lin train.sh --load_f1_f2 25646 --total_steps 150000 --f2_variant linear --prune_f2_topk 0
+
+# Tuesday December 10
+# sbatch -J f1id --partition gpu train.sh --f1_variant identity
+# sbatch -J f1id --partition gpu train.sh --f1_variant identity --fix_variance
+# sbatch -J fix_var --partition gpu train.sh --fix_variance
+# sbatch -J fix_var --partition gpu prune_train.sh --fix_variance
+# sbatch -J fix_var --partition gpu train.sh --fix_variance --f1_variant mlp
+
+# Monday December 9
+# sbatch -J pure --partition gpu -t 02:00:00 run.sh pure_sr.py --time-in-hours 1
+# sbatch -J pure --partition gpu -t 09:00:00 run.sh pure_sr.py --time-in-hours 9
+# sbatch -J pure --partition gpu -t 25:00:00 run.sh pure_sr.py --time-in-hours 24
+# sbatch -J eq_pred --partition gpu train.sh --predict_eq_uncertainty --load_f1 24880 --total_steps 30000 --seed 1
+# sbatch -J eq_pred --partition gpu train.sh --predict_eq_uncertainty --load_f1 24880 --total_steps 60000 --seed 2
+# sbatch -J eq_pred --partition gpu train.sh --predict_eq_uncertainty --load_f1 24880 --total_steps 90000 --seed 3
+
+# Thursday December 5
+# sbatch -J eq_pred --partition gpu train.sh --predict_eq_uncertainty --load_f1 24880 --total_steps 60000
+# sbatch -J eq_pred --partition gpu train.sh --predict_eq_uncertainty --load_f1 24880 --total_steps 60000
+
+# Sunday November 24
+# sbatch -J 1_1 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 24880 --previous_sr_path 'sr_results/11003.pkl' --target 'equation_bounds' --eq_bound_mse_threshold 1
+# sbatch -J 5_1 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 24880 --previous_sr_path 'sr_results/11003.pkl' --target 'equation_bounds' --eq_bound_mse_threshold 5
+# sbatch -J .1_1 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 24880 --previous_sr_path 'sr_results/11003.pkl' --target 'equation_bounds' --eq_bound_mse_threshold .1
+# sbatch -J 1_1p --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 24880 --previous_sr_path 'sr_results/11003.pkl' --target 'equation_bounds' --eq_bound_mse_threshold 1 --loss_fn perceptron
+# sbatch -J pure --partition gpu -t 01:00:00 run.sh pure_sr.py --time-in-hours 0.01
+# sbatch -J eq_pred --partition gpu train.sh --predict_eq_uncertainty --load_f1 24880
+
+# Friday November 22
+# sbatch -J test_classification --partition gpu -t 01:00:00 run.sh sr_classification.py
+# sbatch -J 1_1 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 24880 --previous_sr_path 'sr_results/11003.pkl' --target 'equation_bounds' --eq_bound_mse_threshold 1
+# sbatch -J 5_1 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 24880 --previous_sr_path 'sr_results/11003.pkl' --target 'equation_bounds' --eq_bound_mse_threshold 5
+# sbatch -J .1_1 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 24880 --previous_sr_path 'sr_results/11003.pkl' --target 'equation_bounds' --eq_bound_mse_threshold .1
+# sbatch -J 1_1p --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 24880 --previous_sr_path 'sr_results/11003.pkl' --target 'equation_bounds' --eq_bound_mse_threshold 1 --loss_fn perceptron
+
+# Tuesday November 19
+# sbatch -J pure --partition gpu -t 01:00:00 run.sh pure_sr.py --time-in-hours 0.01
+
+# Monday November 18
+# sbatch -J pure1 --partition gpu sr2.sh --time-in-hours 1
+# sbatch -J pure1 --partition gpu -t 09:00:00 sr2.sh --time-in-hours 8
+# sbatch -J fixvar --partition gpu train.sh --fix_variance
+
+# sbatch -J eq_1_1 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 24880 --previous_sr_path 'sr_results/11003.pkl' --target 'equation_bounds' --eq_bound_mse_threshold 1
+# sbatch -J eq5_1 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 24880 --previous_sr_path 'sr_results/11003.pkl' --target 'equation_bounds' --eq_bound_mse_threshold 5
+# sbatch -J eq.1_1 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 24880 --previous_sr_path 'sr_results/11003.pkl' --target 'equation_bounds' --eq_bound_mse_threshold .1
+# sbatch -J ll_loss --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2_direct --loss_fn ll
+
+# Friday November 15
+# sbatch -J pure1 --partition gpu sr2.sh --time-in-hours 1
+# sbatch -J pure8 --partition gpu sr2.sh --time-in-hours 8
+
+# Thursday November 13
+
+# sbatch -J testeq1_10 --partition gpu sr.sh --time_in_hours 0.01 --version 24880 --previous_sr_path 'sr_results/11003.pkl' --target 'equation_bounds' --eq_bound_mse_threshold 1 --eq_bound_oob_target 10
+
+# sbatch -J eq_1_1 --partition gpu sr.sh --time_in_hours 0.01 --version 24880 --previous_sr_path 'sr_results/11003.pkl' --target 'equation_bounds' --eq_bound_mse_threshold 1
+# sbatch -J eq5_1 --partition gpu sr.sh --time_in_hours 1 --version 24880 --previous_sr_path 'sr_results/11003.pkl' --target 'equation_bounds' --eq_bound_mse_threshold 5
+# sbatch -J eq.1_1 --partition gpu sr.sh --time_in_hours 1 --version 24880 --previous_sr_path 'sr_results/11003.pkl' --target 'equation_bounds' --eq_bound_mse_threshold .1
+# sbatch -J eq.01_1 --partition gpu sr.sh --time_in_hours 1 --version 24880 --previous_sr_path 'sr_results/11003.pkl' --target 'equation_bounds' --eq_bound_mse_threshold .01
+
+# sbatch -J eq_1_1 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 24880 --previous_sr_path 'sr_results/11003.pkl' --target 'equation_bounds' --eq_bound_mse_threshold 1
+# sbatch -J eq5_1 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 24880 --previous_sr_path 'sr_results/11003.pkl' --target 'equation_bounds' --eq_bound_mse_threshold 5
+# sbatch -J eq.1_1 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 24880 --previous_sr_path 'sr_results/11003.pkl' --target 'equation_bounds' --eq_bound_mse_threshold .1
+# sbatch -J eq.01_1 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 24880 --previous_sr_path 'sr_results/11003.pkl' --target 'equation_bounds' --eq_bound_mse_threshold .01
+
+
+# Wednesday November 13
+# sbatch -J pure --partition ellis sr.sh --time-in-hours 1
+# sbatch -J test --partition ellis sr.sh --time_in_hours 1 --version 24880 --target f2
+# sbatch -J test --partition gpu sr.sh --time_in_hours 1 --version 24880 --target f2
+# sbatch -J pure --partition gpu sr.sh --time-in-hours 1
+# sbatch -J pure2 --partition gpu sr.sh --time-in-hours 1
+
 # Friday Oct 16
 
 # evaluate the linear comparisons
-sbatch -J eval2 --partition gpu eval_eqs.sh --version 64336
-sbatch -J eval5 --partition gpu eval_eqs.sh --version 47272
-sbatch -J eval10 --partition gpu eval_eqs.sh --version 94348
-sbatch -J eval15 --partition gpu eval_eqs.sh --version 51791
-sbatch -J eval20 --partition gpu eval_eqs.sh --version 53392
+# sbatch -J eval2 --partition gpu eval_eqs.sh --version 64336
+# sbatch -J eval5 --partition gpu eval_eqs.sh --version 47272
+# sbatch -J eval10 --partition gpu eval_eqs.sh --version 94348
+# sbatch -J eval15 --partition gpu eval_eqs.sh --version 51791
+# sbatch -J eval20 --partition gpu eval_eqs.sh --version 53392
 
 # Friday Oct 4
 # to see how much results are affected by seed

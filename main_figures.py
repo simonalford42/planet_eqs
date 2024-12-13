@@ -35,6 +35,7 @@ import utils
 import wandb
 import petit
 import pickle
+import modules
 
 # to fix the fonts?
 plt.rcParams.update(plt.rcParamsDefault)
@@ -113,16 +114,16 @@ def calc_scores(args, checkpoint_filename, logger=None, plot_random=False):
         assert swag_ensemble[0].ssX is not None
         tmp_ssX = copy(swag_ensemble[0].ssX)
         # print(tmp_ssX.mean_)
-        if args.train_all:
-            swag_ensemble[0].make_dataloaders(
-                ssX=swag_ensemble[0].ssX,
-                train=True,
-                plot_random=True)
-        else:
-            swag_ensemble[0].make_dataloaders(
-                ssX=swag_ensemble[0].ssX,
-                train=False,
-                plot_random=True) #train=False means we show the whole dataset (assuming we don't train on it!)
+        # if args.train_all:
+        #     swag_ensemble[0].make_dataloaders(
+        #         ssX=swag_ensemble[0].ssX,
+        #         train=True,
+        #         plot_random=True)
+        # else:
+        swag_ensemble[0].make_dataloaders(
+            ssX=swag_ensemble[0].ssX,
+            train=False,
+            plot_random=True) #train=False means we show the whole dataset (assuming we don't train on it!)
 
         # print(swag_ensemble[0].ssX.mean_)
         assert np.all(tmp_ssX.mean_ == swag_ensemble[0].ssX.mean_)
@@ -597,7 +598,7 @@ def calc_scores(args, checkpoint_filename, logger=None, plot_random=False):
         logger.log_metrics({"classification": wandb.Image(fig)})
 
 
-def calc_scores_nonswag(model, train_all=False, logger=None, plot_random=False, use_petit=False):
+def calc_scores_nonswag(model, train_all=False, logger=None, plot_random=False, use_petit=False, just_rmse=False):
     model.eval()
     model.cuda()
 
@@ -797,9 +798,10 @@ def calc_scores_nonswag(model, train_all=False, logger=None, plot_random=False, 
     if use_petit:
         # sample_preds is a [1, 8720] tensor of means
         # sample with std 1 to create [2000, 8740] tensor of samples
-        samples = np.random.randn(2000, 8740)
+        # samples = np.random.randn(2000, 8740)
+        # sample_preds = einops.repeat(sample_preds[0], 'b -> R b', R=2000)
+        # sample_preds = sample_preds + samples
         sample_preds = einops.repeat(sample_preds[0], 'b -> R b', R=2000)
-        sample_preds = sample_preds + samples
         # need to make _preds [1,8740, 2]
         # _preds is currently [1, 8740] of means
         # just use std of one.
@@ -807,29 +809,31 @@ def calc_scores_nonswag(model, train_all=False, logger=None, plot_random=False, 
         std = np.ones_like(mean)
         _preds = einops.rearrange([mean, std], 'two one eight -> one eight two')
 
-    stable_past_9 = sample_preds >= 9
+    else:
+
+        stable_past_9 = sample_preds >= 9
 
 
-    _prior = lambda logT: (
-        3.27086190404742*np.exp(-0.424033970670719 * logT) -
-        10.8793430454878*np.exp(-0.200351029031774 * logT**2)
-    )
-    normalization = quad(_prior, a=9, b=np.inf)[0]
+        _prior = lambda logT: (
+            3.27086190404742*np.exp(-0.424033970670719 * logT) -
+            10.8793430454878*np.exp(-0.200351029031774 * logT**2)
+        )
+        normalization = quad(_prior, a=9, b=np.inf)[0]
 
-    prior = lambda logT: _prior(logT)/normalization
+        prior = lambda logT: _prior(logT)/normalization
 
-    # Let's generate random samples of that prior:
-    n_samples = stable_past_9.sum()
-    bins = n_samples*4
-    top = 100.
-    bin_edges = np.linspace(9, top, num=bins)
-    cum_values = [0] + list(np.cumsum(prior(bin_edges)*(bin_edges[1] - bin_edges[0]))) + [1]
-    bin_edges = [9.] +list(bin_edges)+[top]
-    inv_cdf = interp1d(cum_values, bin_edges)
-    r = np.random.rand(n_samples)
-    samples = inv_cdf(r)
+        # Let's generate random samples of that prior:
+        n_samples = stable_past_9.sum()
+        bins = n_samples*4
+        top = 100.
+        bin_edges = np.linspace(9, top, num=bins)
+        cum_values = [0] + list(np.cumsum(prior(bin_edges)*(bin_edges[1] - bin_edges[0]))) + [1]
+        bin_edges = [9.] +list(bin_edges)+[top]
+        inv_cdf = interp1d(cum_values, bin_edges)
+        r = np.random.rand(n_samples)
+        samples = inv_cdf(r)
 
-    sample_preds[stable_past_9] = samples
+        sample_preds[stable_past_9] = samples
 
     # # expectation of samples
     # preds = np.average(sample_preds, 0)
@@ -1019,6 +1023,8 @@ def calc_scores_nonswag(model, train_all=False, logger=None, plot_random=False, 
         snr_rmse = np.average(np.square(ppx[ppx < 8.99] - ppy[ppx < 8.99]), weights=snr[ppx<8.99])**0.5
         print(f'{confidence} confidence gets RMSE of {rmse:.2f}')
         print(f'Weighted by SNR, this is: {snr_rmse:.2f}')
+        if just_rmse:
+            return rmse
 
         ######################################################
         # Bias scores:
@@ -1189,18 +1195,92 @@ def get_args():
     parser.add_argument('--pysr_version', type=int, default=None)
     parser.add_argument('--petit', action='store_true')
     parser.add_argument('--plot_random', action='store_true')
+    parser.add_argument('--pure_sr', action='store_true')
     parser.add_argument('--pysr_model_selection', type=str, default='accuracy', help='"best", "accuracy", "score", or an integer of the pysr equation complexity.')
+    parser.add_argument('--just_rmse', action='store_true')
 
     args = parser.parse_args()
     return args
 
 
+def calculate_k_results():
+    d = {2: {'version': 24880,
+             'pysr_version': 11003},
+         3: {'version': 74649,
+             'pysr_version': 83278},
+         4: {'version': 11566,
+             'pysr_version': 51254},
+         5: {'version': 72646,
+             'pysr_version': 55894}}
+
+    overall_results = {}
+    for k in d:
+        version = d[k]['version']
+        pysr_version = d[k]['pysr_version']
+        reg = pickle.load(open(f'sr_results/{pysr_version}.pkl', 'rb'))
+        results = reg.equations_[0]
+        complexities = results['complexity']
+        k_results = {}
+        for c in complexities:
+            args = get_args()
+            args.version = version
+            args.pysr_version = pysr_version
+            args.pysr_model_selection = c
+            args.just_rmse = True
+            rmse = main(args)
+            k_results[c] = rmse
+            print(f'k={k}, c={c}, rmse={rmse}')
+        overall_results[k] = k_results
+
+    pickle.dump(overall_results, open('k_results2.pkl', 'wb'))
+
+
+def calculate_f2_lin_results():
+    d = {20: 2702,
+         10: 13529,
+         5: 7307,
+         2: 22160}
+    for k, version in d.items():
+        args = get_args()
+        args.version = version
+        args.just_rmse = True
+        rmse = main(args)
+        print(f'k={k}, rmse={rmse}')
+
+
+def calculate_f1_id_results():
+    version = 12370
+    pysr_version = 22943
+
+    f1_id_results = {}
+    reg = pickle.load(open(f'sr_results/{pysr_version}.pkl', 'rb'))
+    results = reg.equations_[0]
+    complexities = results['complexity']
+    for c in complexities:
+        args = get_args()
+        args.version = version
+        args.pysr_version = pysr_version
+        args.pysr_model_selection = c
+        args.just_rmse = True
+        rmse = main(args)
+        f1_id_results[c] = rmse
+        print(f'c={c}, rmse={rmse}')
+
+    pickle.dump(results, open('f1_id_results.pkl', 'wb'))
+
+
+def main(args):
+    if args.pysr_version:
+        if args.pure_sr:
+            model = modules.PureSRNet(args.pysr_version, model_selection=args.pysr_model_selection)
+        else:
+            model = spock_reg_model.load_with_pysr_f2(version=args.version, seed=0, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection)
+    else:
+        model = spock_reg_model.load(version=args.version, seed=0)
+
+    return calc_scores_nonswag(model, use_petit=args.petit, plot_random=args.plot_random, just_rmse=args.just_rmse)
+
 if __name__ == '__main__':
     args = get_args()
+    main(args)
 
-    if args.pysr_version:
-        model = spock_reg_model.load_with_pysr_f2(version=args.version, seed=0, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection)
-    else:
-        model = spock_reg_model.load(verison=args.version, seed=args.seed)
-
-    calc_scores_nonswag(model, use_petit=args.petit, plot_random=args.plot_random)

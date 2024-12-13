@@ -4,6 +4,12 @@ import matplotlib
 import pandas as pd
 import seaborn as sns
 import matplotlib.colors as mcolors
+import matplotlib.font_manager as font_manager
+
+try:
+    plt.style.use('paper')
+except:
+    pass
 
 basedir_bayes = '.'
 colorstr = """*** Primary color:
@@ -54,6 +60,67 @@ for l in colorstr.replace(' ', '').split('\n'):
         colors.append(np.array(new_color))
         shade = 0
 colors = np.array(colors)/255.0
+
+def make_plot_separate(cleaned, path=None):
+    plt.rc('font', family='serif')
+
+    scale = 1
+    lw=1.2
+    fig, axarr = plt.subplots(3, 1, figsize=(9.5*scale, 8*scale), dpi=400, sharex=True)
+    plt.subplots_adjust(hspace=0.2)
+    tmp = cleaned
+    tmp2 = tmp.query('true > 4 & delta > 5')
+    # decrease buffer around plot in image
+    plt.subplots_adjust(left=0.15, right=0.9, top=0.9, bottom=0.1)
+
+
+    for i, label in enumerate(['BNN', 'Ours', 'Petit+20']):
+        ax = axarr[i]
+
+        tmp.plot('delta', 'true', ax=ax, label='True', c='k', linewidth=lw)
+        if label == 'BNN':
+            tmp.plot('delta', 'bnn_median', ax=ax, label='Neural network', c=colors[2, 3], linewidth=lw)
+            ax.fill_between(
+                tmp2['delta'], tmp2['bnn_l'], tmp2['bnn_u'], color=colors[2, [3]], alpha=0.2, linewidth=lw)
+        if label == 'Ours':
+            tmp.plot('delta', 'median', ax=ax, label='Distilled equations', c=colors[3, 3], linewidth=lw)
+            ax.fill_between(
+                tmp2['delta'], tmp2['l'], tmp2['u'], color=colors[3, [3]], alpha=0.2, linewidth=lw)
+        elif label == 'Petit+20':
+            tmp.plot('delta', 'petitf', ax=ax, label='Petit+20', c=colors[0, 3], linewidth=lw)
+
+        if label != 'Petit+20':
+            # ax.annotate('Training range', (12, 4.5))
+            ax.annotate('Training range', (12, 4.5), fontsize=9)
+            ax.plot([0, 14], [9, 9], '--k', linewidth=0.9)
+            ax.plot([0, 14], [4, 4], '--k', linewidth=0.9)
+
+        ax.set_xlim(1, 14)
+        ax.set_ylim(0, 12)
+        # ax.set_xlabel(r'$\Delta$')
+        ax.set_xlabel(r'Interplanetary separation $\Delta$')
+        ax.set_ylabel(r'Instability Time')
+        leg = ax.legend(loc='upper left', frameon=True, fontsize=8, framealpha=1)
+        for line in leg.get_lines():
+            line.set_linewidth(3)
+
+        major_ticks = [0, 5, 10]
+        ax.set_yticks(major_ticks)
+        ax.set_yticks(np.arange(1, 15), minor=True)
+        ax.set_xticks(np.arange(1, 14), minor=True)
+        ax.tick_params(axis='y', which='major', direction='in')
+        ax.tick_params(axis='y', which='minor', direction='in')
+        ax.tick_params(axis='x', which='major', direction='in')
+        ax.tick_params(axis='x', which='minor', direction='in')
+        ax.annotate(f'({chr(97 + i)})', (-0.14, 1.05), xycoords='axes fraction', fontsize=10)
+
+    if path == None:
+        # datetime in readable format
+        time = time.strftime('%Y%m%d_%H%M%S')
+        path = f'five_planet_{time}.png'
+    fig.savefig(path)
+    print('Saved to', path)
+
 
 def make_plot(cleaned, version, pysr_version=None, t20=True, pysr_model_selection=None):
 # +
@@ -118,7 +185,7 @@ def make_plot(cleaned, version, pysr_version=None, t20=True, pysr_model_selectio
                frameon=True, fontsize=8)
 
     s = '' if pysr_version is None else f'pysr={pysr_version}_'
-    if pysr_model_selection is not None:
+    if pysr_version is not None and pysr_model_selection is not None:
         s += f'ms={pysr_model_selection}_'
     path = basedir_bayes + '/' + f'comparison_v{version}_' + s + '5planet.png'
     fig.savefig(path)
@@ -197,5 +264,17 @@ def make_plot(cleaned, version, pysr_version=None, t20=True, pysr_model_selectio
         path = basedir_bayes + f'/comparison_v{version}_{s}5planet_{key}.png'
         plt.savefig(path, dpi=300)
         print('Saved to', path)
+
+
+if __name__ == '__main__':
+    # load the csv file
+    # original comparison
+    # cleaned = pd.read_csv(f'cur_plot_datasets/cur_plot_dataset_1733459469.0279388.csv')
+    # variance=0 comparison
+    cleaned = pd.read_csv(f'cur_plot_dataset_1733775497.052503.csv')
+
+    make_plot_separate(cleaned, path='zero_variance.png')
+    print('made plot')
+
 
 

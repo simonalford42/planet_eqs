@@ -334,19 +334,51 @@ class AddStdPredNN(nn.Module):
         super().__init__()
         self.mean_net = mean_net
         self.std_net = std_net
+        # hack for plotting equal spaced
+        self.megno_location = mean_net.megno_location
 
-    def forward(self, x):
+    def forward(self, x, noisy_val=True):
         B = x.shape[0]
-        out = self.mean_net(x)
+        out = self.mean_net(x, noisy_val=noisy_val)
         mean = out[:, 0:1]
         utils.assert_equal(mean.shape, (B, 1))
-        std = self.std_net(x)
+        std = self.std_net(x, noisy_val=noisy_val)
         utils.assert_equal(std.shape, (B, 2))
         std = std[:, 1:]
         utils.assert_equal(std.shape, (B, 1))
         out = einops.rearrange([mean[:, 0], std[:, 0]], 'two B -> B two')
         utils.assert_equal(out.shape, (B, 2))
         return out
+
+
+class PureSRNet(nn.Module):
+    def __init__(self, version, model_selection='accuracy'):
+        super().__init__()
+        # something like 'sr_results/hall_of_fame_21101_0_1.pkl'
+        self.version = version
+        self.filepath = f'sr_results/{version}.pkl'
+        assert os.path.exists(self.filepath), f'filepath does not exist: {self.filepath}'
+        self.reg = pysr.PySRRegressor.from_file(self.filepath, model_selection=model_selection)
+        self.model = spock_reg_model.load(24880)
+
+    def forward(self, x, noisy_val=False):
+        utils.assert_equal(x.shape[1], 100)
+        # take every 10th timestep, and combine the first two axes
+        x = x[:, ::10]
+        x = einops.rearrange(x, 'B T N -> (B T) N')
+        x = x.cpu().numpy()
+        pred = self.reg.predict(x)
+        import pdb; pdb.set_trace()
+        return torch.from_numpy(pred)
+
+    def path(self):
+        return f'pure_sr_{self.version}'
+
+    def make_dataloaders(self):
+        self.model.make_dataloaders()
+        self._val_dataloader = self.model._val_dataloader
+
+
 
 
 class PySRNet(nn.Module):
@@ -372,10 +404,26 @@ class PySRNet(nn.Module):
         return out
 
 
+class PySREQBoundsNet(nn.Module):
+    def __init__(self, pred_net: PySRNet, eq_bounds_net: PySRNet):
+        super().__init__()
+        self.pred_net = pred_net
+        self.eq_bounds_net = eq_bounds_net
+
+
+    def forward(self, x):
+        B = x.shape[0]
+        preds = self.pred_net(x)
+        eq_bounds = self.eq_bounds_net(x)
+        utils.assert_equal(preds.shape, (B, 2))
+        utils.assert_equal(eq_bounds.shape, (B, 1))
+        preds[:, 1] = eq_bounds[:, 0]
+        return preds
+
+
 def get_pysr_regress_nn(version, model_selection='accuracy', results_dir='sr_results/'):
     pysr_path = os.path.join(results_dir, f'{version}.pkl')
     return PySRNet(pysr_path, model_selection)
-
 
 
 class PySRFeatureNN(torch.nn.Module):
