@@ -383,31 +383,6 @@ def run_pysr(config):
     print(f"Saved to path: {config['equation_file']}")
 
 
-def parse_args():
-    # Instantiate the parser
-    parser = argparse.ArgumentParser(description='Optional app description')
-    # when importing from jupyter nb, it passes an arg to --f which we should just ignore
-    parser.add_argument('--no_log', action='store_true', default=False, help='disable wandb logging')
-    parser.add_argument('--version', type=int, help='')
-
-    parser.add_argument('--time_in_hours', type=float, default=1)
-    parser.add_argument('--niterations', type=float, default=500000) # by default, use time in hours as limit
-    parser.add_argument('--max_size', type=int, default=30)
-    parser.add_argument('--target', type=str, default='f2_direct', choices=['f1', 'f2', 'f2_ifthen', 'f2_direct', 'f2_2', 'equation_bounds'])
-    parser.add_argument('--residual', action='store_true', help='do residual training of your target')
-    parser.add_argument('--n', type=int, default=10000, help='number of data points for the SR problem')
-    parser.add_argument('--batch_size', type=int, default=1000, help='number of data points for the SR problem')
-    parser.add_argument('--sr_residual', action='store_true', help='do residual training of your target with previous sr run as base')
-    parser.add_argument('--loss_fn', type=str, choices=['mse', 'll', 'perceptron'])
-    parser.add_argument('--previous_sr_path', type=str, default='sr_results/92985.pkl')
-
-    parser.add_argument('--eq_bound_mse_threshold', type=float, default=1, help='mse threshold below which to consider an equation good')
-
-
-    args = parser.parse_args()
-    return args
-
-
 def plot_pareto(path):
     results = pickle.load(open(path, 'rb'))
     results = results.equations_[0]
@@ -437,7 +412,30 @@ def run():
     X, y, _ = load_inputs_and_targets(config)
     return X, y, reg
 
-# X, y, reg = run()
+
+def parse_args():
+    # Instantiate the parser
+    parser = argparse.ArgumentParser(description='Optional app description')
+    # when importing from jupyter nb, it passes an arg to --f which we should just ignore
+    parser.add_argument('--no_log', action='store_true', default=False, help='disable wandb logging')
+    parser.add_argument('--version', type=int, help='')
+
+    parser.add_argument('--time_in_hours', type=float, default=1)
+    parser.add_argument('--niterations', type=float, default=500000) # by default, use time in hours as limit
+    parser.add_argument('--max_size', type=int, default=30)
+    parser.add_argument('--target', type=str, default='f2_direct', choices=['f1', 'f2', 'f2_ifthen', 'f2_direct', 'f2_2', 'equation_bounds'])
+    parser.add_argument('--residual', action='store_true', help='do residual training of your target')
+    parser.add_argument('--n', type=int, default=10000, help='number of data points for the SR problem')
+    parser.add_argument('--batch_size', type=int, default=1000, help='number of data points for the SR problem')
+    parser.add_argument('--sr_residual', action='store_true', help='do residual training of your target with previous sr run as base')
+    parser.add_argument('--loss_fn', type=str, choices=['mse', 'll', 'perceptron'])
+    parser.add_argument('--previous_sr_path', type=str, default='sr_results/92985.pkl')
+
+    parser.add_argument('--eq_bound_mse_threshold', type=float, default=1, help='mse threshold below which to consider an equation good')
+
+
+    args = parser.parse_args()
+    return args
 
 
 if __name__ == '__main__':
