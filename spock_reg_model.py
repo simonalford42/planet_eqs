@@ -22,7 +22,6 @@ import glob
 from matplotlib import pyplot as plt
 import os
 
-# from torchviz import make_dot
 
 
 def load(version, seed=None):
@@ -45,9 +44,9 @@ def load(version, seed=None):
         return VarModel.load_from_checkpoint(f)
 
 
-def load_with_pysr_f2(version, pysr_version, pysr_model_selection='accuracy', seed=0):
-    model = load(version, seed)
-    model.regress_nn = modules.get_pysr_regress_nn(pysr_version, pysr_model_selection)
+def load_with_pysr_f2(version, pysr_version, pysr_model_selection='accuracy', pysr_dir='sr_results/'):
+    model = load(version)
+    model.regress_nn = modules.get_pysr_regress_nn(pysr_version, pysr_model_selection, results_dir=pysr_dir)
     return model
 
 
@@ -779,7 +778,7 @@ class VarModel(pl.LightningModule):
         elif 'load_f1_f2' in hparams and hparams['load_f1_f2']:
             load_version = hparams['load_f1_f2']
         if load_version is not None:
-            model = load(load_version, seed=0)
+            model = load(load_version)
             regress_nn = model.regress_nn
             summary_dim = model.summary_dim
 
@@ -817,7 +816,7 @@ class VarModel(pl.LightningModule):
                 if 'load_f1' in hparams and hparams['load_f1']:
                     print('Using --load_f1 network regress_nn to predict std')
                     assert 0, 'plz debug this before using it, something seems off'
-                    base_f2 = load(hparams['load_f1'], seed=0).regress_nn
+                    base_f2 = load(hparams['load_f1']).regress_nn
                     regress_nn = base_f2
                     # base_f2 = modules.PySRNet('sr_results/29741.pkl', 'best')
                     utils.freeze_module(base_f2)
@@ -872,7 +871,7 @@ class VarModel(pl.LightningModule):
                     print('PySR only predicts mean. Adding a new network to predict std.')
                     if 'load_f1' in hparams and hparams['load_f1']:
                         print('Using --load_f1 network regress_nn to predict std')
-                        base_f2 = load(hparams['load_f1'], seed=0).regress_nn
+                        base_f2 = load(hparams['load_f1']).regress_nn
                     else:
                         print('Initializing new network to predict std')
                         base_f2 = modules.mlp(summary_dim, 2, hparams['hidden_dim'], hparams['f2_depth'])
@@ -905,15 +904,20 @@ class VarModel(pl.LightningModule):
             else:
                 assert 'load_f1_f2' in hparams and hparams['load_f1_f2']
                 load_version = hparams['load_f1_f2']
-            model = load(load_version, seed=0)
+            model = load(load_version)
             feature_nn = model.feature_nn
             out_dim = model.feature_nn_out_dim
             if 'prune_f1_topk' in hparams and hparams['prune_f1_topk'] is not None:
                 # hack in case f1 was a weird variant, like products2
                 if isinstance(feature_nn, nn.Sequential):
-                    assert isinstance(feature_nn[1], nn.Linear)
-                    feature_nn[1] = modules.pruned_linear(feature_nn[1], top_k=hparams['prune_f1_topk'])
-                else:
+                    if isinstance(feature_nn[1], nn.Linear):
+                        feature_nn = modules.pruned_linear(feature_nn, top_k=hparams['prune_f1_topk'])
+                    elif isinstance(feature_nn[1], nn.Identity):
+                        feature_nn = nn.Sequential(
+                            modules.pruned_input_mask(feature_nn[0], top_k=hparams['prune_f1_topk']),
+                            nn.Identity())
+
+                elif isinstance(feature_nn, nn.Linear):
                     feature_nn = modules.pruned_linear(feature_nn, top_k=hparams['prune_f1_topk'])
 
         elif 'pysr_f1' in hparams and hparams['pysr_f1']:
@@ -966,7 +970,7 @@ class VarModel(pl.LightningModule):
         if self.l1_reg_inputs:
             self.inputs_mask = modules.MaskLayer(self.n_features)
             feature_nn = torch.nn.Sequential(self.inputs_mask,
-                                             self.feature_nn)
+                                             feature_nn)
 
         return feature_nn, out_dim
 

@@ -1,5 +1,49 @@
 #!/usr/bin/env bash
 
+# Tuesday January 14 2025
+# sbatch -J srf1id3 --partition gpu sr.sh --time_in_hours 8 --version 95292 --target f2
+# sbatch -J srf1id2 --partition gpu sr.sh --time_in_hours 8 --version 75178 --target f2
+# sbatch -J srf1id1 --partition gpu sr.sh --time_in_hours 8 --version 95292 --target f2
+export PATH=$PATH:/share/apps/anaconda3/2021.05/bin
+
+# Sunday December 21
+# sbatch -J 10f1id_sr --partition gpu --time 9:00:00 sr.sh --time_in_hours 8 --version 14763 --target f2
+# sbatch -J f1id1 --partition gpu prune_train.sh --seed 1 --f1_variant identity --prune_f1_topk 10
+# sbatch -J f1id2 --partition gpu prune_train.sh --seed 2 --f1_variant identity --prune_f1_topk 10
+# sbatch -J f1id3 --partition gpu prune_train.sh --seed 3 --f1_variant identity --prune_f1_topk 10
+
+
+# Saturday December 21
+# sbatch -J 10f1idL1reginputs --partition gpu train.sh --f1_variant identity --load_f1_f2 26929 --prune_f1_topk 10 --total_steps 150000
+
+# Friday December 20
+# sbatch -J f1idL1reginputs --partition gpu train.sh --f1_variant identity --l1_reg inputs --l1_coeff 2
+# sbatch -J f1idL1reginputs --partition gpu train.sh --f1_variant identity --l1_reg inputs --l1_coeff 2 --total_steps 150000
+
+# Wednedsay December 18
+# sbatch -J p1sr --partition gpu --time 9:00:00 sr.sh --time_in_hours 8 --version 92130 --target f2 --max_size 30
+# sbatch -J p2sr --partition gpu --time 9:00:00 sr.sh --time_in_hours 8 --version 10777 --target f2 --max_size 30
+# sbatch -J p3sr --partition gpu --time 9:00:00 sr.sh --time_in_hours 8 --version 43317 --target f2 --max_size 30
+
+# Tuesday December 17
+# sbatch -J f1id1 --partition gpu --time 9:00:00 sr.sh --time_in_hours 8 --version 854 --target f2 --max_size 30
+# sbatch -J f1id2 --partition gpu --time 9:00:00 sr.sh --time_in_hours 8 --version 11237 --target f2 --max_size 30
+# sbatch -J f1id3 --partition gpu --time 9:00:00 sr.sh --time_in_hours 8 --version 28114 --target f2 --max_size 30
+# sbatch -J prune1 --partition gpu prune_train.sh --seed 1
+# sbatch -J prune2 --partition gpu prune_train.sh --seed 2
+# sbatch -J prune3 --partition gpu prune_train.sh --seed 3
+# sbatch -J sr_ll --partition gpu --time 9:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2_direct --loss_fn ll
+# sbatch -J f1_id_ll --partition gpu --time 9:00:00 sr.sh --time_in_hours 8 --version 12370 --target f2_direct --loss_fn ll
+
+# Monday December 16
+# try different seeds for f1 identity and baseline
+# sbatch -J f1id1 --partition gpu train.sh --f1_variant identity --seed 1
+# sbatch -J f1id2 --partition gpu train.sh --f1_variant identity --seed 2
+# sbatch -J f1id3 --partition gpu train.sh --f1_variant identity --seed 3
+# sbatch -J prune1 --partition gpu prune_train.sh --seed 1
+# sbatch -J prune2 --partition gpu prune_train.sh --seed 2
+# sbatch -J prune3 --partition gpu prune_train.sh --seed 3
+
 # Thursday December 12
 # sbatch -J k3s --partition gpu --time 9:00:00 sr.sh --time_in_hours 8 --version 74649 --target f2 --max_size 30
 # sbatch -J k4s --partition gpu --time 9:00:00 sr.sh --time_in_hours 8 --version 11566 --target f2 --max_size 30

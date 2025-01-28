@@ -115,18 +115,14 @@ used_axes = np.linspace(0, 17500-1, N).astype(np.int32)#np.arange(17500//3, 1750
 
 nsim_list = nsim_list[used_axes]
 
-
-model = spock_reg_model.load(args.version, seed=0)
-bnn_model = None
-if args.pysr_version:
-    eq_pred_net = modules.PySRNet(os.path.join(args.pysr_dir, f'{args.pysr_version}.pkl'), args.pysr_model_selection)
-
-    model.regress_nn = eq_pred_net
-    # also load the original model so we can plot bnn & equations at the same time
-    bnn_model = spock_reg_model.load(args.version)
-    bnn_model = NonSwagFeatureRegressor(model=bnn_model)
-
+model = spock_reg_model.load(args.version)
 model = NonSwagFeatureRegressor(model=model)
+bnn_model = None
+
+if args.pysr_version:
+    bnn_model = model
+    model = spock_reg_model.load_with_pysr_f2(args.version, args.pysr_version, args.pysr_model_selection, pysr_dir=args.pysr_dir)
+    model = NonSwagFeatureRegressor(model=model)
 
 # # read initial condition file
 infile_delta_2_to_10 = '../data/initial_conditions_delta_2_to_10.npz'
@@ -534,6 +530,11 @@ cleaned['pperiodetitf'] = np.log10(pd.Series([Tsurv(
     )
      for i in range(len(cleaned))]))
 
+mse = ((cleaned['true'] - cleaned['median'])**2).mean()
+print('rmse: ', mse**0.5)
+bnn_mse = ((cleaned['true'] - cleaned['bnn_median'])**2).mean()
+print('bnn rmse: ', bnn_mse**0.5)
+
 # +
 # petit = Tsurv(p12, p23, [m1, m2, m3])
 # petit = np.nan_to_num(np.log10(Tsurv), posinf=1e9, neginf=0.0)
@@ -542,11 +543,6 @@ cleaned['pperiodetitf'] = np.log10(pd.Series([Tsurv(
 # petit = np.nan_to_num(np.log10(Tsurv), posinf=1e9, neginf=0.0)
 # cleaned['petitf'].append(petit)
 # -
-
-
-filename = f'cur_plot_datasets/{time.time()}.csv'
-cleaned.to_csv(filename)
-print('saved data to', filename)
 
 path = f'five_planet_v{args.version}_pysr{args.pysr_version}'
 if args.pysr_model_selection != 'accuracy':
@@ -558,6 +554,10 @@ if args.turbo:
     path += '_turbo'
 if args.extrapolate:
     path += '_extrapolate'
+
+filename = f'cur_plot_datasets/{path}_{time.time()}.csv'
+cleaned.to_csv(filename)
+print('saved data to', filename)
 
 path += '.png'
 

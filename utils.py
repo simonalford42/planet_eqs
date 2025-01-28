@@ -40,8 +40,25 @@ def ckpt_path(version, seed=None, glob=False):
             if seed != 0:
                 print('Using seed:', seed)
         except FileNotFoundError:
-            print('Defaulting to seed=0')
-            seed = 0
+            # we might be running from figures/
+            try:
+                # detect which seeds are present by looking for directories of form 'results/{version}_{seed}'
+                seeds = [int(d.split('_')[-1])
+                         for d in os.listdir('../results')
+                         if (d.startswith(str(version) + '_')
+                             and os.path.isdir(os.path.join('../results', d)))]
+                if len(seeds) == 0:
+                    raise ValueError(f"No results found for version {version}")
+                if len(seeds) > 1:
+                    print(f'Warning: multiple seeds found for version {version}: {seeds}. Using first seed.')
+
+                seed = seeds[0]
+                if seed != 0:
+                    print('Using seed:', seed)
+
+            except FileNotFoundError:
+                print('Defaulting to seed=0')
+                seed = 0
 
     return "results/" + str(version) + '_' + str(seed)
 

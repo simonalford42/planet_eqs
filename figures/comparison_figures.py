@@ -182,48 +182,48 @@ data['petit'] = np.nan_to_num(data['petit'], posinf=1e9, neginf=1e9, nan=1e9)
 data['petit'] = np.log10(data['petit'])
 # -
 
-#Obertas results:
-data['obertas_delta'] = (
-    (data[['avg_beta12', 'avg_beta23']]).min(1)
-)
-b = 0.951
-c = -1.202
-data['obertas'] = b * data['obertas_delta'] + c
+# #Obertas results:
+# data['obertas_delta'] = (
+#     (data[['avg_beta12', 'avg_beta23']]).min(1)
+# )
+# b = 0.951
+# c = -1.202
+# data['obertas'] = b * data['obertas_delta'] + c
 
-from xgboost import XGBRegressor, XGBClassifier
-from sklearn.linear_model import LinearRegression
+# from xgboost import XGBRegressor, XGBClassifier
+# from sklearn.linear_model import LinearRegression
 
-spock_xgb_params = {'base_score': 0.5,
- 'booster': 'gbtree',
- 'colsample_bylevel': 1,
- 'colsample_bynode': 1,
- 'colsample_bytree': 1,
- 'gamma': 0,
- 'gpu_id': -1,
- 'importance_type': 'gain',
- 'interaction_constraints': '',
- 'learning_rate': 0.05,
- 'max_delta_step': 0,
- 'max_depth': 13,
- 'min_child_weight': 5,
- 'missing': np.nan,
- 'monotone_constraints': '()',
- 'n_estimators': 100,
- 'n_jobs': 0,
- 'num_parallel_tree': 1,
- 'random_state': 0,
- 'reg_alpha': 0,
- 'reg_lambda': 1,
- 'scale_pos_weight': 1,
- 'subsample': 0.95,
- 'tree_method': 'auto',
- 'validate_parameters': False,
- 'verbosity': None}
+# spock_xgb_params = {'base_score': 0.5,
+#  'booster': 'gbtree',
+#  'colsample_bylevel': 1,
+#  'colsample_bynode': 1,
+#  'colsample_bytree': 1,
+#  'gamma': 0,
+#  'gpu_id': -1,
+#  'importance_type': 'gain',
+#  'interaction_constraints': '',
+#  'learning_rate': 0.05,
+#  'max_delta_step': 0,
+#  'max_depth': 13,
+#  'min_child_weight': 5,
+#  'missing': np.nan,
+#  'monotone_constraints': '()',
+#  'n_estimators': 100,
+#  'n_jobs': 0,
+#  'num_parallel_tree': 1,
+#  'random_state': 0,
+#  'reg_alpha': 0,
+#  'reg_lambda': 1,
+#  'scale_pos_weight': 1,
+#  'subsample': 0.95,
+#  'tree_method': 'auto',
+#  'validate_parameters': False,
+#  'verbosity': None}
 
 
-# Note: can't take all hyperparams the same, since
-# they were optimized on a different training set - there
-# is some overlap here. So much re-optimize hyperparams (use auto method):
+# # Note: can't take all hyperparams the same, since
+# # they were optimized on a different training set - there
+# # is some overlap here. So much re-optimize hyperparams (use auto method):
 
 class SimpleSKLearn(object):
     def __init__(self):
@@ -237,32 +237,32 @@ class SimpleSKLearn(object):
 
 
 models = {
-    'Obertas+17': {
-        'model': SimpleSKLearn(),#LinearRegression(),
-        'features': ['obertas'],#['avg_beta12', 'avg_beta23'],
-        'title': 'Obertas et al. (2017)'
-    },
-    'XGBoost': {
-        'model': XGBRegressor(**spock_xgb_params),
-        'features':
-"EMcrossnear MMRstrengthnear MMRstrengthfar EPstdnear".split(' ')
-+ "EMfracstdfar EMfracstdnear EMcrossfar EPstdfar MEGNOstd".split(' ')
-+ "MEGNO".split(' '),
-        'title': 'Modified T20'
-    },
-    'XGBoost_classifier': {
-        'model': XGBClassifier(**spock_xgb_params),
-        'features':
-"EMcrossnear MMRstrengthnear MMRstrengthfar EPstdnear".split(' ')
-+ "EMfracstdfar EMfracstdnear EMcrossfar EPstdfar MEGNOstd".split(' ')
-+ "MEGNO".split(' '),
-        'title': 'T20'
-    },
-    'Ideal': {
-        'model': SimpleSKLearn(),
-        'features': ['perturbed'],
-        'title': 'Theoretical limit'
-    },
+#     'Obertas+17': {
+#         'model': SimpleSKLearn(),#LinearRegression(),
+#         'features': ['obertas'],#['avg_beta12', 'avg_beta23'],
+#         'title': 'Obertas et al. (2017)'
+#     },
+#     'XGBoost': {
+#         'model': XGBRegressor(**spock_xgb_params),
+#         'features':
+# "EMcrossnear MMRstrengthnear MMRstrengthfar EPstdnear".split(' ')
+# + "EMfracstdfar EMfracstdnear EMcrossfar EPstdfar MEGNOstd".split(' ')
+# + "MEGNO".split(' '),
+#         'title': 'Modified T20'
+#     },
+#     'XGBoost_classifier': {
+#         'model': XGBClassifier(**spock_xgb_params),
+#         'features':
+# "EMcrossnear MMRstrengthnear MMRstrengthfar EPstdnear".split(' ')
+# + "EMfracstdfar EMfracstdnear EMcrossfar EPstdfar MEGNOstd".split(' ')
+# + "MEGNO".split(' '),
+#         'title': 'T20'
+#     },
+#     'Ideal': {
+#         'model': SimpleSKLearn(),
+#         'features': ['perturbed'],
+#         'title': 'Theoretical limit'
+#     },
     'Petit+20': {
         'model': SimpleSKLearn(),
         'features': ['petit'],
@@ -283,37 +283,37 @@ plt.rc('font', family='serif')
 
 
 
-# +
-cmodelstr = 'XGBoost'
-cfeat = models[cmodelstr]['features']
-cdata = copy(data[cfeat + ['instability_time', 'shadow_instability_time']])
-cdata[['instability_time', 'shadow_instability_time']] = np.log10(
-    cdata[['instability_time', 'shadow_instability_time']]
-)
-cmodel = models[cmodelstr]['model']
-cdata.replace([np.inf, -np.inf], np.nan)
-if random:
-    cX = np.array(cdata.iloc[:-len_random].query('instability_time >= 4'
-                      '& shadow_instability_time >= 4'
-        )[cfeat]).copy()
-    cy = np.array(cdata.iloc[:-len_random].query('instability_time >= 4'
-                      '& shadow_instability_time >= 4'
-        )[['instability_time', 'shadow_instability_time']]).copy()
+# # +
+# cmodelstr = 'XGBoost'
+# cfeat = models[cmodelstr]['features']
+# cdata = copy(data[cfeat + ['instability_time', 'shadow_instability_time']])
+# cdata[['instability_time', 'shadow_instability_time']] = np.log10(
+#     cdata[['instability_time', 'shadow_instability_time']]
+# )
+# cmodel = models[cmodelstr]['model']
+# cdata.replace([np.inf, -np.inf], np.nan)
+# if random:
+#     cX = np.array(cdata.iloc[:-len_random].query('instability_time >= 4'
+#                       '& shadow_instability_time >= 4'
+#         )[cfeat]).copy()
+#     cy = np.array(cdata.iloc[:-len_random].query('instability_time >= 4'
+#                       '& shadow_instability_time >= 4'
+#         )[['instability_time', 'shadow_instability_time']]).copy()
 
 
-    cX_random = np.array(cdata.iloc[-len_random:].query('instability_time >= 4'
-                      '& shadow_instability_time >= 4'
-        )[cfeat]).copy()
-    cy_random = np.array(cdata.iloc[-len_random:].query('instability_time >= 4'
-                      '& shadow_instability_time >= 4'
-        )[['instability_time', 'shadow_instability_time']]).copy()
+#     cX_random = np.array(cdata.iloc[-len_random:].query('instability_time >= 4'
+#                       '& shadow_instability_time >= 4'
+#         )[cfeat]).copy()
+#     cy_random = np.array(cdata.iloc[-len_random:].query('instability_time >= 4'
+#                       '& shadow_instability_time >= 4'
+#         )[['instability_time', 'shadow_instability_time']]).copy()
 
-else:
-    cdata = cdata.query('instability_time >= 4'
-                      '& shadow_instability_time >= 4'
-    )
-    cy = np.array(cdata[['instability_time', 'shadow_instability_time']]).copy()
-    cX = np.array(cdata[cfeat]).copy()
+# else:
+#     cdata = cdata.query('instability_time >= 4'
+#                       '& shadow_instability_time >= 4'
+#     )
+#     cy = np.array(cdata[['instability_time', 'shadow_instability_time']]).copy()
+#     cX = np.array(cdata[cfeat]).copy()
 
 # +
 # np.log10(data.iloc[-len_random:].query('instability_time >= 10**4'
@@ -331,7 +331,8 @@ else:
 # +
 # %matplotlib inline
 
-for cmodelstr in ['Obertas+17', 'Petit+20', 'XGBoost', 'XGBoost_classifier', 'Ideal']:
+# for cmodelstr in ['Obertas+17', 'Petit+20', 'XGBoost', 'XGBoost_classifier', 'Ideal']:
+for cmodelstr in ['Petit+20']:
 
     cfeat = models[cmodelstr]['features']
     cdata = copy(data[cfeat + ['instability_time', 'shadow_instability_time']])

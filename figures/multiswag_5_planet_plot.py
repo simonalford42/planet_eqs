@@ -271,8 +271,7 @@ if __name__ == '__main__':
     # original comparison
     # cleaned = pd.read_csv(f'cur_plot_datasets/cur_plot_dataset_1733459469.0279388.csv')
     # variance=0 comparison
-    cleaned = pd.read_csv(f'cur_plot_dataset_1733775497.052503.csv')
-
+    cleaned = pd.read_csv(f'cur_plot_datasets/cur_plot_dataset_1733946056.0587265.csv')
     make_plot_separate(cleaned, path='zero_variance.png')
     print('made plot')
 

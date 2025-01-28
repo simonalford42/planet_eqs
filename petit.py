@@ -17,13 +17,25 @@ def tsurv_inputs(x):
     # petit paper is the average over the 10k orbits
     ixs = {'a1': 8, 'a2': 17, 'a3': 26, 'm1': 35, 'm2': 36, 'm3': 37}
     a1, a2, a3 = x[:, ixs['a1']].mean(), x[:, ixs['a2']].mean(), x[:, ixs['a3']].mean()
-    # TODO: in multiswag_5_planet.py, a1/a2/a3 are not averaged, but just the initial value.
+    # alternative: in multiswag_5_planet.py, a1/a2/a3 are not averaged, but just the initial value.
+    # a1, a2, a3 = x[0, ixs['a1']], x[0, ixs['a2']], x[0, ixs['a3']]
+    # alternative gets the same rmse when running main_figures.py --petit ...
     nu12 = (a1 / a2) ** (3 / 2)
     nu23 = (a2 / a3) ** (3 / 2)
     masses = [x[0, ixs['m1']], x[0, ixs['m2']], x[0, ixs['m3']]]
     return (nu12, nu23, masses)
 
 
+'''
+nu12 = np.array((data['avg_a1']/data['avg_a2'])**(3./2))
+nu23 = np.array((data['avg_a2']/data['avg_a3'])**(3./2))
+m1 = np.array(data['m1'])
+m2 = np.array(data['m2'])
+m3 = np.array(data['m3'])
+petit_result = np.array([Tsurv(nu12[i], nu23[i], [m1[i], m2[i], m3[i]]) for i in range(len(m1))])
+data['petit'] = petit_result
+data['petit'] = np.nan_to_num(data['petit'], posinf=1e9, neginf=1e9, nan=1e9)
+'''
 def tsurv(x):
     '''
     x: [B, T, 41] batch of inputs

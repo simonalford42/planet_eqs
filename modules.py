@@ -5,6 +5,8 @@ import utils
 import os
 import json
 import einops
+import pickle
+import pandas as pd
 import spock_reg_model
 import numpy as np
 import torch.nn.functional as F
@@ -243,6 +245,16 @@ class MaskedLinear(nn.Module):
         return self.linear.weight * self.mask
 
 
+def pruned_input_mask(net, top_k):
+    mask_weights = net.mask
+    _, topk_ixs = torch.topk(mask_weights.abs(), k=top_k)
+    new_mask = torch.zeros_like(net.mask)
+    new_mask[topk_ixs] = 1.0
+    new_layer = MaskLayer(mask_weights.shape[0])
+    new_layer.mask.data = new_mask
+    return new_layer
+
+
 def pruned_linear(linear, top_k, top_n=None):
     '''
     top_k: prune so that each output feature uses top_k input feature in its combination
@@ -326,6 +338,20 @@ def load_pysr_module_list(filepath, model_selection):
         return nn.ModuleList(modules)
 
 
+class DirectPySRNet(nn.Module):
+    def __init__(self, filepath, model_selection):
+        super().__init__()
+        self.pysr_net = PySRNet(filepath, model_selection)
+
+    def forward(self, x):
+        B = x.shape[0]
+        mean = self.pysr_net(x)
+        utils.assert_equal(mean.shape, (B, 1))
+        std = torch.ones_like(mean)
+        out = einops.rearrange([mean[:, 0], std[:, 0]], 'two B -> B two')
+        return out
+
+
 class AddStdPredNN(nn.Module):
     '''
     Uses one NN to predict the mean, and another NN for predicting the std.
@@ -335,15 +361,15 @@ class AddStdPredNN(nn.Module):
         self.mean_net = mean_net
         self.std_net = std_net
         # hack for plotting equal spaced
-        self.megno_location = mean_net.megno_location
+        # self.megno_location = mean_net.megno_location
 
-    def forward(self, x, noisy_val=True):
+    def forward(self, x):
         B = x.shape[0]
-        out = self.mean_net(x, noisy_val=noisy_val)
+        out = self.mean_net(x)
         mean = out[:, 0:1]
         utils.assert_equal(mean.shape, (B, 1))
-        std = self.std_net(x, noisy_val=noisy_val)
-        utils.assert_equal(std.shape, (B, 2))
+        std = self.std_net(x)
+        utils.assert_equal(std.shape[0], B)
         std = std[:, 1:]
         utils.assert_equal(std.shape, (B, 1))
         out = einops.rearrange([mean[:, 0], std[:, 0]], 'two B -> B two')
@@ -379,6 +405,11 @@ class PureSRNet(nn.Module):
         self._val_dataloader = self.model._val_dataloader
 
 
+
+class Pred1StdNN(nn.Module):
+    def forward(self, x):
+        B = x.shape[0]
+        return torch.ones((B, 1), device=x.device)
 
 
 class PySRNet(nn.Module):
@@ -423,7 +454,16 @@ class PySREQBoundsNet(nn.Module):
 
 def get_pysr_regress_nn(version, model_selection='accuracy', results_dir='sr_results/'):
     pysr_path = os.path.join(results_dir, f'{version}.pkl')
-    return PySRNet(pysr_path, model_selection)
+
+    # detect if the model was direct_f2, if so load other module.
+    reg = pickle.load(open(pysr_path, 'rb'))
+    from sr import LL_LOSS
+    is_direct_f2 = hasattr(reg, 'elementwise_loss') and reg.elementwise_loss == LL_LOSS
+
+    if is_direct_f2:
+        return DirectPySRNet(pysr_path, model_selection)
+    else:
+        return PySRNet(pysr_path, model_selection)
 
 
 class PySRFeatureNN(torch.nn.Module):

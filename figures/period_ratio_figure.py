@@ -649,6 +649,45 @@ def plot_nn_eq_petit_megno_4way_comparison(args):
     plt.close(fig)
 
 
+def plot_f1_features(args):
+    results = load_results(get_results_path(args.Ngrid, args.version))
+    n_features = results[0]['f1'].shape[0] // 2
+
+    P12s, P23s = get_period_ratios(args.Ngrid)
+
+    for feature in range(n_features):
+        for plot_std in [True, False]:
+            values = [d['f1'][feature + n_features if plot_std else feature] if d is not None else np.nan for d in results]
+            X,Y,Z = get_centered_grid(P12s, P23s, values)
+
+            fig, ax = plt.subplots(figsize=(8,6))
+
+            cmap = plt.cm.inferno.copy().reversed()
+            cmap.set_bad(color='white')
+            im = ax.pcolormesh(X, Y, Z, cmap=cmap)
+            ax.set_title(f'Feature {feature} std' if plot_std else f'Feature {feature} mean')
+            ax.set_xlabel("P1/P2")
+            ax.set_ylabel("P2/P3")
+
+            cb = plt.colorbar(im, ax=ax)
+            cb.set_label('Feature std' if plot_std else 'Feature mean')
+            ax.set_xlabel("P1/P2")
+            ax.set_ylabel("P2/P3")
+            plt.tight_layout()
+
+            path = get_results_path(args.Ngrid, args.version)
+            # get rid of .pkl
+            path = path[:-4]
+            path += f'_plot_feature{feature}'
+            path += '_std' if plot_std else '_mean'
+            path += '.png'
+
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            plt.savefig(path, dpi=800)
+            print('Saved figure to', path)
+            plt.close(fig)
+
+
 def plot_pysr_4way_comparison(args):
     # get the model selections by grepping for the files
     path = get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection='*')
