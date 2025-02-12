@@ -4,7 +4,6 @@
 # sbatch -J srf1id3 --partition gpu sr.sh --time_in_hours 8 --version 95292 --target f2
 # sbatch -J srf1id2 --partition gpu sr.sh --time_in_hours 8 --version 75178 --target f2
 # sbatch -J srf1id1 --partition gpu sr.sh --time_in_hours 8 --version 95292 --target f2
-export PATH=$PATH:/share/apps/anaconda3/2021.05/bin
 
 # Sunday December 21
 # sbatch -J 10f1id_sr --partition gpu --time 9:00:00 sr.sh --time_in_hours 8 --version 14763 --target f2

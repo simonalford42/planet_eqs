@@ -3,7 +3,7 @@
  # job name
 #SBATCH -J run
  # output file (%j expands to jobID)
-#SBATCH -o %A.out
+#SBATCH -o out/%A.out
  # total nodes
 #SBATCH -N 1
  # total cores

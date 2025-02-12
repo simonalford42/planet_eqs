@@ -5,55 +5,36 @@
 import sys
 sys.path.append('../')
 
-
 import os
 
 os.environ['XLA_PYTHON_CLIENT_PREALLOCATE'] = 'false'
 
-
-# import jax
-# import jax.numpy as jnp
-# from jax.random import PRNGKey, normal
 import numpy as np
-
-# +
 import spock_reg_model
 import numpy as np
 import rebound
 import matplotlib.pyplot as plt
-import matplotlib
-import random
-import dill
 import torch
 import sys
-from functools import partial
 from multiprocessing import Pool
 import pandas as pd
 import time
-import spock
-from spock import FeatureRegressor, FeatureRegressorXGB, NonSwagFeatureRegressor
-from icecream import ic
-import utils
-import seaborn as sns
+from spock import NonSwagFeatureRegressor
 import utils2
 import argparse
-import modules
 import numpy as jnp
 from time import time as ttime
 from petit20_survival_time import Tsurv
 from scipy.integrate import quad
 from scipy.interpolate import interp1d
 import einops
-import glob
-from matplotlib import ticker
-import seaborn as sns
 from oldsimsetup import init_sim_parameters
 from collections import OrderedDict
 import sys
 sys.path.append('spock')
 from tseries_feature_functions import get_extended_tseries
 
-from multiswag_5_planet_plot import make_plot, make_plot_separate
+from multiswag_5_planet_plot import make_plot, make_plot_separate, make_plot2
 
 try:
     plt.style.use('paper')
@@ -544,7 +525,8 @@ print('bnn rmse: ', bnn_mse**0.5)
 # cleaned['petitf'].append(petit)
 # -
 
-path = f'five_planet_v{args.version}_pysr{args.pysr_version}'
+path = f'five_planet_figures/five_planet2_v{args.version}_pysr{args.pysr_version}'
+# path = f'five_planet_v{args.version}_pysr{args.pysr_version}'
 if args.pysr_model_selection != 'accuracy':
     path += f'_ms={args.pysr_model_selection}'
 
@@ -561,6 +543,7 @@ print('saved data to', filename)
 
 path += '.png'
 
-make_plot_separate(cleaned, path=path)
+# make_plot_separate(cleaned, path=path)
+make_plot2(cleaned, path=path)
 
 print('made plot')

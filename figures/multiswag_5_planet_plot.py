@@ -5,6 +5,7 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.colors as mcolors
 import matplotlib.font_manager as font_manager
+import time
 
 try:
     plt.style.use('paper')
@@ -61,6 +62,61 @@ for l in colorstr.replace(' ', '').split('\n'):
         shade = 0
 colors = np.array(colors)/255.0
 
+def make_plot2(cleaned, path=None):
+
+    plt.rc('font', family='serif')
+
+    scale = 1
+    lw = 1.2
+    fig, ax = plt.subplots(figsize=(7*scale, 2*scale), dpi=400)
+    # plt.subplots_adjust(left=0.15, right=0.9, top=0.9, bottom=0.1)
+
+    tmp = cleaned
+    tmp2 = tmp.query('true > 4 & delta > 5')
+
+    # Ground truth
+    tmp.plot('delta', 'true', ax=ax, label='True', c='k', linewidth=lw)
+
+    # Distilled equations
+    tmp.plot('delta', 'median', ax=ax, label='Distilled equations', c=colors[3, 3], linewidth=lw)
+    ax.fill_between(
+        tmp2['delta'], tmp2['l'], tmp2['u'], color=colors[3, [3]], alpha=0.2, linewidth=lw
+    )
+
+    # Petit+20
+    tmp.plot('delta', 'petitf', ax=ax, label='Petit+20', c=colors[0, 3], linewidth=lw)
+
+    # Training range
+    ax.annotate('Training range', (12, 4.5), fontsize=9)
+    ax.plot([0, 14], [9, 9], '--k', linewidth=0.9)
+    ax.plot([0, 14], [4, 4], '--k', linewidth=0.9)
+
+    ax.set_xlim(1, 14)
+    ax.set_ylim(0, 12)
+    ax.set_xlabel(r'Interplanetary separation $\Delta$')
+    ax.set_ylabel(r'Instability Time')
+
+    leg = ax.legend(loc='upper left', frameon=True, fontsize=8, framealpha=1)
+    for line in leg.get_lines():
+        line.set_linewidth(3)
+
+    major_ticks = [0, 5, 10]
+    ax.set_yticks(major_ticks)
+    ax.set_yticks(np.arange(1, 15), minor=True)
+    ax.set_xticks(np.arange(1, 14), minor=True)
+    ax.tick_params(axis='y', which='major', direction='in')
+    ax.tick_params(axis='y', which='minor', direction='in')
+    ax.tick_params(axis='x', which='major', direction='in')
+    ax.tick_params(axis='x', which='minor', direction='in')
+    # ax.annotate('(a)', (-0.14, 1.05), xycoords='axes fraction', fontsize=10)
+
+    if path is None:
+        t = time.strftime('%Y%m%d_%H%M%S')
+        path = f'five_planet_figures/five_planet2_{t}.png'
+    fig.savefig(path)
+    print('Saved to', path)
+
+
 def make_plot_separate(cleaned, path=None):
     plt.rc('font', family='serif')
 
@@ -116,8 +172,8 @@ def make_plot_separate(cleaned, path=None):
 
     if path == None:
         # datetime in readable format
-        time = time.strftime('%Y%m%d_%H%M%S')
-        path = f'five_planet_{time}.png'
+        t = time.strftime('%Y%m%d_%H%M%S')
+        path = f'five_planet_figures/five_planet_{t}.png'
     fig.savefig(path)
     print('Saved to', path)
 

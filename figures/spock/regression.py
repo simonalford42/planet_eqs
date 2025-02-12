@@ -173,7 +173,6 @@ class NonSwagFeatureRegressor():
             else:
                 old_X = X
                 X = self.ssX.transform(X.reshape(-1, X.shape[-1])).reshape(X.shape)
-                import pdb; pdb.set_trace()
                 X = torch.tensor(X).float()
                 if self.cuda:
                     X = X.cuda()

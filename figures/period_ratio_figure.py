@@ -17,6 +17,7 @@ import spock
 import utils2
 import pickle
 from utils2 import assert_equal
+import multiprocessing as mp
 import argparse
 import time
 
@@ -25,6 +26,9 @@ warnings.filterwarnings("ignore", category=ResourceWarning)
 
 INSTABILITY_TIME_LABEL = r"$\log_{10}(T_{\rm inst})$"
 MEGNO_LABEL = r"$\log_{10}(\rm MEGNO-2)$"
+
+GROUND_TRUTH_MAX_T = None # Assigned in get_args function
+
 
 '''
 Example commands:
@@ -54,6 +58,11 @@ python period_ratio_figure.py --Ngrid 4 --petit --plot
 python period_ratio_figure.py --Ngrid 4 --megno --compute
 python period_ratio_figure.py --Ngrid 4 --megno --plot
 
+# compute and plot for ground truth predictions using job array
+python period_ratio_figure.py --Ngrid 100 --compute --ground_truth --max_t 1e9 --job_array
+python period_ratio_figure.py --Ngrid 100 --collate --ground_truth
+python period_ratio_figure.py --Ngrid 100 --plot --ground_truth
+
 # create input cache for Ngrid=4
 python period_ratio_figure.py --Ngrid 4 --create_input_cache
 
@@ -61,44 +70,6 @@ python period_ratio_figure.py --Ngrid 4 --create_input_cache
 scopy bnn_chaos_model/figures/period_results/v=43139_ngrid=6_pysr_f2_v=33060/ ~/code/bnn_chaos_model/figures/period_results/
 scopy bnn_chaos_model/figures/period_results/v=43139_ngrid=6.pkl ~/code/bnn_chaos_model/figures/period_results/
 '''
-
-def get_args():
-    print(utils2.get_script_execution_command())
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--Ngrid', '-n', type=int, default=1600)
-    parser.add_argument('--version', '-v', type=int, default=24880)
-
-    parser.add_argument('--plot', '-p', action='store_true')
-    parser.add_argument('--compute', action='store_true')
-    parser.add_argument('--collate', action='store_true')
-    parser.add_argument('--petit', action='store_true')
-    parser.add_argument('--megno', action='store_true')
-    parser.add_argument('--create_input_cache', action='store_true')
-
-    parser.add_argument('--pysr_version', type=str, default=None) # sr_results/11003.pkl
-    parser.add_argument('--pysr_dir', type=str, default='../sr_results/')  # folder containing pysr results pkl
-
-    parser.add_argument('--pysr_model_selection', type=str, default=None, help='"best", "accuracy", "score", or an integer of the pysr equation complexity. If not provided, will do all complexities. If plotting, has to be an integer complexity')
-
-    # parallel processing args
-    # ix should be in [0, total)
-    parser.add_argument('--parallel_ix', '-i', type=int, default=None)
-    parser.add_argument('--parallel_total', '-t', type=int, default=None)
-
-    parser.add_argument('--equation_bounds', '-e', action='store_true')
-
-    args = parser.parse_args()
-
-    if args.pysr_version is not None:
-        args.pysr_path = os.path.join(args.pysr_dir, f'{args.pysr_version}.pkl')
-    else:
-        args.pysr_path = None
-
-    if args.create_input_cache and not args.collate:
-        args.compute = True
-
-
-    return args
 
 
 def load_model(version):
@@ -121,10 +92,37 @@ def get_simulation(par):
     return sim
 
 
-def get_model_prediction(sim, model, use_petit=False, use_megno=False, create_input_cache=False):
+def get_ground_truth(sim):
+    sim = sim.copy()
+    sim.dt = 0.05
+    sim.exit_max_distance = 20.
+    sim.exit_min_distance = 0
+    T = GROUND_TRUTH_MAX_T
+
+    try:
+        sim.integrate(T)
+    except rebound.Escape:
+        # get the current time
+        return sim.t
+    except rebound.Encounter:
+        return sim.t
+
+    return T
+
+def get_ground_truth_wrapper(par):
+    sim = get_simulation(par)
+    out = get_ground_truth(sim)
+    return {'ground_truth': out}
+
+
+def get_model_prediction(sim, model, use_petit=False, use_megno=False, create_input_cache=False, ground_truth=False):
     '''
     cache: maps simulation id to X.
     '''
+
+    if ground_truth:
+        return {'ground_truth': get_ground_truth(sim)}
+
     sim = sim.copy()
     sim.dt = 0.05
     sim.init_megno()
@@ -192,9 +190,20 @@ def get_parameters(P12s, P23s):
     return parameters
 
 
-def compute_results_for_parameters(parameters, model, use_petit=False, use_megno=False, create_input_cache=False):
-    simulations = [get_simulation(par) for par in parameters]
-    results = [get_model_prediction(sim, model, use_petit=use_petit, use_megno=use_megno, create_input_cache=create_input_cache) for sim in simulations]
+def compute_results_for_parameters(parameters, model, use_petit=False, use_megno=False, create_input_cache=False, ground_truth=False):
+
+    if ground_truth:
+        # ground truth only requires cpu, so we can parallelize across cores
+        num_cpus = int(os.getenv("SLURM_CPUS_PER_TASK", mp.cpu_count()))
+        print(f'Parallelizing {len(parameters)} sims across {num_cpus} cores')
+
+        with mp.Pool(processes=num_cpus) as pool:
+            results = pool.map(get_ground_truth_wrapper, parameters)
+
+    else:
+        simulations = [get_simulation(par) for par in parameters]
+        results = [get_model_prediction(sim, model, use_petit=use_petit, use_megno=use_megno, create_input_cache=create_input_cache, ground_truth=ground_truth) for sim in simulations]
+
     return results
 
 
@@ -236,37 +245,45 @@ def predict_from_cached_input(model, cached_input):
 
 
 def compute_results(args):
-    model = load_model(args.version)
+    if not args.ground_truth:
+        model = load_model(args.version)
+    else:
+        model = None
+
     P12s, P23s = get_period_ratios(args.Ngrid)
     parameters = get_parameters(P12s, P23s)
 
-    input_cache = load_input_cache(args.Ngrid)
-    if input_cache:
-        assert len(input_cache) == len(parameters), f'Input cache length {len(input_cache)} does not match parameters length {len(parameters)}'
-        input_cache = {params: input for params, input in zip(parameters, input_cache)}
+    input_cache = None
+    if not (args.petit or args.megno or args.ground_truth):
+        input_cache = load_input_cache(args.Ngrid)
+        if input_cache:
+            assert len(input_cache) == len(parameters), f'Input cache length {len(input_cache)} does not match parameters length {len(parameters)}'
+            input_cache = {params: input for params, input in zip(parameters, input_cache)}
 
     if args.parallel_ix is not None:
+        # if there are already results for this ix, return
+        path = get_results_path(args.Ngrid, args.version, args.parallel_ix, args.parallel_total, args.pysr_version, args.pysr_model_selection, args.petit, args.megno, input_cache=args.create_input_cache, ground_truth=args.ground_truth)
+
+        if os.path.exists(path):
+            print(f'File {path} already exists')
+            print(f'Already computed results for ix={args.parallel_ix}, skipping')
+            return
+
         parameters = get_list_chunk(parameters, args.parallel_ix, args.parallel_total)
 
-    if input_cache and not args.petit and not args.megno:
+    if input_cache:
         print('Computing using cached input')
 
         for par in parameters:
             assert par in input_cache, f'Input cache missing for {par}'
 
-        # results = [predict_from_cached_input(model, input_cache[par]) for par in parameters]
-
-        # compute results, but time it
-        start = time.time()
         results = [predict_from_cached_input(model, input_cache[par]) for par in parameters]
-        print('Time taken:', time.time() - start)
-        print('Num results: ', len(results))
 
     else:
-        results = compute_results_for_parameters(parameters, model, use_petit=args.petit, use_megno=args.megno, create_input_cache=args.create_input_cache)
+        results = compute_results_for_parameters(parameters, model, use_petit=args.petit, use_megno=args.megno, create_input_cache=args.create_input_cache, ground_truth=args.ground_truth)
 
     # save the results
-    path = get_results_path(args.Ngrid, args.version, args.parallel_ix, args.parallel_total, args.pysr_version, args.pysr_model_selection, args.petit, args.megno, input_cache=args.create_input_cache)
+    path = get_results_path(args.Ngrid, args.version, args.parallel_ix, args.parallel_total, args.pysr_version, args.pysr_model_selection, args.petit, args.megno, input_cache=args.create_input_cache, ground_truth=args.ground_truth)
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
     with open(path, 'wb') as f:
@@ -276,13 +293,17 @@ def compute_results(args):
     return results
 
 
-def get_results_path(Ngrid, version=None, parallel_ix=None, parallel_total=None, pysr_version=None, pysr_model_selection=None, use_petit=False, use_megno=False, input_cache=False):
+def get_results_path(Ngrid, version=None, parallel_ix=None, parallel_total=None, pysr_version=None, pysr_model_selection=None, use_petit=False, use_megno=False, input_cache=False, ground_truth=False):
     if use_petit:
         path = f'period_results/petit/petit_ngrid={Ngrid}'
     elif use_megno:
         path = f'period_results/megno/megno_ngrid={Ngrid}'
     elif input_cache:
         path = f'period_results/caches/cache_ngrid={Ngrid}'
+    elif ground_truth:
+        T = GROUND_TRUTH_MAX_T
+        T_str = f'{T:.0e}'.replace('e+0', 'e')
+        path = f'period_results/ground_truth/ground_truth_ngrid={Ngrid}_T={T_str}'
     else:
         path = f'period_results/v={version}/v={version}_ngrid={Ngrid}'
 
@@ -313,9 +334,9 @@ def collate_parallel_results(args):
     results = []
     if args.parallel_total is None:
         # try to detect the total
-        path = get_results_path(args.Ngrid, args.version, use_petit=args.petit, input_cache=args.create_input_cache, use_megno=args.megno)
+        path = get_results_path(args.Ngrid, args.version, use_petit=args.petit, input_cache=args.create_input_cache, use_megno=args.megno, ground_truth=args.ground_truth)
 
-        files = os.listdir(get_results_path(args.Ngrid, args.version, use_petit=args.petit, input_cache=args.create_input_cache, use_megno=args.megno)[:-4])
+        files = os.listdir(get_results_path(args.Ngrid, args.version, use_petit=args.petit, input_cache=args.create_input_cache, use_megno=args.megno, ground_truth=args.ground_truth)[:-4])
         # filter to those of form f'{ix}-{total}.pkl'
         files = [file for file in files if file.endswith('.pkl')]
         # get the total. use the largest possible total
@@ -332,8 +353,9 @@ def collate_parallel_results(args):
 
     missing = False
     for ix in range(total):
-        print(ix)
-        path = get_results_path(args.Ngrid, args.version, ix, total, use_petit=args.petit, input_cache=args.create_input_cache, use_megno=args.megno)
+        # print(ix)
+        path = get_results_path(args.Ngrid, args.version, ix, total, use_petit=args.petit, input_cache=args.create_input_cache, use_megno=args.megno, ground_truth=args.ground_truth)
+        # print(f'path={path}')
 
         try:
             sub_results = load_results(path)
@@ -366,22 +388,28 @@ def collate_parallel_results(args):
 
     # concatenate into one big list of results, maintaining ordering
     results = [result for sub_results in results for result in sub_results]
-    path = get_results_path(args.Ngrid, args.version, use_petit=args.petit, use_megno=args.megno)
+    path = get_results_path(args.Ngrid, args.version, use_petit=args.petit, use_megno=args.megno, ground_truth=args.ground_truth)
     with open(path, 'wb') as f:
         pickle.dump(results, f)
     print('Saved results to', path)
 
 
 def plot_results(args, metric=None):
-    if not args.petit and not args.megno and not args.equation_bounds and metric is None:
+    if (not (args.petit or args.megno or args.ground_truth or args.equation_bounds)) and metric is None:
         for metric in ['mean', 'std']:
             plot_results(args, metric)
         return
 
-    results = load_results(get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection, use_petit=args.petit, use_megno=args.megno))
+    results = load_results(get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection, use_petit=args.petit, use_megno=args.megno, ground_truth=args.ground_truth))
     P12s, P23s = get_period_ratios(args.Ngrid)
 
-    fig, ax = plt.subplots(figsize=(8,6))
+    fig, ax = plt.subplots(figsize=(5,4.5))
+    ax.set_aspect('equal', adjustable='box')
+
+    if not args.minimal_plot:
+        ticks = [0.55, 0.60, 0.65, 0.70, 0.75]
+        ax.set_xticks(ticks)
+        ax.set_yticks(ticks)
 
     # get the results for the specific metric
     if args.petit:
@@ -390,6 +418,8 @@ def plot_results(args, metric=None):
         results = [d['megno'] if d is not None else np.nan for d in results]
     elif args.equation_bounds:
         results = [d['bound'] if d is not None else np.nan for d in results]
+    elif args.ground_truth:
+        results = [d['ground_truth'] if d is not None else np.nan for d in results]
     elif metric == 'mean':
         results = [d['mean'] if d is not None else np.nan for d in results]
     elif metric == 'mean2':
@@ -416,6 +446,11 @@ def plot_results(args, metric=None):
         cmap.set_bad(color='white')
         im = ax.pcolormesh(X, Y, np.log10(Zfilt-2), vmin=-4, vmax=4, cmap=cmap)
         label = MEGNO_LABEL
+    if args.ground_truth:
+        cmap = plt.cm.inferno.copy().reversed()
+        cmap.set_bad(color='white')
+        im = ax.pcolormesh(X, Y, Z, cmap=cmap)
+        label = INSTABILITY_TIME_LABEL
     elif metric == 'std':
         cmap = plt.cm.inferno.copy().reversed()
         cmap.set_bad(color='white')
@@ -439,13 +474,20 @@ def plot_results(args, metric=None):
         im = ax.pcolormesh(X, Y, Z, vmin=zmin, vmax=zmax, cmap=cmap)
         label = INSTABILITY_TIME_LABEL
 
-    cb = plt.colorbar(im, ax=ax)
-    cb.set_label(label)
-    ax.set_xlabel("P1/P2")
-    ax.set_ylabel("P2/P3")
+    if args.minimal_plot:
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_xlabel("")
+        ax.set_ylabel("")
+    else:
+        cb = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+        cb.set_label(label)
+        ax.set_xlabel("P1/P2")
+        ax.set_ylabel("P2/P3")
+
     plt.tight_layout()
 
-    path = get_results_path(args.Ngrid, args.version, use_petit=args.petit, use_megno=args.megno)
+    path = get_results_path(args.Ngrid, args.version, use_petit=args.petit, use_megno=args.megno, ground_truth=args.ground_truth)
     # get rid of .pkl
     path = path[:-4]
     path += '_plot'
@@ -504,7 +546,6 @@ def compute_pysr_f2_results(args):
     batch = torch.tensor(batch).float().cuda()
 
     for model_selection in model_selections:
-        print(model_selection)
         regress_nn = modules.PySRNet(args.pysr_path, model_selection).cuda()
         pred = regress_nn(batch).detach().cpu().numpy()
         results = np.full((len(f1_results), pred.shape[1]), np.NaN)
@@ -556,7 +597,6 @@ def plot_results_pysr_f2(args):
 
     # filter to those of form f'{i}.pkl'
     files = [file for file in files if file.endswith('.pkl')]
-    print(f'files={files}')
 
     # go from f'{model_selection}.pkl' to model_selection
     model_selections = sorted([int(f.split('.')[0]) for f in files])
@@ -581,10 +621,19 @@ def plot_results_pysr_f2(args):
     args.pysr_model_selection = original_model_selection
 
 
-def plot_nn_eq_petit_megno_4way_comparison(args):
+def plot_4way_comparison(args):
     # Create the figure and axes
-    fig, axs = plt.subplots(2, 2, figsize=(12, 10))
+    # fig, axs = plt.subplots(2, 2, figsize=(12, 10))
+    fig, axs = plt.subplots(2, 2, figsize=(9.5, 8))
     axs = axs.flatten()
+
+    for ax in axs:
+        ax.set_aspect('equal', adjustable='box')
+
+    ticks = [0.55, 0.60, 0.65, 0.70, 0.75]
+    for ax in axs:
+        ax.set_xticks(ticks)
+        ax.set_yticks(ticks)
 
     nn_results = load_results(get_results_path(args.Ngrid, args.version))
     eq_results = load_results(get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection='accuracy'))
@@ -631,7 +680,7 @@ def plot_nn_eq_petit_megno_4way_comparison(args):
             im = axs[i].pcolormesh(X, Y, Z, vmin=zmin, vmax=zmax, cmap=cmap)
             label = INSTABILITY_TIME_LABEL
 
-        cb = plt.colorbar(im, ax=axs[i])
+        cb = plt.colorbar(im, ax=axs[i], fraction=0.046, pad=0.04)
         cb.set_label(label)
         axs[i].set_xlabel("P1/P2")
         axs[i].set_ylabel("P2/P3")
@@ -642,7 +691,7 @@ def plot_nn_eq_petit_megno_4way_comparison(args):
 
     # fig.set_constrained_layout(True)
 
-    path = get_results_path(args.Ngrid, args.version)[:-4] + '_comparison'
+    path = get_results_path(args.Ngrid, args.version)[:-4] + '_comparison2'
     os.makedirs(os.path.dirname(path), exist_ok=True)
     plt.savefig(path + '.png', dpi=800)
     print('Saved figure to', path + '.png')
@@ -688,7 +737,7 @@ def plot_f1_features(args):
             plt.close(fig)
 
 
-def plot_pysr_4way_comparison(args):
+def plot_4way_pysr_comparison(args):
     # get the model selections by grepping for the files
     path = get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection='*')
     files = os.listdir(os.path.dirname(path))
@@ -706,8 +755,16 @@ def plot_pysr_4way_comparison(args):
     model_selections = [ms for ms in model_selections if ms in desired_complexities]
 
     # Create the figure and axes
-    fig, axs = plt.subplots(2, 2, figsize=(12, 10))
+    fig, axs = plt.subplots(2, 2, figsize=(9, 8))
     axs = axs.flatten()
+
+    for ax in axs:
+        ax.set_aspect('equal', adjustable='box')
+
+    ticks = [0.55, 0.60, 0.65, 0.70, 0.75]
+    for ax in axs:
+        ax.set_xticks(ticks)
+        ax.set_yticks(ticks)
 
     for i, model_selection in enumerate(model_selections):
         args.pysr_model_selection = model_selection
@@ -740,8 +797,6 @@ def plot_pysr_4way_comparison(args):
     plt.savefig(path + '.png', dpi=800)
     print('Saved figure to', path + '.png')
     plt.close(fig)
-
-
 
 
 def calculate_mse(Ngrid, version, pysr_version):
@@ -786,12 +841,78 @@ def calculate_mse(Ngrid, version, pysr_version):
     print('MSE PySR F2:', mse_pysr_f2)
 
 
+def get_args():
+    print(utils2.get_script_execution_command())
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--Ngrid', '-n', type=int, default=1600)
+    parser.add_argument('--version', '-v', type=int, default=24880)
+
+    parser.add_argument('--plot', action='store_true')
+    parser.add_argument('--compute', action='store_true')
+    parser.add_argument('--collate', action='store_true')
+    parser.add_argument('--petit', action='store_true')
+    parser.add_argument('--megno', action='store_true')
+    parser.add_argument('--ground_truth', action='store_true')
+    parser.add_argument('--create_input_cache', action='store_true')
+
+    parser.add_argument('--pysr_version', type=str, default=None) # sr_results/11003.pkl
+    parser.add_argument('--pysr_dir', type=str, default='../sr_results/')  # folder containing pysr results pkl
+
+    parser.add_argument('--pysr_model_selection', type=str, default=None, help='"best", "accuracy", "score", or an integer of the pysr equation complexity. If not provided, will do all complexities. If plotting, has to be an integer complexity')
+
+    # parallel processing args
+    # ix should be in [0, total)
+    parser.add_argument('--parallel_ix', '-i', type=int, default=None)
+    parser.add_argument('--parallel_total', '-t', type=int, default=None)
+
+    parser.add_argument('--equation_bounds', action='store_true')
+    parser.add_argument('--job_array', action='store_true')
+    parser.add_argument('--max_t', type=float, default=1e9, help='Maximum integration time for ground truth')
+    parser.add_argument('--plot_special', type=str, default=None, choices=['4way', '4way_pysr'])
+    parser.add_argument('--minimal_plot', action='store_true')
+
+    args = parser.parse_args()
+
+    if args.pysr_version is not None:
+        args.pysr_path = os.path.join(args.pysr_dir, f'{args.pysr_version}.pkl')
+    else:
+        args.pysr_path = None
+
+    if args.create_input_cache and not args.collate:
+        args.compute = True
+
+    if args.job_array:
+        try:
+            array_id = int(os.environ['SLURM_ARRAY_TASK_ID'])
+            array_total = int(os.environ['SLURM_ARRAY_TASK_COUNT'])
+            # get the
+        except KeyError:
+            print("Error: --job_array specified but SLURM array variables not found")
+            sys.exit(1)
+
+        # sometimes, we want more jobs than job array slots possible
+        # in this case, we overload parallel_ix to be the index in the different job array submissions.
+        if args.parallel_ix is not None:
+            args.parallel_ix = args.parallel_ix * array_total + array_id
+            args.parallel_total = args.parallel_total * array_total
+            if args.parallel_ix >= args.Ngrid ** 2:
+                print('Exceeded total number of jobs, this one is not needed.')
+                sys.exit(0)
+        else:
+            args.parallel_ix = array_id
+            args.parallel_total = array_total
+
+    if args.ground_truth:
+        global GROUND_TRUTH_MAX_T
+        GROUND_TRUTH_MAX_T = args.max_t
+
+    return args
+
+
 if __name__ == '__main__':
     args = get_args()
 
-    # plot_nn_eq_petit_megno_4way_comparison(args)
-    # plot_pysr_4way_comparison(args)
-    # assert 0
+    start = time.time()
 
     if args.create_input_cache:
         # check if cache already exists for this size!
@@ -817,4 +938,12 @@ if __name__ == '__main__':
             plot_results(args)
             # plot_summary_stats(args)
 
-    print('Done')
+    if args.plot_special:
+        if args.plot_special == '4way':
+            plot_4way_comparison(args)
+        if args.plot_special == '4way_pysr':
+            plot_4way_pysr_comparison(args)
+
+    end = time.time()
+    formatted_time = time.strftime('%H:%M:%S', time.gmtime(end - start))
+    print(f'Done (time taken: {formatted_time})')

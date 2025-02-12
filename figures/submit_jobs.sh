@@ -1,5 +1,59 @@
 #!/usr/bin/env bash
 
+sbatch --time=20-00:00:00 --array=0-899%100 job_array.sh --Ngrid 300 --max_t 1e9 --compute
+
+# testing running more than 100 at once using multiple job arrays
+# sbatch --array=0-899%100 job_array.sh --Ngrid 100 --max_t 1e6 --compute --parallel_ix 1 --parallel_total 2
+# sbatch --array=0-999%100 job_array.sh --Ngrid 100 --max_t 1e6 --compute --parallel_ix 2 --parallel_total 10
+# sbatch --array=0-999%100 job_array.sh --Ngrid 100 --max_t 1e6 --compute --parallel_ix 3 --parallel_total 10
+# sbatch --array=0-999%100 job_array.sh --Ngrid 100 --max_t 1e6 --compute --parallel_ix 4 --parallel_total 10
+# sbatch --array=0-999%100 job_array.sh --Ngrid 100 --max_t 1e6 --compute --parallel_ix 5 --parallel_total 10
+# sbatch --array=0-999%100 job_array.sh --Ngrid 100 --max_t 1e6 --compute --parallel_ix 6 --parallel_total 10
+# sbatch --array=0-999%100 job_array.sh --Ngrid 100 --max_t 1e6 --compute --parallel_ix 7 --parallel_total 10
+# sbatch --array=0-999%100 job_array.sh --Ngrid 100 --max_t 1e6 --compute --parallel_ix 8 --parallel_total 10
+# sbatch --array=0-999%100 job_array.sh --Ngrid 100 --max_t 1e6 --compute --parallel_ix 9 --parallel_total 10
+
+# sbatch --array=0-899%100 job_array.sh --Ngrid 42 --max_t 1e5 --compute --parallel_ix 0
+# sbatch --array=0-899%100 job_array.sh --Ngrid 42 --max_t 1e5 --compute --parallel_ix 0
+# sbatch --array=0-899%100 job_array.sh --Ngrid 42 --max_t 1e5 --compute --parallel_ix 1
+# sbatch --array=0-89%50 job_array.sh --Ngrid 13 --max_t 1e5 --compute --parallel_ix 0 --parallel_total 2
+# sbatch --array=0-89%50 job_array.sh --Ngrid 13 --max_t 1e5 --compute --parallel_ix 1 --parallel_total 2
+# sbatch --array=0-8%4 job_array.sh --Ngrid 11 --max_t 1e5 --compute --parallel_ix 0 --parallel_total 2
+# sbatch --array=0-8%4 job_array.sh --Ngrid 11 --max_t 1e5 --compute --parallel_ix 1 --parallel_total 2
+
+# testing to see if I can run more than 100 jobs at once
+# sbatch --array=0-499%100 job_array.sh --Ngrid 26 --max_t 1e5 --compute
+
+# sbatch -J five --partition ellis five_planet.sh --turbo --paper-ready
+# sbatch --array=0-899%100 job_array.sh --Ngrid 100 --max_t 1e7 --compute
+
+# command for 100x100 1e8 photo
+# job_id=""
+# for ix in {0..10}; do
+#     job_id=$(sbatch ${job_id:+"--dependency=afterany:$job_id"} --array=0-999%100 job_array.sh --Ngrid 100 --max_t 1e8 --compute --parallel_ix $ix | cut -d ' ' -f 4)
+# done
+
+# sbatch --array=0-899%100 job_array.sh --Ngrid 100 --max_t 1e8 --compute --parallel_ix $ix | cut -d ' ' -f 4)
+
+# testing on a much smaller size to start
+# sbatch --array=0-25%10 job_array.sh --Ngrid 9 --max_t 1e6 --compute
+# sbatch --array=0-899%100 job_array.sh --Ngrid 41 --max_t 1e6 --compute
+# sbatch --array=0-35%10 job_array.sh --Ngrid 12 --max_t 1e6 --compute
+
+# sbatch --array=0-899%100 job_array.sh --Ngrid 100 --max_t 1e6 --compute
+# sbatch --array=0-899%100 job_array.sh --Ngrid 100 --max_t 1e7 --compute
+
+# command for 400x400 1e8 photo
+# job_id=""
+# for ix in {0..159}; do
+#     job_id=$(sbatch ${job_id:+"--dependency=afterany:$job_id"} --array=0-999%100 job_array.sh --Ngrid 400 --max_t 1e8 --compute --parallel_ix $ix | cut -d ' ' -f 4)
+# done
+
+# sbatch -J five --partition ellis five_planet.sh --turbo
+# sbatch --array=0-8 job_array.sh --Ngrid 3 --max_t 100000000 --compute
+# sbatch --array=0-99 job_array.sh --Ngrid 10 --max_t 1000000 --compute
+# sbatch --array=0-15 job_array.sh --Ngrid 4 --max_t 100000 --compute
+
 # sbatch -J five --partition ellis five_planet.sh --paper-ready --version 12370 --pysr_version 22943
 # sbatch -J five --partition ellis five_planet.sh --paper-ready --pysr_model_selection 14
 
