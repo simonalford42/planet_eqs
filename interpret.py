@@ -5,7 +5,12 @@ import numpy as np
 import re
 import sympy as sp
 import pickle
-from pysr.export_latex import sympy2latextable
+from pysr.export_latex import sympy2latextable, sympy2latex
+from matplotlib import pyplot as plt
+import matplotlib.ticker as ticker
+plt.rcParams["font.family"] = "serif"
+plt.rcParams['mathtext.fontset']='dejavuserif'
+import pandas as pd
 
 def get_feature_nn(version):
     # load when on the cluster
@@ -22,7 +27,7 @@ def get_feature_nn(version):
     return feature_nn
 
 
-def get_pysr_results(pysr_version, include_ssx, feature_nn=None):
+def get_pysr_results(pysr_version, include_ssx=False, feature_nn=None):
     # load pysr f2 equations
     results = pickle.load(open(f'sr_results/{pysr_version}.pkl', 'rb'))
     results = results.equations_[0]
@@ -32,6 +37,11 @@ def get_pysr_results(pysr_version, include_ssx, feature_nn=None):
 
     if include_ssx:
         add_scalar_to_pysr_results(results, feature_nn)
+
+    # rmse_values maps complexity to rmse
+    rmse_values = get_k_rmse_values()[2]
+    # add rmse column, matching complexity with existing 'complexity' column
+    results['rmse'] = results['complexity'].map(rmse_values)
 
     return results
 
@@ -250,6 +260,10 @@ def add_scalar_to_pysr_results(results, feature_nn):
     results['sympy_format'] = results['sympy_format'].apply(add_bias_to_mean_terms2)
 
 
+def get_variables_in_str(e):
+    return [e[i:i+2] for i in range(len(e) - 1) if e[i] in ['m', 's'] and e[i+1].isdigit()]
+
+
 def get_mapping_dict(results, important_complexities):
     # make a "renaming map" of old_ix: new_ix where variables are mapped to
     # their order they appear in the equations of complexity in important_complexities
@@ -262,7 +276,8 @@ def get_mapping_dict(results, important_complexities):
     def vars_in_str(e):
         return [int(e[i+1]) for i in range(len(e)-1) if e[i] in ['m', 's'] and e[i+1].isdigit()]
 
-    all_vars = vars_in_str(all_eqs)
+    all_vars = get_variables_in_str(all_eqs)
+    all_vars = [int(s[1]) for s in all_vars]
     all_vars = list(dict.fromkeys(all_vars)) # remove duplicates, but keep order
 
     # get vars just in the important equations
@@ -306,9 +321,10 @@ def paretoize(x, y, replace=False):
     return list(x_pareto), list(y_pareto)
 
 
-def get_rmse_values():
-    k_results2 = pickle.load(open(f'k_results2.pkl', 'rb'))
-    return k_results2[2]
+def get_k_rmse_values():
+    k_results = pickle.load(open(f'pickles/k_results_test.pkl', 'rb'))
+    # k_results maps k value to dict mapping complexity to rmse
+    return k_results
 
 
 def f1_latex_string(feature_nn, include_ssx=False, include_ssx_bias=True, mapping_dict=None):
@@ -326,20 +342,179 @@ def f1_latex_string(feature_nn, include_ssx=False, include_ssx_bias=True, mappin
     return s
 
 
-def f2_latex_str(results, important_complexities=None, mapping_dict=None):
+def number_of_variables_in_expression(equation: str):
+    # assumes each variable is m{i} or s{i}
+    # so we can just count the number of s's and count the number of m's
+    # checking for a number after so "sin" doesn't get counted
+    # assume max feature dim from f1 is 100
+    count = 0
+    for i in range(100):
+        if 'm' + str(i) in equation:
+            count += 1
+        if 's' + str(i) in equation:
+            count += 1
+
+    return count
+
+
+def overall_complexity(entry: pd.Series, k: int):
+    complexity = entry['complexity']
+    # return complexity
+    num_variables = number_of_variables_in_expression(entry.equation)
+    return complexity + (3 * k - 2) * num_variables
+
+
+def f1_latex_string2(feature_nn, include_ssx=False, include_ssx_bias=True, pysr_results=None, important_complexities=None):
+    if pysr_results is not None:
+        if important_complexities == None:
+            equations = pysr_results['equation']
+        else:
+            important_ixs = get_important_ixs(pysr_results, important_complexities)
+            equations = pysr_results['equation'][important_ixs]
+
+        # only print variables used in an important equation in the pysr results
+        all_vars = [get_variables_in_str(e) for e in equations]
+        # go from list of lists to just one big list
+        all_vars = [item for sublist in all_vars for item in sublist]
+        all_vars = list(dict.fromkeys(all_vars)) # remove duplicates, but keep order
+        mu_vars = [int(s[1]) for s in all_vars if s[0] == 'm']
+        std_vars = [int(s[1]) for s in all_vars if s[0] == 's']
+        mu_vars = sorted(mu_vars)
+        std_vars = sorted(std_vars)
+    else:
+        mu_vars = range(feature_nn.input_linear.shape[0])
+        std_vars = mu_vars
+
+
+    s = ('\\begin{align*}\n'
+        + 'f_1& \\text{ features:} \\\\ \n')
+
+    # means
+    for i in mu_vars:
+        feature_str = feature_string(feature_nn, i, include_ssx, latex=True, include_ssx_bias=include_ssx_bias)
+        s += '    &\mu_{' + str(i) + '} = \mathbb{E}\\left [' + feature_str + '\\right ] \\\\ \n'
+
+    # stds
+    for i in std_vars:
+        feature_str = feature_string(feature_nn, i, include_ssx, latex=True, include_ssx_bias=include_ssx_bias)
+        s += '    &\sigma_{' + str(i) + '} = \\text{Std} \\left (' + feature_str + '\\right ) \\\\ \n'
+
+    s += '''\end{align*}'''
+    return s
+
+
+def f1_latex_strings(feature_nn, include_ssx=False, include_ssx_bias=True, pysr_results=None, important_complexities=None, std_biases=False):
+    if pysr_results is not None:
+        if important_complexities == None:
+            equations = pysr_results['equation']
+        else:
+            important_ixs = get_important_ixs(pysr_results, important_complexities)
+            equations = pysr_results['equation'][important_ixs]
+
+        # only print variables used in an important equation in the pysr results
+        all_vars = [get_variables_in_str(e) for e in equations]
+        # go from list of lists to just one big list
+        all_vars = [item for sublist in all_vars for item in sublist]
+        all_vars = list(dict.fromkeys(all_vars)) # remove duplicates, but keep order
+        mu_vars = [int(s[1]) for s in all_vars if s[0] == 'm']
+        std_vars = [int(s[1]) for s in all_vars if s[0] == 's']
+        mu_vars = sorted(mu_vars)
+        std_vars = sorted(std_vars)
+    else:
+        mu_vars = range(feature_nn.input_linear.shape[0])
+        std_vars = mu_vars
+
+    strings = []
+
+    # means
+    for i in mu_vars:
+        feature_str = feature_string(feature_nn, i, include_ssx, latex=True, include_ssx_bias=include_ssx_bias)
+        s = '\mu_{' + str(i) + '} = { \\rm \mathbb{E}} \\left [' + feature_str + ' \\right ]'
+        strings.append(s)
+
+    # stds
+    for i in std_vars:
+        feature_str = feature_string(feature_nn, i, include_ssx, latex=True, include_ssx_bias=include_ssx_bias and std_biases)
+        s = r'\sigma_{' + str(i) + r'} = {\rm Std}\left(' + feature_str + r'\right)'
+        strings.append(s)
+
+    return strings
+
+
+def f2_latex_str(results, important_complexities=None, mapping_dict=None, add_rmse=True):
     if important_complexities is None:
-        important_complexities = results['complexity']
+        important_complexities = results['complexity'].values
 
     important_ixs = get_important_ixs(results, important_complexities)
 
-    s = sympy2latextable(results, precision=2, columns=['equation', 'complexity', 'loss'], indices=important_ixs)
+    s = sympy2latextable(results, precision=2, columns=['equation', 'complexity'], indices=important_ixs)
 
     if mapping_dict:
         s = remap_latex_str(s, mapping_dict)
 
     s = s.replace('m_{', '\\mu_{')
     s = s.replace('s_{', '\\sigma_{')
-    s = s.replace('y_{0}', r'\log_{10} T_{\text{inst}}')
+    s = s.replace('y = ', r'\log_{10} T_{\text{inst}} = ')
+
+    if add_rmse:
+        # add column of rmse scores
+        s = s.replace('cc@', 'ccc@')
+        s = s.replace('Complexity \\\\', 'Complexity & RMSE \\\\')
+
+        for i in range(len(results)):
+            complexity = results.iloc[i]['complexity']
+            rmse = results.iloc[i]['rmse']
+            s = s.replace(f'${complexity}$ \\\\', f'${complexity}$ & ${rmse:.2f}$ \\\\')
 
     return s
 
+def save_latex(latex_str, output_file, format='svg', font_family='serif'):
+    fig, ax = plt.subplots()
+    ax.set_axis_off()
+    text = ax.text(0.5, 0.5, latex_str, fontsize=20, ha='center', va='center', family=font_family)
+
+    fig.canvas.draw()  # update text positions
+    renderer = fig.canvas.get_renderer()
+    bbox = text.get_window_extent(renderer=renderer).transformed(fig.dpi_scale_trans.inverted())
+
+    fig.savefig(output_file, format=format, bbox_inches=bbox, pad_inches=0, transparent=True, dpi=400)
+    plt.close(fig)
+
+
+def f2_latex_strings(results, important_complexities=None, mapping_dict=None):
+    if important_complexities is None:
+        important_complexities = results['complexity'].values
+
+    important_ixs = get_important_ixs(results, important_complexities)
+
+    latex_strs = [sympy2latex(expr, prec=2) for expr in results['sympy_format'][important_ixs]]
+    latex_strs = ['\\log_{10} T_{\\mathrm{inst}} = ' + s for s in latex_strs]
+
+    def transform(s):
+        if mapping_dict:
+            s = remap_latex_str(s, mapping_dict)
+
+        s = s.replace('m_{', '\\mu_{')
+        s = s.replace('s_{', '\\sigma_{')
+        return s
+
+    latex_strs = [transform(s) for s in latex_strs]
+    return {c: s for c, s in zip(important_complexities, latex_strs)}
+
+
+
+
+def plot_period_ratio_rmse():
+    period_ratio_rmse = pickle.load(open('pickles/period_ratio_rmse.pkl', 'rb'))
+    eqs = [int(s[2:]) for s in period_ratio_rmse.keys() if s[0:2] == 'eq']
+    rmses = [period_ratio_rmse[f'eq{eq}'] for eq in eqs]
+    plt.plot(eqs, rmses, 'o', label='equations')
+    plt.xlabel('Complexity')
+    plt.ylabel('Period ratio sweep RMSE')
+    # add horizontal line at period_ratio_rmse['nn']
+    plt.axhline(period_ratio_rmse['nn'], color='r', linestyle='--', label='nn')
+    plt.legend()
+    # add minor x axis tick marks at integers
+    plt.gca().xaxis.set_minor_locator(ticker.MultipleLocator(1))
+    plt.show()
+    return plt

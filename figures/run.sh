@@ -2,8 +2,8 @@
 
  # job name
 #SBATCH -J period
- # output file (%j expands to jobID)
-#SBATCH -o out/%A.out
+ # output file
+#SBATCH -o out/%A_%a.out
  # total nodes
 #SBATCH -N 1
  # total cores
@@ -12,8 +12,8 @@
  # total limit (hh:mm:ss)
 #SBATCH -t 48:00:00
 #SBATCH --mem=50G
-#SBATCH --gres=gpu:1
-#SBATCH --partition=ellis
+## #SBATCH --gres=gpu:1
+## #SBATCH --partition=ellis
 
 source /home/sca63/mambaforge/etc/profile.d/conda.sh
 

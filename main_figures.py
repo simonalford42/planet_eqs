@@ -598,7 +598,7 @@ def calc_scores(args, checkpoint_filename, logger=None, plot_random=False):
         logger.log_metrics({"classification": wandb.Image(fig)})
 
 
-def calc_scores_nonswag(model, train_all=False, logger=None, plot_random=False, use_petit=False, just_rmse=False):
+def calc_scores_nonswag(model, train_all=False, logger=None, plot_random=False, use_petit=False, just_rmse=False, train_set=False):
     model.eval()
     model.cuda()
 
@@ -608,8 +608,6 @@ def calc_scores_nonswag(model, train_all=False, logger=None, plot_random=False, 
 
     if plot_random:
         path += '_random'
-
-    print('path:', path)
 
     plt.switch_backend('agg')
 
@@ -677,7 +675,7 @@ def calc_scores_nonswag(model, train_all=False, logger=None, plot_random=False, 
             return petit.tsurv(X_sample)
 
     else:
-        model.make_dataloaders()
+        model.make_dataloaders(train=train_set)
         if plot_random:
             assert model.ssX is not None
             tmp_ssX = copy(model.ssX)
@@ -1021,8 +1019,8 @@ def calc_scores_nonswag(model, train_all=False, logger=None, plot_random=False, 
 
         rmse = np.average(np.square(ppx[ppx < 8.99] - ppy[ppx < 8.99]))**0.5
         snr_rmse = np.average(np.square(ppx[ppx < 8.99] - ppy[ppx < 8.99]), weights=snr[ppx<8.99])**0.5
-        print(f'{confidence} confidence gets RMSE of {rmse:.2f}')
-        print(f'Weighted by SNR, this is: {snr_rmse:.2f}')
+        print(f'{confidence} confidence gets RMSE of {rmse:.6f}')
+        print(f'Weighted by SNR, this is: {snr_rmse:.6f}')
         if just_rmse:
             return rmse
 
@@ -1190,14 +1188,28 @@ def calc_scores_nonswag(model, train_all=False, logger=None, plot_random=False, 
 
 
 def calculate_k_results():
-    d = {2: {'version': 24880,
-             'pysr_version': 11003},
-         3: {'version': 74649,
-             'pysr_version': 83278},
-         4: {'version': 11566,
-             'pysr_version': 51254},
-         5: {'version': 72646,
-             'pysr_version': 55894}}
+    d = {
+        2:  {
+            'version': 24880,
+            'pysr_version': 11003,
+            'val_loss': 1.62794,
+        },
+        3:  {
+            'version': 74649,
+            'pysr_version': 83278,
+            'val_loss': 1.67736,
+        },
+        4:  {
+            'version': 11566,
+            'pysr_version': 51254,
+            'val_loss': 1.63825,
+        },
+        5:  {
+            'version': 72646,
+            'pysr_version': 55894,
+            'val_loss': 1.66181,
+        }
+    }
 
     overall_results = {}
     for k in d:
@@ -1218,7 +1230,7 @@ def calculate_k_results():
             print(f'k={k}, c={c}, rmse={rmse}')
         overall_results[k] = k_results
 
-    pickle.dump(overall_results, open('k_results2.pkl', 'wb'))
+    pickle.dump(overall_results, open('pickles/k_results_test.pkl', 'wb'))
 
 
 def calculate_f2_lin_results():
@@ -1232,6 +1244,9 @@ def calculate_f2_lin_results():
         args.just_rmse = True
         rmse = main(args)
         print(f'k={k}, rmse={rmse}')
+        d[k] = {'version': version, 'rmse': rmse}
+
+    pickle.dump(d, open('pickles/f2_lin_results_test.pkl', 'wb'))
 
 
 def calculate_f1_id_results():
@@ -1252,7 +1267,64 @@ def calculate_f1_id_results():
         f1_id_results[c] = rmse
         print(f'c={c}, rmse={rmse}')
 
-    pickle.dump(results, open('f1_id_results.pkl', 'wb'))
+    pickle.dump(results, open('pickles/f1_id_results_test.pkl', 'wb'))
+
+
+def calculate_nn_and_petit_results():
+    version = 24880
+    args = get_args()
+    args.version = version
+    args.just_rmse = True
+    rmse = main(args)
+    print(f'nn, rmse={rmse}')
+    args.petit = True
+    petit_rmse = main(args)
+    d = {'version': version, 'rmse': rmse, 'petit_rmse': petit_rmse}
+    pickle.dump(d, open('pickles/nn_and_petit_results_test.pkl', 'wb'))
+
+
+def calculate_pure_sr_results():
+    version = 92428
+    results = pickle.load(open(f'sr_results/{version}.pkl', 'rb'))
+    d = {'version': version}
+    args = get_args()
+    args.pure_sr = True
+    args.pysr_version = version
+    args.just_rmse = True
+
+    for c in results.equations_['complexity']:
+        args.pysr_model_selection = c
+        rmse = main(args)
+        print(r'pure_sr complexity={c}, rmse={rmse}')
+        d[c] = rmse
+
+    pickle.dump(d, open('pickles/pure_sr_results_test.pkl', 'wb'))
+
+
+def calculate_results_all_complexities(version=24880, pysr_version=58106):
+    results = {}
+    reg = pickle.load(open(f'sr_results/{pysr_version}.pkl', 'rb'))
+    results = reg.equations_[0]
+    complexities = results['complexity']
+    for c in complexities:
+        args = get_args()
+        args.version = version
+        args.pysr_version = pysr_version
+        args.pysr_model_selection = c
+        args.just_rmse = True
+        rmse = main(args)
+        results[c] = rmse
+        print(f'c={c}, rmse={rmse}')
+
+    pickle.dump(results, open(f'pickles/{version}_{pysr_version}f1_id_results_test.pkl', 'wb'))
+
+
+def calculate_all_results():
+    calculate_nn_and_petit_results()
+    calculate_f2_lin_results()
+    calculate_f1_id_results()
+    calculate_pure_sr_results()
+    calculate_k_results()
 
 
 def main(args):
@@ -1264,7 +1336,8 @@ def main(args):
     else:
         model = spock_reg_model.load(version=args.version)
 
-    return calc_scores_nonswag(model, use_petit=args.petit, plot_random=args.plot_random, just_rmse=args.just_rmse)
+    return calc_scores_nonswag(model, use_petit=args.petit, plot_random=args.plot_random, just_rmse=args.just_rmse, train_set=args.train_set)
+
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -1273,6 +1346,7 @@ def get_args():
     parser.add_argument('--petit', action='store_true')
     parser.add_argument('--plot_random', action='store_true')
     parser.add_argument('--pure_sr', action='store_true')
+    parser.add_argument('--train_set', action='store_true')
     parser.add_argument('--pysr_model_selection', type=str, default='accuracy', help='"best", "accuracy", "score", or an integer of the pysr equation complexity.')
     parser.add_argument('--just_rmse', action='store_true')
 
@@ -1281,6 +1355,7 @@ def get_args():
 
 
 if __name__ == '__main__':
+    # calculate_all_results()
     args = get_args()
     main(args)
 

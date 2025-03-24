@@ -79,9 +79,10 @@ def make_plot2(cleaned, path=None):
 
     # Distilled equations
     tmp.plot('delta', 'median', ax=ax, label='Distilled equations', c=colors[3, 3], linewidth=lw)
-    ax.fill_between(
-        tmp2['delta'], tmp2['l'], tmp2['u'], color=colors[3, [3]], alpha=0.2, linewidth=lw
-    )
+    # no error bars
+    # ax.fill_between(
+    #     tmp2['delta'], tmp2['l'], tmp2['u'], color=colors[3, [3]], alpha=0.2, linewidth=lw
+    # )
 
     # Petit+20
     tmp.plot('delta', 'petitf', ax=ax, label='Petit+20', c=colors[0, 3], linewidth=lw)
@@ -113,6 +114,8 @@ def make_plot2(cleaned, path=None):
     if path is None:
         t = time.strftime('%Y%m%d_%H%M%S')
         path = f'five_planet_figures/five_planet2_{t}.png'
+
+    fig.tight_layout()
     fig.savefig(path)
     print('Saved to', path)
 
@@ -323,13 +326,12 @@ def make_plot(cleaned, version, pysr_version=None, t20=True, pysr_model_selectio
 
 
 if __name__ == '__main__':
-    # load the csv file
-    # original comparison
-    # cleaned = pd.read_csv(f'cur_plot_datasets/cur_plot_dataset_1733459469.0279388.csv')
-    # variance=0 comparison
-    cleaned = pd.read_csv(f'cur_plot_datasets/cur_plot_dataset_1733946056.0587265.csv')
-    make_plot_separate(cleaned, path='zero_variance.png')
-    print('made plot')
+    path = 'five_planet_figures/five_planet2_v24880_pysr11003_ms=30_N=5000_samps=10000_turbo'
+    time = '1739990877.3044198'
 
+    # path = 'five_planet_figures/five_planet2_v24880_pysr11003_ms=26_N=5000_samps=10000_turbo'
+    # time = '1740510166.2667198'
 
-
+    csv_path = f'cur_plot_datasets/{path}_{time}.csv'
+    cleaned = pd.read_csv(csv_path)
+    make_plot2(cleaned, path=path + '.png')

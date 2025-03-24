@@ -317,13 +317,13 @@ def get_config(args):
         niterations=args.niterations,
         # multithreading=False,
         binary_operators=["+", "*", '/', '-', '^'],
-        unary_operators=['sin'],  # removed "log"
+        # unary_operators=['sin'],  # removed "log"
         maxsize=args.max_size,
         timeout_in_seconds=int(60*60*args.time_in_hours),
         # prevent ^ from using complex exponents, nesting power laws is expressive but uninterpretable
         # base can have any complexity, exponent can have max 1 complexity
         constraints={'^': (-1, 1)},
-        nested_constraints={"sin": {"sin": 0}},
+        # nested_constraints={"sin": {"sin": 0}},
         ncyclesperiteration=1000, # increase utilization since usually using 32-ish cores?
     )
 

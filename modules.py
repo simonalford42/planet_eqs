@@ -378,11 +378,15 @@ class AddStdPredNN(nn.Module):
 
 
 class PureSRNet(nn.Module):
-    def __init__(self, version, model_selection='accuracy'):
+    def __init__(self, version=None, pysr_path=None, model_selection='accuracy'):
         super().__init__()
         # something like 'sr_results/hall_of_fame_21101_0_1.pkl'
         self.version = version
-        self.filepath = f'sr_results/{version}.pkl'
+        if pysr_path is None:
+            self.filepath = f'sr_results/{version}.pkl'
+        else:
+            self.filepath = pysr_path
+
         assert os.path.exists(self.filepath), f'filepath does not exist: {self.filepath}'
         self.reg = pysr.PySRRegressor.from_file(self.filepath, model_selection=model_selection)
         self.model = spock_reg_model.load(24880)

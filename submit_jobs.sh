@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# March 21 2025
+sbatch -J no_sin --time 09:00:00 --partition gpu sr.sh --time_in_hours 8 --version 24880 --target f2
+
 # Tuesday January 14 2025
 # sbatch -J srf1id3 --partition gpu sr.sh --time_in_hours 8 --version 95292 --target f2
 # sbatch -J srf1id2 --partition gpu sr.sh --time_in_hours 8 --version 75178 --target f2

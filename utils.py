@@ -109,13 +109,15 @@ def print_torch_device():
         print('Using torch device CPU')
 
 
-def assert_equal(a, b):
-    if np.ndarray in [type(a), type(b)]:
-        assert np.array_equal(a, b), f'a != b: a:{a}, b:{b}'
-    elif torch.Tensor in [type(a), type(b)]:
-        assert torch.equal(a, b), f'a != b: a:{a}, b:{b}'
-    else:
-        assert a == b, f'a != b: a:{a}, b:{b}'
+def assert_equal(*args):
+    # iterate through adjacent pairs and check for equality
+    for a, b in zip(args[:-1], args[1:]):
+        if np.ndarray in [type(a), type(b)]:
+            assert np.array_equal(a, b), f'a != b: a:{a}, b:{b}'
+        elif torch.Tensor in [type(a), type(b)]:
+            assert torch.equal(a, b), f'a != b: a:{a}, b:{b}'
+        else:
+            assert a == b, f'a != b: a:{a}, b:{b}'
 
 
 def num_params(model):

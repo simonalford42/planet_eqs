@@ -57,7 +57,7 @@ def get_args():
     parser.add_argument('--version', '-v', type=int, default=24880)
 
     parser.add_argument('--paper-ready', '-p', action='store_true')
-    parser.add_argument('--turbo', action='store_true', help='skips some sampling stuff for experimentation')
+    parser.add_argument('--turbo', action='store_true', help='skips sampling. No perf difference for equation models that are basically deterministic')
 
     parser.add_argument('--pysr_version', type=int, default=11003)
     parser.add_argument('--pysr_dir', type=str, default='../sr_results/')  # folder containing pysr results pkl
@@ -515,6 +515,19 @@ mse = ((cleaned['true'] - cleaned['median'])**2).mean()
 print('rmse: ', mse**0.5)
 bnn_mse = ((cleaned['true'] - cleaned['bnn_median'])**2).mean()
 print('bnn rmse: ', bnn_mse**0.5)
+
+# trying to compare rmse to petit
+# ix1 = cleaned[cleaned['true'] != cleaned['bnn_median']].index
+# ix2 = cleaned[cleaned['petitf'] <= 10].index
+# ix3 = ix1.intersection(ix2)
+# c2 = cleaned.loc[ix3]
+# rmse_eq = np.sqrt(np.mean((c2['true'] - c2['median'])**2))
+# 1.1543915552024004
+# rmse_bnn = np.sqrt(np.mean((c2['true'] - c2['bnn_median'])**2))
+# 0.3554099783721814
+# rmse_petit = np.sqrt(np.mean((c2['true'] - c2['petitf'])**2))
+# 1.0603360947824365
+
 
 # +
 # petit = Tsurv(p12, p23, [m1, m2, m3])
