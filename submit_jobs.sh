@@ -1,7 +1,166 @@
 #!/usr/bin/env bash
 
+# May 2 2025
+
+# evaluate rmse for new f2 linear runs
+# sbatch -J rmse_k20 --partition gpu -t 02:20:00 run.sh calc_rmse.py --version 8880 --eval_type nn
+# sbatch -J rmse_k10 --partition gpu -t 02:20:00 run.sh calc_rmse.py --version 22697 --eval_type nn
+# sbatch -J rmse_k5 --partition gpu -t 02:20:00 run.sh calc_rmse.py --version 13523 --eval_type nn
+
+# May 1 2025
+
+# new f2 linear runs
+# sbatch -J k20_f2lin train.sh --load_f1_f2 25646 --total_steps 150000 --f2_variant linear --mse_loss
+# sbatch -J k10_f2lin train.sh --load_f1_f2 25646 --total_steps 150000 --f2_variant linear --prune_f2_topk 10 --mse_loss
+# sbatch -J k5_f2lin train.sh --load_f1_f2 25646 --total_steps 150000 --f2_variant linear --prune_f2_topk 5 --mse_loss
+# sbatch -J k2_f2lin --partition gpu train.sh --load_f1_f2 25646 --total_steps 150000 --f2_variant linear --prune_f2_topk 2 --mse_loss
+# sbatch -J k0_f2lin --partition gpu train.sh --load_f1_f2 25646 --total_steps 150000 --f2_variant linear --prune_f2_topk 0 --mse_loss
+
+# calc RMSe for topk jobs
+# sbatch -J rmse3 --partition ellis -t 02:20:00 run.sh calc_rmse.py --version 74649 --pysr_version TBD --eval_type pysr
+# sbatch -J rmse4 --partition ellis -t 02:20:00 run.sh calc_rmse.py --version 11566 --pysr_version 94842 --eval_type pysr
+# sbatch -J rmse5 --partition ellis -t 02:20:00 run.sh calc_rmse.py --version 72646 --pysr_version 42503 --eval_type pysr
+
+# calculate f2 linear results
+# sbatch -J f2_lin20 --partition gpu -t 01:20:00 run.sh calc_rmse.py --version 2702 --eval_type nn
+# sbatch -J f2_lin10 --partition gpu -t 01:20:00 run.sh calc_rmse.py --version 13529 --eval_type nn
+# sbatch -J f2_lin5 --partition gpu -t 01:20:00 run.sh calc_rmse.py --version 7307 --eval_type nn
+# sbatch -J f2_lin2 --partition gpu -t 01:20:00 run.sh calc_rmse.py --version 22160 --eval_type nn
+
+# April 30 2025
+
+# new topk sr runs
+# sbatch -J topk_3 --partition ellis -t 09:00:00 sr.sh --time_in_hours 8 --version 74649 --target f2_direct --seed 0
+# sbatch -J topk_4 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 11566 --target f2_direct --seed 0
+# sbatch -J topk_5 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 72646 --target f2_direct --seed 0
+
+# April 28, 2025
+
+# direct mse SR for ft networks
+# sbatch -J ftfv_dir --partition ellis -t 09:00:00 sr.sh --time_in_hours 8 --version 10970 --target f2_direct --seed 0
+# sbatch -J ftfv_f2 --partition ellis -t 09:00:00 sr.sh --time_in_hours 8 --version 10970 --target f2 --seed 0
+
+#### calculating RMSE values for different things
+# nn's
+# sbatch -J rmse --partition gpu -t 02:20:00 run.sh calc_rmse.py --version 24880 --eval_type nn
+# sbatch -J rmse --partition gpu -t 02:20:00 run.sh calc_rmse.py --version 4590 --eval_type nn
+# sbatch -J rmse --partition gpu -t 02:20:00 run.sh calc_rmse.py --version 86952 --eval_type nn
+# sbatch -J rmse --partition gpu -t 02:20:00 run.sh calc_rmse.py --version 12318 --eval_type nn
+# sbatch -J rmse --partition gpu -t 02:20:00 run.sh calc_rmse.py --version 10970 --eval_type nn
+
+# petit
+# sbatch -J rmse --partition gpu -t 12:00:00 run.sh calc_rmse.py --eval_type petit
+
+# pure sr
+# sbatch -J rmse --partition gpu -t 12:00:00 run.sh calc_rmse.py --eval_type pure_sr --pysr_version 83941
+# sbatch -J rmse --partition gpu -t 12:00:00 run.sh calc_rmse.py --eval_type pure_sr --pysr_version 72420
+
+# f1 identity
+# sbatch -J rmse --partition gpu -t 02:20:00 run.sh calc_rmse.py --eval_type f1_identity --version 28114 --pysr_version 9054
+# sbatch -J rmse --partition gpu -t 02:20:00 run.sh calc_rmse.py --eval_type f1_identity --version 28114 --pysr_version 23758
+
+### possible outcomes
+# mse nn's
+# sbatch -J rmse --partition gpu -t 02:20:00 run.sh calc_rmse.py --eval_type pysr --version 4590 --pysr_version 65599
+# sbatch -J rmse --partition gpu -t 02:20:00 run.sh calc_rmse.py --eval_type pysr --version 86952 --pysr_version 55106
+# sbatch -J rmse --partition gpu -t 02:20:00 run.sh calc_rmse.py --eval_type pysr --version 4590 --pysr_version 40403
+# sbatch -J rmse --partition gpu -t 02:20:00 run.sh calc_rmse.py --eval_type pysr --version 86952 --pysr_version 66953
+
+# fine-tuned mse nn's
+# sbatch -J rmse --partition gpu -t 02:20:00 run.sh calc_rmse.py --eval_type pysr --version 12318 --pysr_version 86055
+# sbatch -J rmse --partition gpu -t 02:20:00 run.sh calc_rmse.py --eval_type pysr --version 10970 --pysr_version 4929
+# sbatch -J rmse --partition gpu -t 02:20:00 run.sh calc_rmse.py --eval_type pysr --version 12318 --pysr_version 22271
+# sbatch -J rmse --partition gpu -t 02:20:00 run.sh calc_rmse.py --eval_type pysr --version 10970 --pysr_version 39675
+
+# special NN but mse/direct
+# sbatch -J rmse --partition gpu -t 02:20:00 run.sh calc_rmse.py --eval_type pysr --version 24880 --pysr_version 93102
+
+# special loss for everything
+# sbatch -J rmse --partition gpu -t 02:20:00 run.sh calc_rmse.py --eval_type pysr --version 24880 --pysr_version 11003
+# sbatch -J rmse --partition gpu -t 02:20:00 run.sh calc_rmse.py --eval_type pysr --version 24880 --pysr_version 79364
+
+
+# April 28, 2025
+
+# pure SR with mse or special loss
+# sbatch -J pure --partition ellis -t 09:00:00 run.sh pure_sr.py --time-in-hours 8 --seed 0 --loss_fn mse
+# sbatch -J pure2 --partition gpu -t 09:00:00 run.sh pure_sr.py --time-in-hours 8 --seed 0 --loss_fn special
+
+# new f1 identity runs
+# sbatch -J f1id_ll --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --target f2_direct --loss_fn ll --seed 0 --version 28114
+
+# fine-tuned fixvar mse loss
+# sbatch -J ftfv_24880 --partition gpu train.sh --load_f1 24880 --total_steps 150000 --seed 0 --fix_variance
+
+# running SR for fine-tuned NN's
+# sbatch -J ft_mse_f2_mse --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 12318 --target f2 --seed 0
+# sbatch -J ft_fv_f2_mse --partition ellis -t 09:00:00 sr.sh --time_in_hours 8 --version 10970 --target f2 --seed 0
+# sbatch -J ft_mse_direct_mse --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 12318 --target f2_direct --seed 0
+# sbatch -J ft_fv_direct_mse --partition ellis -t 09:00:00 sr.sh --time_in_hours 8 --version 10970 --target f2_direct --seed 0
+
+# April 23, 2025
+
+# fine tune 24880 for mse loss
+# sbatch -J ft_24880 --partition ellis train.sh --load_f1 24880 --total_steps 150000 --seed 0 --mse_loss
+# sbatch -J ftf_24880 --partition ellis train.sh --load_f1 24880 --total_steps 150000 --seed 0 --mse_loss --freeze_f1
+
+# run sr.py with special loss function
+# sbatch -J ll --partition ellis -t 09:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2_direct --seed 0 --loss_fn ll
+
+# versions=(4590 4590 84963 84963 86952 86952)
+# pysr_versions=(40403 65599 77075 57131 66953 55106)
+
+# for i in "${!versions[@]}"; do
+#     version=${versions[$i]}
+#     pysr_version=${pysr_versions[$i]}
+#     sbatch -J c --partition gpu -t 00:20:00 run.sh calc_rmse.py --version $version --pysr_version $pysr_version --train
+#     sbatch -J c --partition gpu -t 00:20:00 run.sh calc_rmse.py --version $version --pysr_version $pysr_version
+# done
+
+# running pure SR on the mse-loss or fix-variance trained NN's
+# sbatch -J fixv --partition ellis -t 09:00:00 sr.sh --time_in_hours 8 --version 86952 --target f2_direct --seed 0
+# sbatch -J mse2 --partition ellis -t 09:00:00 sr.sh --time_in_hours 8 --version 84963 --target f2_direct --seed 0
+# sbatch -J mse --partition ellis -t 09:00:00 sr.sh --time_in_hours 8 --version 4590 --target f2_direct --seed 0
+# sbatch -J fixv --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 86952 --target f2 --seed 0
+# sbatch -J mse2 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 84963 --target f2 --seed 0
+# sbatch -J mse --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 4590 --target f2 --seed 0
+
+# April 22, 2025
+
+# training NN with mse loss, or fix variance, two seeds
+# sbatch -J mse --partition ellis prune_train.sh --seed 0 --mse_loss
+# sbatch -J mse2 --partition gpu prune_train.sh --seed 1 --mse_loss
+# sbatch -J fix_var --partition gpu prune_train.sh --seed 0 --fix_variance
+
+# sr with f1 identity, target f2_direct or f2
+# sbatch -J f1id --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --target f2_direct --seed 0 --version 28114
+# sbatch -J f1id_f2 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --target f2 --seed 0 --version 28114
+
+# SR with f2 direct
+# sbatch -J f2_dir --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2_direct --seed 1
+# sbatch -J f2_dir --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2_direct --seed 0
+
+# pure SR with NN targets
+# sbatch -J pure --partition ellis -t 09:00:00 run.sh pure_sr.py --time-in-hours 8 --seed 0 --nn_targets True
+# sbatch -J pure --partition ellis -t 09:00:00 run.sh pure_sr.py --time-in-hours 8 --seed 1 --nn_targets True
+
+# pure SR with different seeds
+# sbatch -J pure --partition gpu -t 09:00:00 run.sh pure_sr.py --time-in-hours 8 --seed 2
+# sbatch -J pure --partition gpu -t 09:00:00 run.sh pure_sr.py --time-in-hours 8 --seed 3
+
+# ------------------------------------------------------------------------
+
+# SR with k=3 and k=4
+# sbatch -J k3 --time 09:00:00 --partition gpu sr.sh --time_in_hours 8 --version 24880 --target f2
+# sbatch -J k3_24h --partition ellis --time 25:00:00 sr.sh --time_in_hours 24 --version 24880 --target f2
+# sbatch -J k4 --time 09:00:00 --partition gpu sr.sh --time_in_hours 8 --version 24880 --target f2
+# sbatch -J k3s --partition gpu --time 9:00:00 sr.sh --time_in_hours 8 --version 74649 --target f2 --max_size 30
+# sbatch -J k4s --partition gpu --time 9:00:00 sr.sh --time_in_hours 8 --version 11566 --target f2 --max_size 30
+
 # March 21 2025
-sbatch -J no_sin --time 09:00:00 --partition gpu sr.sh --time_in_hours 8 --version 24880 --target f2
+# sbatch -J no_sin --time 09:00:00 --partition gpu sr.sh --time_in_hours 8 --version 24880 --target f2
+# sbatch -J clipped --time 01:30:00 --partition gpu sr.sh --time_in_hours 1 --version 24880 --target f2
+# sbatch -J clipped2 --time 09:00:00 --partition gpu sr.sh --time_in_hours 8 --version 24880 --target f2
 
 # Tuesday January 14 2025
 # sbatch -J srf1id3 --partition gpu sr.sh --time_in_hours 8 --version 95292 --target f2

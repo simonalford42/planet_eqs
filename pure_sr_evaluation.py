@@ -47,7 +47,7 @@ def split_expression(expr):
 
     idx, op = extract_top_level_operator(expr)
     if idx is None:
-        return expr, None, None
+        return "", None, expr
     left = expr[:idx].strip()
     right = expr[idx+1:].strip()
 
@@ -84,6 +84,7 @@ def transform_expression(subexpr, var_names):
         code = re.sub(r'(?<!\.)\bsqrt\((.*?)\)', r'np.sqrt(\1)', code)
         code = re.sub(r'(?<!\.)\bexp\((.*?)\)', r'np.exp(\1)', code)
         code = re.sub(r'(?<!\.)\blog\((.*?)\)', r'np.log(\1)', code)
+        code = re.sub(r'(?<!\.)\bsin\((.*?)\)', r'np.sin(\1)', code)
         changed = (code != old_code)
 
     # for v in var_names:
@@ -146,18 +147,35 @@ def lambdify_pure_sr_expression(expr: str, var_names):
     print("Right code:", right_code)
 
     def f(x: np.ndarray):
-        # x (B, 100, 41)
-        x_every_10th = x[:, ::10].numpy()
-        f1_inp = {v: x_every_10th[..., i] for i, v in enumerate(var_names)}
-        f1_out = eval(left_code, {"np": np}, {"x": f1_inp})  # (B, T)
-        # take std across T axis
-        std = np.std(f1_out, axis=1) # (B, )
-        f2_inp = {v: std for v in var_names}
-        f2_out = eval(right_code, {"np": np}, {"x": f2_inp})  # (B, )
-        return f2_out
+        try:
+            # x (B, 100, 41)
+            x_every_10th = x[:, ::10].numpy()
+            f1_inp = {v: x_every_10th[..., i] for i, v in enumerate(var_names)}
+            if left_code == "":  # no left and right, just right
+                f1_out = np.zeros((x.shape[0], 1))
+            else:
+                f1_out = eval(left_code, {"np": np}, {"x": f1_inp})  # (B, T)
+
+            if type(f1_out) in [float, np.float64]:
+                # repeat so that it's (B, T)
+                f1_out = np.full((x.shape[0], 1), f1_out)
+
+            # take std across T axis
+            std = np.std(f1_out, axis=1) # (B, )
+            f2_inp = {v: std for v in var_names}
+            f2_out = eval(right_code, {"np": np}, {"x": f2_inp})  # (B, )
+            if type(f2_out) in [float, np.float64]:
+                # repeat so that it's (B, )
+                f2_out = np.full((x.shape[0],), f2_out)
+            return f2_out
+        except Exception as e:
+            print(f"Error evaluating expression: {expr}")
+            import traceback
+            print(f"Error message: {e}")
+            print(f"Traceback: {traceback.format_exc()}")
+            return np.NaN
 
     return f
-
 
 def example2():
     reg = pickle.load(open('sr_results/32834.pkl', 'rb'))
@@ -181,50 +199,20 @@ def example2():
     f2_out = eval(right_code, {"np": np}, {"x": f2_inp})  # (B, )
 
 
-def evaluate_pure_sr_model(version, plot_random=False):
-    model = spock_reg_model.load(24880)
-    model.make_dataloaders()
-    from copy import deepcopy as copy
-    if plot_random:
-        assert model.ssX is not None
-        tmp_ssX = copy(model.ssX)
-        model.make_dataloaders(
-            ssX=model.ssX,
-            train=False,
-            plot_random=True) #train=False means we show the whole dataset (assuming we don't train on it!)
+def pure_sr_predict_fn(results, complexity=None):
+    if complexity is None:
+        # use highest complexity
+        complexity = results['complexity'].max()
+    result = results[results['complexity'] == complexity].iloc[0]
+    expr = result.equation
+    print(expr)
+    var_names = results.feature_names_in_
+    expr_fn = lambdify_pure_sr_expression(expr, var_names)
+    return expr_fn
 
-        assert np.all(tmp_ssX.mean_ == model.ssX.mean_)
 
-    val_dataloader = model._val_dataloader
-
+def get_pure_sr_results(version):
     reg = pickle.load(open(f'sr_results/{version}.pkl', 'rb'))
-    pure_results = {}
-
-    for i in range(len(reg.equations_)):
-        try:
-            expr = reg.equations_.iloc[i].equation
-            complexity = reg.equations_.iloc[i].complexity
-            var_names = reg.feature_names_in_
-            expr_fn = lambdify_pure_sr_expression(expr, var_names)
-
-            mses = []
-            for x, y in iter(val_dataloader):
-                pred = expr_fn(x)
-                mse = np.mean((pred[:, None] - y.numpy())**2)
-                mses.append(mse)
-
-            avg_mse = np.mean(mses)
-            print(f'Complexity {complexity}, Avg mse:', avg_mse)
-            pure_results[complexity] = avg_mse
-
-        except Exception as e:
-            print(f'Failed to evaluate expression {expr}: {e}')
-            import traceback
-            traceback.print_exc()
-            continue
-
-    pickle.dump(pure_results, open(f'pure_results.pkl', 'wb'))
-
-
-if __name__ == '__main__':
-    evaluate_pure_sr_model(81050, plot_random=False)
+    results = reg.equations_
+    results.feature_names_in_ = reg.feature_names_in_
+    return results

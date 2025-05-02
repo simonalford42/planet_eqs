@@ -1,11 +1,11 @@
 import numpy as np
 import spock_reg_model
+import os
 from sklearn.preprocessing import StandardScaler
 import numpy as np
 import re
 import sympy as sp
 import pickle
-from pysr.export_latex import sympy2latextable, sympy2latex
 from matplotlib import pyplot as plt
 import matplotlib.ticker as ticker
 plt.rcParams["font.family"] = "serif"
@@ -27,10 +27,31 @@ def get_feature_nn(version):
     return feature_nn
 
 
-def get_pysr_results(pysr_version, include_ssx=False, feature_nn=None):
+def load_pickle(filename):
+    with open(filename, 'rb') as f:
+        data = pickle.load(f)
+    return data
+
+
+def get_rmse_values(version=24880, pysr_version=11003, split='test'):
+    filepath = f"pickles/pysr_results_all_{version}_{pysr_version}.pkl"
+
+    # check if file exists
+    if not os.path.exists(filepath):
+        return None
+
+    with open(filepath, 'rb') as f:
+        rmse_values = pickle.load(f)
+
+    return rmse_values[split]
+
+
+def get_pysr_results(pysr_version, version=None, include_ssx=False, feature_nn=None):
     # load pysr f2 equations
     results = pickle.load(open(f'sr_results/{pysr_version}.pkl', 'rb'))
-    results = results.equations_[0]
+    results = results.equations_
+    if type(results) == list:
+        results = results[0]  # just the mean equations
 
     # remove 'lambda_format' column
     results.drop(columns=['lambda_format'], inplace=True)
@@ -39,9 +60,11 @@ def get_pysr_results(pysr_version, include_ssx=False, feature_nn=None):
         add_scalar_to_pysr_results(results, feature_nn)
 
     # rmse_values maps complexity to rmse
-    rmse_values = get_k_rmse_values()[2]
-    # add rmse column, matching complexity with existing 'complexity' column
-    results['rmse'] = results['complexity'].map(rmse_values)
+    if version is not None:
+        rmse_values = get_rmse_values(version, pysr_version=pysr_version)
+        if rmse_values:
+            # add rmse column, matching complexity with existing 'complexity' column
+            results['rmse'] = results['complexity'].map(rmse_values)
 
     return results
 
@@ -358,7 +381,7 @@ def number_of_variables_in_expression(equation: str):
 
 
 def overall_complexity(entry: pd.Series, k: int):
-    complexity = entry['complexity']
+    complexity = entry['complexity'].item()
     # return complexity
     num_variables = number_of_variables_in_expression(entry.equation)
     return complexity + (3 * k - 2) * num_variables
@@ -447,6 +470,7 @@ def f2_latex_str(results, important_complexities=None, mapping_dict=None, add_rm
 
     important_ixs = get_important_ixs(results, important_complexities)
 
+    from pysr.export_latex import sympy2latextable
     s = sympy2latextable(results, precision=2, columns=['equation', 'complexity'], indices=important_ixs)
 
     if mapping_dict:
@@ -487,6 +511,7 @@ def f2_latex_strings(results, important_complexities=None, mapping_dict=None):
 
     important_ixs = get_important_ixs(results, important_complexities)
 
+    from pysr.export_latex import sympy2latex
     latex_strs = [sympy2latex(expr, prec=2) for expr in results['sympy_format'][important_ixs]]
     latex_strs = ['\\log_{10} T_{\\mathrm{inst}} = ' + s for s in latex_strs]
 

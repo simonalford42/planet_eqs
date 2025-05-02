@@ -12,9 +12,10 @@
  # total limit (hh:mm:ss)
 #SBATCH -t 02:00:00
 #SBATCH --mem=200G
-#SBATCH --partition=default_partition
+#SBATCH --partition=ellis
 
 source /home/sca63/mambaforge/etc/profile.d/conda.sh
-conda activate bnn_chaos_model
+# conda activate bnn_chaos_model
+conda activate bnn_new_pysr
 
 python -u sr.py "$@"

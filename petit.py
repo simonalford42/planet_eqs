@@ -55,6 +55,9 @@ def tsurv(x):
     return torch.tensor(preds)
 
 
+def petit_prediction_fn():
+    return tsurv
+
 # copied from spock_reg_model.py
 def safe_log_erf(x):
     base_mask = x < -1

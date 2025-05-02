@@ -58,6 +58,12 @@ function elementwise_loss(prediction, target)
 end
 """
 
+CLIPPED_LOSS = """"
+function elementwise_loss(prediction, target)
+    return (target - min(prediction, 9))^2
+end
+"""
+
 ### predicting < 0 is a -1
 ### predicting >= 0 is a +1
 
@@ -83,7 +89,6 @@ function elementwise_loss(x, y)
     end
 end
 '''
-
 
 
 LABELS = ['time', 'e+_near', 'e-_near', 'max_strength_mmr_near', 'e+_far', 'e-_far', 'max_strength_mmr_far', 'megno', 'a1', 'e1', 'i1', 'cos_Omega1', 'sin_Omega1', 'cos_pomega1', 'sin_pomega1', 'cos_theta1', 'sin_theta1', 'a2', 'e2', 'i2', 'cos_Omega2', 'sin_Omega2', 'cos_pomega2', 'sin_pomega2', 'cos_theta2', 'sin_theta2', 'a3', 'e3', 'i3', 'cos_Omega3', 'sin_Omega3', 'cos_pomega3', 'sin_pomega3', 'cos_theta3', 'sin_theta3', 'm1', 'm2', 'm3', 'nan_mmr_near', 'nan_mmr_far', 'nan_megno']
@@ -307,7 +312,8 @@ def get_config(args):
     path = f'sr_results/{id}.csv'
 
     # https://stackoverflow.com/a/57474787/4383594
-    num_cpus = int(os.environ.get('SLURM_CPUS_ON_NODE')) * int(os.environ.get('SLURM_JOB_NUM_NODES'))
+    # num_cpus = int(os.environ.get('SLURM_CPUS_ON_NODE')) * int(os.environ.get('SLURM_JOB_NUM_NODES'))
+    num_cpus = 10
     pysr_config = dict(
         procs=num_cpus,
         populations=3*num_cpus,
@@ -325,11 +331,14 @@ def get_config(args):
         constraints={'^': (-1, 1)},
         # nested_constraints={"sin": {"sin": 0}},
         ncyclesperiteration=1000, # increase utilization since usually using 32-ish cores?
+        random_state=args.seed,
     )
 
     if args.loss_fn == 'll':
         assert args.target == 'f2_direct', 'log likelihood loss only useful for f2_direct'
         pysr_config['elementwise_loss'] = LL_LOSS
+    elif args.loss_fn == 'clipped':
+        pysr_config['elementwise_loss'] = CLIPPED_LOSS
 
     if args.target == 'equation_bounds':
         pysr_config['elementwise_loss'] = MODIFIED_ZEROONE_LOSS
@@ -423,12 +432,13 @@ def parse_args():
     parser.add_argument('--time_in_hours', type=float, default=1)
     parser.add_argument('--niterations', type=float, default=500000) # by default, use time in hours as limit
     parser.add_argument('--max_size', type=int, default=30)
+    parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--target', type=str, default='f2_direct', choices=['f1', 'f2', 'f2_ifthen', 'f2_direct', 'f2_2', 'equation_bounds'])
     parser.add_argument('--residual', action='store_true', help='do residual training of your target')
     parser.add_argument('--n', type=int, default=10000, help='number of data points for the SR problem')
     parser.add_argument('--batch_size', type=int, default=1000, help='number of data points for the SR problem')
     parser.add_argument('--sr_residual', action='store_true', help='do residual training of your target with previous sr run as base')
-    parser.add_argument('--loss_fn', type=str, choices=['mse', 'll', 'perceptron'])
+    parser.add_argument('--loss_fn', type=str, choices=['mse', 'll', 'perceptron', 'clipped'], default='mse')
     parser.add_argument('--previous_sr_path', type=str, default='sr_results/92985.pkl')
 
     parser.add_argument('--eq_bound_mse_threshold', type=float, default=1, help='mse threshold below which to consider an equation good')

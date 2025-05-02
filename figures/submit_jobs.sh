@@ -1,41 +1,18 @@
 #!/usr/bin/env bash
 
-# sbatch -J five --partition ellis five_planet.sh --version 24880 --pysr_version 11003 --paper-ready --pysr_model_selection 26
+# sbatch -J bnn300 --partition gpu run.sh --Ngrid 300 --version 24880 --pysr_version --compute
 
-# sbatch --time=2-00:00:00 --partition=default_partition run.sh --Ngrid 300 --max_t 1e9 --compute --ground_truth --parallel_total 90000 --parallel_ix 83560
-# sbatch --time=2-00:00:00 --partition=default_partition run.sh --Ngrid 300 --max_t 1e9 --compute --ground_truth --parallel_total 90000 --parallel_ix 83561
-# sbatch --time=2-00:00:00 --partition=default_partition run.sh --Ngrid 300 --max_t 1e9 --compute --ground_truth --parallel_total 90000 --parallel_ix 83562
-# sbatch --time=2-00:00:00 --partition=default_partition run.sh --Ngrid 300 --max_t 1e9 --compute --ground_truth --parallel_total 90000 --parallel_ix 83563
-# sbatch --time=2-00:00:00 --partition=default_partition run.sh --Ngrid 300 --max_t 1e9 --compute --ground_truth --parallel_total 90000 --parallel_ix 83564
-# sbatch --time=2-00:00:00 --partition=default_partition run.sh --Ngrid 300 --max_t 1e9 --compute --ground_truth --parallel_total 90000 --parallel_ix 83565
-# sbatch --time=2-00:00:00 --partition=default_partition run.sh --Ngrid 300 --max_t 1e9 --compute --ground_truth --parallel_total 90000 --parallel_ix 83566
-# sbatch --time=2-00:00:00 --partition=default_partition run.sh --Ngrid 300 --max_t 1e9 --compute --ground_truth --parallel_total 90000 --parallel_ix 83567
-# sbatch --time=2-00:00:00 --partition=default_partition run.sh --Ngrid 300 --max_t 1e9 --compute --ground_truth --parallel_total 90000 --parallel_ix 83568
-# sbatch --time=2-00:00:00 --partition=default_partition run.sh --Ngrid 300 --max_t 1e9 --compute --ground_truth --parallel_total 90000 --parallel_ix 83569
-# sbatch --time=2-00:00:00 --partition=default_partition run.sh --Ngrid 300 --max_t 1e9 --compute --ground_truth --parallel_total 90000 --parallel_ix 83570
+# sbatch -J five29 --partition ellis five_planet.sh --version 24880 --pysr_version 58106 --paper-ready --pysr_model_selection 29
+# sbatch -J five27 --partition ellis five_planet.sh --version 24880 --pysr_version 58106 --paper-ready --pysr_model_selection 27
+# sbatch -J five25 --partition ellis five_planet.sh --version 24880 --pysr_version 58106 --paper-ready --pysr_model_selection 25
+# sbatch -J five23 --partition ellis five_planet.sh --version 24880 --pysr_version 58106 --paper-ready --pysr_model_selection 23
+# sbatch -J five21 --partition ellis five_planet.sh --version 24880 --pysr_version 58106 --paper-ready --pysr_model_selection 21
+# sbatch -J five21 --partition ellis five_planet.sh --version 24880 --pysr_version 58106 --paper-ready --pysr_model_selection 19
+# sbatch -J five21 --partition ellis five_planet.sh --version 24880 --pysr_version 58106 --paper-ready --pysr_model_selection 17
+# sbatch -J five21 --partition ellis five_planet.sh --version 24880 --pysr_version 58106 --paper-ready --pysr_model_selection 15
+# sbatch -J five21 --partition ellis five_planet.sh --version 24880 --pysr_version 58106 --paper-ready --pysr_model_selection 13
+# sbatch -J five21 --partition ellis five_planet.sh --version 24880 --pysr_version 58106 --paper-ready --pysr_model_selection 11
 
-# sbatch --time=2-00:00:00 --partition=default_partition run.sh --Ngrid 300 --max_t 1e9 --compute --ground_truth --parallel_total 9000 --parallel_ix 8350
-# sbatch --time=2-00:00:00 --partition=default_partition run.sh --Ngrid 300 --max_t 1e9 --compute --ground_truth --parallel_total 9000 --parallel_ix 8351
-# sbatch --time=2-00:00:00 --partition=default_partition run.sh --Ngrid 300 --max_t 1e9 --compute --ground_truth --parallel_total 9000 --parallel_ix 8352
-# sbatch --time=2-00:00:00 --partition=default_partition run.sh --Ngrid 300 --max_t 1e9 --compute --ground_truth --parallel_total 9000 --parallel_ix 8353
-# sbatch --time=2-00:00:00 --partition=default_partition run.sh --Ngrid 300 --max_t 1e9 --compute --ground_truth --parallel_total 9000 --parallel_ix 8354
-# sbatch --time=2-00:00:00 --partition=default_partition run.sh --Ngrid 300 --max_t 1e9 --compute --ground_truth --parallel_total 9000 --parallel_ix 8355
-# sbatch --time=2-00:00:00 --partition=default_partition run.sh --Ngrid 300 --max_t 1e9 --compute --ground_truth --parallel_total 9000 --parallel_ix 8356
-# sbatch --time=2-00:00:00 --partition=default_partition run.sh --Ngrid 300 --max_t 1e9 --compute --ground_truth --parallel_total 9000 --parallel_ix 8357
-# sbatch --time=2-00:00:00 --partition=default_partition run.sh --Ngrid 300 --max_t 1e9 --compute --ground_truth --parallel_total 9000 --parallel_ix 8358
-# sbatch --time=2-00:00:00 --partition=default_partition run.sh --Ngrid 300 --max_t 1e9 --compute --ground_truth --parallel_total 9000 --parallel_ix 8359
-
-# sbatch --time=2-00:00:00 --partition=default_partition run.sh --Ngrid 300 --max_t 1e9 --compute --ground_truth --parallel_total 9000 --parallel_ix 8760
-# sbatch --time=2-00:00:00 --partition=default_partition run.sh --Ngrid 300 --max_t 1e9 --compute --ground_truth --parallel_total 9000 --parallel_ix 8761
-# sbatch --time=2-00:00:00 --partition=default_partition run.sh --Ngrid 300 --max_t 1e9 --compute --ground_truth --parallel_total 9000 --parallel_ix 8762
-# sbatch --time=2-00:00:00 --partition=default_partition run.sh --Ngrid 300 --max_t 1e9 --compute --ground_truth --parallel_total 9000 --parallel_ix 8763
-# sbatch --time=2-00:00:00 --partition=default_partition run.sh --Ngrid 300 --max_t 1e9 --compute --ground_truth --parallel_total 9000 --parallel_ix 8764
-# sbatch --time=2-00:00:00 --partition=default_partition run.sh --Ngrid 300 --max_t 1e9 --compute --ground_truth --parallel_total 9000 --parallel_ix 8764
-# sbatch --time=2-00:00:00 --partition=default_partition run.sh --Ngrid 300 --max_t 1e9 --compute --ground_truth --parallel_total 9000 --parallel_ix 8765
-# sbatch --time=2-00:00:00 --partition=default_partition run.sh --Ngrid 300 --max_t 1e9 --compute --ground_truth --parallel_total 9000 --parallel_ix 8766
-# sbatch --time=2-00:00:00 --partition=default_partition run.sh --Ngrid 300 --max_t 1e9 --compute --ground_truth --parallel_total 9000 --parallel_ix 8767
-# sbatch --time=2-00:00:00 --partition=default_partition run.sh --Ngrid 300 --max_t 1e9 --compute --ground_truth --parallel_total 9000 --parallel_ix 8768
-# sbatch --time=2-00:00:00 --partition=default_partition run.sh --Ngrid 300 --max_t 1e9 --compute --ground_truth --parallel_total 9000 --parallel_ix 8769
 
 # sbatch --time=48:00:00 --array=0-3 -J petit16 --partition gpu run.sh --Ngrid 16 --compute --petit --job_array
 # sbatch --time=48:00:00 --array=0-24 -J petit300 --partition gpu run.sh --Ngrid 300 --compute --petit --job_array

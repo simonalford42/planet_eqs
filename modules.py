@@ -377,39 +377,6 @@ class AddStdPredNN(nn.Module):
         return out
 
 
-class PureSRNet(nn.Module):
-    def __init__(self, version=None, pysr_path=None, model_selection='accuracy'):
-        super().__init__()
-        # something like 'sr_results/hall_of_fame_21101_0_1.pkl'
-        self.version = version
-        if pysr_path is None:
-            self.filepath = f'sr_results/{version}.pkl'
-        else:
-            self.filepath = pysr_path
-
-        assert os.path.exists(self.filepath), f'filepath does not exist: {self.filepath}'
-        self.reg = pysr.PySRRegressor.from_file(self.filepath, model_selection=model_selection)
-        self.model = spock_reg_model.load(24880)
-
-    def forward(self, x, noisy_val=False):
-        utils.assert_equal(x.shape[1], 100)
-        # take every 10th timestep, and combine the first two axes
-        x = x[:, ::10]
-        x = einops.rearrange(x, 'B T N -> (B T) N')
-        x = x.cpu().numpy()
-        pred = self.reg.predict(x)
-        import pdb; pdb.set_trace()
-        return torch.from_numpy(pred)
-
-    def path(self):
-        return f'pure_sr_{self.version}'
-
-    def make_dataloaders(self):
-        self.model.make_dataloaders()
-        self._val_dataloader = self.model._val_dataloader
-
-
-
 class Pred1StdNN(nn.Module):
     def forward(self, x):
         B = x.shape[0]
@@ -463,6 +430,7 @@ def get_pysr_regress_nn(version, model_selection='accuracy', results_dir='sr_res
     reg = pickle.load(open(pysr_path, 'rb'))
     from sr import LL_LOSS
     is_direct_f2 = hasattr(reg, 'elementwise_loss') and reg.elementwise_loss == LL_LOSS
+    is_direct_f2 = is_direct_f2 or type(reg.equations_) != list
 
     if is_direct_f2:
         return DirectPySRNet(pysr_path, model_selection)

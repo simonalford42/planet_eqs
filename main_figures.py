@@ -1,45 +1,27 @@
 #!/usr/bin/env python
 # coding: utf-8
 import argparse
-from custom_cmap import custom_cmap
 from copy import deepcopy as copy
 import einops
-import fit_trunc_dist
-from functools import partial
 import glob
-from icecream import ic
 from matplotlib import pyplot as plt
 from matplotlib.colors import LogNorm
 import matplotlib as mpl
 import numpy as np
-from numpy import sqrt, pi, exp
-from numba import jit, prange
-from parse_swag_args import parse
 import pandas as pd
-from pytorch_lightning import Trainer
-from pytorch_lightning.callbacks import ModelCheckpoint
 import seaborn as sns
-from scipy.optimize import minimize
-from scipy.stats import truncnorm
-from scipy.special import erf
-from scipy.stats import gaussian_kde
 from scipy.integrate import quad
 from scipy.interpolate import interp1d
 from sklearn.metrics import roc_curve, roc_auc_score
 import spock_reg_model
-import sys
-import torch
-import time
 from tqdm.notebook import tqdm
-import utils
 import wandb
 import petit
 import pickle
-import modules
+from pure_sr_evaluation import pure_sr_predict_fn, get_pure_sr_results, lambdify_pure_sr_expression
 
 # to fix the fonts?
 plt.rcParams.update(plt.rcParamsDefault)
-
 
 
 def calc_scores(args, checkpoint_filename, logger=None, plot_random=False):
@@ -597,8 +579,76 @@ def calc_scores(args, checkpoint_filename, logger=None, plot_random=False):
                                     'weighted_roc': weight_roc,})
         logger.log_metrics({"classification": wandb.Image(fig)})
 
+def fast_truncnorm(
+        loc, scale, left=np.inf, right=np.inf,
+        d=10000, nsamp=50, seed=0):
+    """Fast truncnorm sampling.
 
-def calc_scores_nonswag(model, train_all=False, logger=None, plot_random=False, use_petit=False, just_rmse=False, train_set=False):
+    Assumes scale and loc have the desired shape of output.
+    length is number of elements.
+    Select nsamp based on expecting at last one sample
+        to fit within your (left, right) range.
+    Select d based on memory considerations - need to operate on
+        a (d, nsamp) array.
+    """
+    oldscale = scale
+    oldloc = loc
+
+    scale = scale.reshape(-1)
+    loc = loc.reshape(-1)
+    samples = np.zeros_like(scale)
+    start = 0
+
+    for start in range(0, scale.shape[0], d):
+
+        end = start + d
+        if end > scale.shape[0]:
+            end = scale.shape[0]
+
+        cd = end-start
+        rand_out = np.random.randn(
+            nsamp, cd
+        )
+
+        rand_out = (
+            rand_out * scale[None, start:end]
+            + loc[None, start:end]
+        )
+
+        if right == np.inf:
+            mask = (rand_out > left)
+        elif left == np.inf:
+            mask = (rand_out < right)
+        else:
+            mask = (rand_out > left) & (rand_out < right)
+
+        first_good_val = rand_out[
+            mask.argmax(0), np.arange(cd)
+        ]
+
+        samples[start:end] = first_good_val
+
+    return samples.reshape(*oldscale.shape)
+
+
+def default_dataloader(random=False, train=False):
+    model = spock_reg_model.load(24880)
+    model.make_dataloaders(train=train)
+    if random:
+        from copy import deepcopy as copy
+        assert model.ssX is not None
+        tmp_ssX = copy(model.ssX)
+        model.make_dataloaders(
+            ssX=model.ssX,
+            train=False,
+            plot_random=True) #train=False means we show the whole dataset (assuming we don't train on it!)
+
+        assert np.all(tmp_ssX.mean_ == model.ssX.mean_)
+
+    return model._val_dataloader
+
+
+def calc_scores_nonswag(model, train_all=False, logger=None, plot_random=False, use_petit=False, just_rmse=False, train_set=False, use_pure_sr=False, pure_sr_version=None, pure_sr_i=None):
     model.eval()
     model.cuda()
 
@@ -674,6 +724,21 @@ def calc_scores_nonswag(model, train_all=False, logger=None, plot_random=False, 
         def sample_model(X_sample):
             return petit.tsurv(X_sample)
 
+    elif use_pure_sr:
+        model.make_dataloaders(train=train_set)
+        val_dataloader = model._val_dataloader
+
+        reg = pickle.load(open(f'sr_results/{pure_sr_version}.pkl', 'rb'))
+        i = pure_sr_i
+
+        expr = reg.equations_.iloc[i].equation
+        complexity = reg.equations_.iloc[i].complexity
+        var_names = reg.feature_names_in_
+        expr_fn = lambdify_pure_sr_expression(expr, var_names)
+
+        def sample_model(X_sample):
+            return expr_fn(X_sample)
+
     else:
         model.make_dataloaders(train=train_set)
         if plot_random:
@@ -724,7 +789,7 @@ def calc_scores_nonswag(model, train_all=False, logger=None, plot_random=False, 
 
     _preds = np.concatenate(raw_preds, axis=1)
 
-    if use_petit:
+    if use_petit or use_pure_sr:
         sample_preds = _preds
     else:
 
@@ -793,7 +858,7 @@ def calc_scores_nonswag(model, train_all=False, logger=None, plot_random=False, 
                 fast_truncnorm(np.array(mean), np.array(std),
                        left=4, d=874000, nsamp=40));
 
-    if use_petit:
+    if use_petit or use_pure_sr:
         # sample_preds is a [1, 8720] tensor of means
         # sample with std 1 to create [2000, 8740] tensor of samples
         # samples = np.random.randn(2000, 8740)
@@ -1187,6 +1252,50 @@ def calc_scores_nonswag(model, train_all=False, logger=None, plot_random=False, 
     return rmse, snr_rmse, roc, weight_roc
 
 
+def nn_prediction_fn(model):
+    model.eval()
+    model.cuda()
+    def predict_fn(x):
+        pred = model(x.cuda(), noisy_val=False).cpu().detach().numpy()
+        # just the mean
+        return pred[..., 0]
+
+    return predict_fn
+
+
+def calculate_rmse(predict_fn, dataloader, clip=True, within_range=True):
+    truths = []
+    preds = []
+    for x, y in tqdm(dataloader):
+        truths.append(y.numpy())
+        preds.append(predict_fn(x))
+
+    truths = np.concatenate(truths)
+    if type(preds[0]) == float:
+        preds = np.array(preds)
+    else:
+        preds = np.concatenate(preds)
+
+    print('num nan:', np.sum(np.isnan(preds)))
+    preds[np.isnan(preds)] = 4
+
+    if clip:
+        preds = np.clip(preds, 4, 9)
+
+    truths = np.average(truths, 1)  # avg the two ground truths for each sim
+
+    if within_range:
+        preds = preds[truths < 9]
+        truths = truths[truths < 9]
+
+    rmse = np.average(np.square(truths - preds))**0.5
+    return rmse
+
+
+def const_predict_fn(const):
+    return lambda *_: const
+
+
 def calculate_k_results():
     d = {
         2:  {
@@ -1255,8 +1364,7 @@ def calculate_f1_id_results():
 
     f1_id_results = {}
     reg = pickle.load(open(f'sr_results/{pysr_version}.pkl', 'rb'))
-    results = reg.equations_[0]
-    complexities = results['complexity']
+    complexities = reg.equations_[0]['complexity']
     for c in complexities:
         args = get_args()
         args.version = version
@@ -1267,7 +1375,7 @@ def calculate_f1_id_results():
         f1_id_results[c] = rmse
         print(f'c={c}, rmse={rmse}')
 
-    pickle.dump(results, open('pickles/f1_id_results_test.pkl', 'wb'))
+    pickle.dump(f1_id_results, open('pickles/f1_id_results_test.pkl', 'wb'))
 
 
 def calculate_nn_and_petit_results():
@@ -1283,60 +1391,51 @@ def calculate_nn_and_petit_results():
     pickle.dump(d, open('pickles/nn_and_petit_results_test.pkl', 'wb'))
 
 
-def calculate_pure_sr_results():
-    version = 92428
-    results = pickle.load(open(f'sr_results/{version}.pkl', 'rb'))
-    d = {'version': version}
-    args = get_args()
-    args.pure_sr = True
-    args.pysr_version = version
-    args.just_rmse = True
-
-    for c in results.equations_['complexity']:
-        args.pysr_model_selection = c
-        rmse = main(args)
-        print(r'pure_sr complexity={c}, rmse={rmse}')
-        d[c] = rmse
-
-    pickle.dump(d, open('pickles/pure_sr_results_test.pkl', 'wb'))
-
-
-def calculate_results_all_complexities(version=24880, pysr_version=58106):
+def calculate_results_all_complexities(version=24880, pysr_version=11003, test=True):
     results = {}
     reg = pickle.load(open(f'sr_results/{pysr_version}.pkl', 'rb'))
-    results = reg.equations_[0]
-    complexities = results['complexity']
-    for c in complexities:
+    complexities = reg.equations_[0]['complexity']
+    for c in complexities[::-1][0:3]:
+    # for c in complexities[::-1]:3]:
         args = get_args()
         args.version = version
         args.pysr_version = pysr_version
         args.pysr_model_selection = c
         args.just_rmse = True
+        if not test:
+            args.train_set = True
         rmse = main(args)
         results[c] = rmse
         print(f'c={c}, rmse={rmse}')
 
-    pickle.dump(results, open(f'pickles/{version}_{pysr_version}f1_id_results_test.pkl', 'wb'))
+    pickle.dump(results, open(f"pickles/{version}_{pysr_version}_{'test' if test else 'train'}.pkl", 'wb'))
 
 
 def calculate_all_results():
     calculate_nn_and_petit_results()
-    calculate_f2_lin_results()
-    calculate_f1_id_results()
-    calculate_pure_sr_results()
-    calculate_k_results()
+    # calculate_f2_lin_results()
+    # calculate_f1_id_results()
+    # calculate_k_results()
 
 
 def main(args):
-    if args.pysr_version:
-        if args.pure_sr:
-            model = modules.PureSRNet(args.pysr_version, model_selection=args.pysr_model_selection)
-        else:
-            model = spock_reg_model.load_with_pysr_f2(version=args.version, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection)
+    if args.pysr_version and not args.pure_sr:
+        model = spock_reg_model.load_with_pysr_f2(version=args.version, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection)
     else:
         model = spock_reg_model.load(version=args.version)
 
-    return calc_scores_nonswag(model, use_petit=args.petit, plot_random=args.plot_random, just_rmse=args.just_rmse, train_set=args.train_set)
+    dataloader = default_dataloader(random=args.random)
+
+    if args.petit:
+        dataloader = petit.petit_dataloader()
+        predict_fn = petit.tsurv
+    elif args.pure_sr:
+        pure_sr_results = get_pure_sr_results(args.pysr_version)
+        predict_fn = pure_sr_predict_fn(pure_sr_results, args.pure_sr_complexity)
+    else:
+        predict_fn = nn_prediction_fn(model)
+
+    return calculate_rmse(predict_fn, dataloader)
 
 
 def get_args():
@@ -1344,11 +1443,10 @@ def get_args():
     parser.add_argument('--version', '-v', type=int, default=24880)
     parser.add_argument('--pysr_version', type=int, default=None)
     parser.add_argument('--petit', action='store_true')
-    parser.add_argument('--plot_random', action='store_true')
+    parser.add_argument('--random', action='store_true')
     parser.add_argument('--pure_sr', action='store_true')
-    parser.add_argument('--train_set', action='store_true')
+    parser.add_argument('--pure_sr_complexity', type=int, default=None)
     parser.add_argument('--pysr_model_selection', type=str, default='accuracy', help='"best", "accuracy", "score", or an integer of the pysr equation complexity.')
-    parser.add_argument('--just_rmse', action='store_true')
 
     args = parser.parse_args()
     return args
@@ -1356,6 +1454,20 @@ def get_args():
 
 if __name__ == '__main__':
     # calculate_all_results()
+    # calculate_f1_id_results()
+
+    # k = 3 all day
+    # calculate_results_all_complexities(version=74649, pysr_version=11900, test=False)
+    # k = 3 8 hours
+    # calculate_results_all_complexities(version=74649, pysr_version=11900, test=False)
+
+    # k = 4 all day
+    # calculate_results_all_complexities(version=11566, pysr_version=51254, test=False)
+    # k = 4 8 hours
+    # calculate_results_all_complexities(version=11566, pysr_version=83278, test=False)
+
+    # calculate_results_all_complexities(version=24880, pysr_version=58106, test=False)
     args = get_args()
-    main(args)
+    rmse = main(args)
+    print('RMSE:', rmse)
 

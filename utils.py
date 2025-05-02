@@ -5,6 +5,7 @@ import numpy as np
 import uuid
 from contextlib import nullcontext
 from collections import namedtuple
+import pickle
 import itertools
 import sys
 
@@ -61,6 +62,12 @@ def ckpt_path(version, seed=None, glob=False):
                 seed = 0
 
     return "results/" + str(version) + '_' + str(seed)
+
+
+def load_pickle(path):
+    with open(path, 'rb') as f:
+        data = pickle.load(f)
+    return data
 
 
 # batched covariance calculation:

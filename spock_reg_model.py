@@ -716,6 +716,7 @@ class VarModel(pl.LightningModule):
         self.include_nan = hparams['include_nan']
         self.include_eplusminus = True if 'include_eplusminus' not in hparams else hparams['include_eplusminus']
         self.train_all = False if 'train_all' not in hparams else hparams['train_all']
+        self.mse = hparams['mse_loss'] if 'mse_loss' in hparams else False
 
         self._cur_summary = None
 
@@ -1115,7 +1116,7 @@ class VarModel(pl.LightningModule):
             # no clamp
             mu = testy[:, [0]]
             std = testy[:, [1]]
-        if type(self.regress_nn) in [modules.PySRNet, modules.PySREQBoundsNet]:
+        if type(self.regress_nn) in [modules.PySRNet, modules.PySREQBoundsNet, modules.DirectPySRNet]:
             mu = testy[:, [0]]
             std = testy[:, [1]]
             mu = hard_clamp(mu, 4.0, 12.0)
@@ -1318,6 +1319,18 @@ class VarModel(pl.LightningModule):
 
         return -total_loss.sum(1)
 
+    def mse_loss(self, testy, y):
+        # y: [B, 2] batch of ground truth means. each input system has two
+        #  simulations, one with a small initial perturbation, so the two means
+        #  are samples from the distribution of instability times for that
+        #  initial system
+        # so we just sum over the loss for both of them.
+        mu = testy[:, [0]]
+        std = testy[:, [1]]
+
+        # ignore std, and just compute mse with mu and y
+        return torch.sum((mu - y)**2, dim=1)
+
     def lossfnc(self, x, y, samples=1, noisy_val=True, include_reg=True):
 
         # change the predicted mean to the eq_model's predicted mean
@@ -1343,7 +1356,10 @@ class VarModel(pl.LightningModule):
         else:
             testy = self(x, noisy_val=noisy_val)
 
-        loss = self._lossfnc(testy, y).sum()
+        if self.mse:
+            loss = self.mse_loss(testy, y).sum()
+        else:
+            loss = self._lossfnc(testy, y).sum()
 
         if include_reg:
             if self.l1_reg_inputs:
