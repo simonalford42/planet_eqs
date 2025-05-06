@@ -332,7 +332,6 @@ def paretoize(x, y, replace=False):
 
     for xx, yy in xy_sorted:
         if yy < best_so_far:
-            transformed.append((xx, yy))
             best_so_far = yy
 
         if replace:

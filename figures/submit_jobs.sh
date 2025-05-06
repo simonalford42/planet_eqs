@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# sbatch -J bnn300 --partition gpu run.sh --Ngrid 300 --version 24880 --pysr_version --compute
+# sbatch -J pysr300 --partition ellis run.sh --Ngrid 300 --version 24880 --pysr_version 93102 --compute
 
 # sbatch -J five29 --partition ellis five_planet.sh --version 24880 --pysr_version 58106 --paper-ready --pysr_model_selection 29
 # sbatch -J five27 --partition ellis five_planet.sh --version 24880 --pysr_version 58106 --paper-ready --pysr_model_selection 27

@@ -312,8 +312,8 @@ def get_config(args):
     path = f'sr_results/{id}.csv'
 
     # https://stackoverflow.com/a/57474787/4383594
-    # num_cpus = int(os.environ.get('SLURM_CPUS_ON_NODE')) * int(os.environ.get('SLURM_JOB_NUM_NODES'))
-    num_cpus = 10
+    num_cpus = int(os.environ.get('SLURM_CPUS_ON_NODE')) * int(os.environ.get('SLURM_JOB_NUM_NODES'))
+    # num_cpus = 10
     pysr_config = dict(
         procs=num_cpus,
         populations=3*num_cpus,

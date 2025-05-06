@@ -1,10 +1,9 @@
 import torch
+import pickle
 import os
 import time
 import numpy as np
 import uuid
-from contextlib import nullcontext
-from collections import namedtuple
 import itertools
 import sys
 
@@ -187,6 +186,11 @@ class Timing(object):
             raise ValueError("Timing message should be string function")
         print(f"{message} in {dt:.1f} seconds")
 
+
+def load_pickle(path):
+    with open(path, 'rb') as f:
+        data = pickle.load(f)
+    return data
 
 if __name__ == '__main__':
     c = torch.tensor(float('-inf'))

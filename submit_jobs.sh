@@ -1,5 +1,22 @@
 #!/usr/bin/env bash
 
+# May 5 2025
+# sbatch -J 2_8 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2_direct --seed 2
+# sbatch -J 3_8 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2_direct --seed 3
+# sbatch -J 4_24 --partition gpu -t 25:00:00 sr.sh --time_in_hours 24 --version 24880 --target f2_direct --seed 4
+# sbatch -J 5_24 --partition ellis -t 25:00:00 sr.sh --time_in_hours 24 --version 24880 --target f2_direct --seed 5
+# sbatch -J 6_48 --partition gpu -t 49:00:00 sr.sh --time_in_hours 48 --version 24880 --target f2_direct --seed 6
+# sbatch -J 7_48 --partition ellis -t 49:00:00 sr.sh --time_in_hours 48 --version 24880 --target f2_direct --seed 7
+# sbatch -J 8_8f2 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --seed 8
+# sbatch -J 9_8f2 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --seed 9
+# sbatch -J 10_8f2 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --seed 10
+# sbatch -J 11_8f2 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2 --seed 11
+
+# May 4 2025
+# sbatch -J rmse_k2 --partition ellis -t 02:20:00 run.sh calc_rmse.py --version 22649 --eval_type nn --dataset test
+# sbatch -J rmse3 --partition ellis -t 02:20:00 run.sh calc_rmse.py --version 74649 --pysr_version 49636 --eval_type pysr --dataset test
+# sbatch -J rmse_k0 --partition gpu -t 02:20:00 run.sh calc_rmse.py --version 4014 --eval_type nn
+
 # May 2 2025
 
 # evaluate rmse for new f2 linear runs
@@ -17,7 +34,7 @@
 # sbatch -J k0_f2lin --partition gpu train.sh --load_f1_f2 25646 --total_steps 150000 --f2_variant linear --prune_f2_topk 0 --mse_loss
 
 # calc RMSe for topk jobs
-# sbatch -J rmse3 --partition ellis -t 02:20:00 run.sh calc_rmse.py --version 74649 --pysr_version TBD --eval_type pysr
+# sbatch -J rmse3 --partition ellis -t 02:20:00 run.sh calc_rmse.py --version 74649 --pysr_version 49636 --eval_type pysr
 # sbatch -J rmse4 --partition ellis -t 02:20:00 run.sh calc_rmse.py --version 11566 --pysr_version 94842 --eval_type pysr
 # sbatch -J rmse5 --partition ellis -t 02:20:00 run.sh calc_rmse.py --version 72646 --pysr_version 42503 --eval_type pysr
 

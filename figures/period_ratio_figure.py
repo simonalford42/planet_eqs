@@ -18,7 +18,7 @@ import modules
 import spock
 import utils2
 import pickle
-from utils2 import assert_equal
+from utils2 import assert_equal, load_pickle
 import multiprocessing as mp
 import argparse
 import time
@@ -338,11 +338,6 @@ def get_results_path(Ngrid, version=None, parallel_ix=None, parallel_total=None,
     return path
 
 
-def load_results(path):
-    with open(path, 'rb') as f:
-        return pickle.load(f)
-
-
 def collate_parallel_results(args):
     '''load the parallel results and save as one big list'''
     results = []
@@ -372,7 +367,7 @@ def collate_parallel_results(args):
         # print(f'path={path}')
 
         try:
-            sub_results = load_results(path)
+            sub_results = load_pickle(path)
 
             if args.create_input_cache:
                 sub_results = [t.cpu() if t is not None else None for t in sub_results]
@@ -418,7 +413,7 @@ def plot_results(args, metric=None):
         # just plot mean by default, don't need std
         metric = 'mean'
 
-    results = load_results(get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection, use_petit=args.petit, use_megno=args.megno, ground_truth=args.ground_truth))
+    results = load_pickle(get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection, use_petit=args.petit, use_megno=args.megno, ground_truth=args.ground_truth))
     P12s, P23s = get_period_ratios(args.Ngrid)
 
     fig, ax = plt.subplots(figsize=(5,4.5))
@@ -442,7 +437,7 @@ def plot_results(args, metric=None):
         results = [d['mean'] if d is not None else np.nan for d in results]
     elif metric == 'mean2':
         pysr_results = results
-        base_results = load_results(get_results_path(args.Ngrid, args.version))
+        base_results = load_pickle(get_results_path(args.Ngrid, args.version))
         results = [(pysr_d['mean'] - d['mean'])**2 if d is not None and pysr_d is not None else np.nan for pysr_d, d in zip(pysr_results, base_results)]
     elif metric == 'std':
         results = [d['std'] if d is not None else np.nan for d in results]
@@ -452,7 +447,7 @@ def plot_results(args, metric=None):
     results = np.array(results)
 
     if args.rmse_diff:
-        ground_truth_results = load_results(get_results_path(args.Ngrid, args.version, ground_truth=True))
+        ground_truth_results = load_pickle(get_results_path(args.Ngrid, args.version, ground_truth=True))
         ground_truth_results = [d['ground_truth'] if d is not None else np.nan for d in ground_truth_results]
         ground_truth_results = np.array(ground_truth_results)
         ground_truth_results = np.log10(ground_truth_results)
@@ -461,7 +456,7 @@ def plot_results(args, metric=None):
         results[results > 9] = 9
         eq_rmse = np.sqrt((results - ground_truth_results)**2)
 
-        nn_results = load_results(get_results_path(args.Ngrid, args.version))
+        nn_results = load_pickle(get_results_path(args.Ngrid, args.version))
         nn_results = np.array([d['mean'] if d is not None else np.nan for d in nn_results])
         nn_results[nn_results < 4] = 4
         nn_results[nn_results > 9] = 9
@@ -574,7 +569,7 @@ def get_pysr_module(sr_results_path, residual_sr_results_path=None, model_select
 
 def compute_pysr_f2_results(args):
     try:
-        results = load_results(get_results_path(args.Ngrid, args.version))
+        results = load_pickle(get_results_path(args.Ngrid, args.version))
     except FileNotFoundError:
         print('Results not found. Make sure you run --compute with the same --version, but without --pysr, before you compute with pysr f2')
         import sys
@@ -582,7 +577,11 @@ def compute_pysr_f2_results(args):
 
     if args.pysr_model_selection is None:
         reg = pickle.load(open(args.pysr_path, 'rb'))
-        model_selections = list(reg.equations_[0]['complexity'])
+        eqs = reg.equations_
+        if type(eqs) == list:
+            eqs = eqs[0]
+
+        model_selections = list(eqs['complexity'])
     else:
         model_selections = [args.pysr_model_selection]
 
@@ -614,18 +613,23 @@ def compute_pysr_f2_results(args):
                         'bound': result[0],
                     })
         else:
-            assert_equal(results.shape[1], 2)
+            # assert_equal(results.shape[1], 2)
             # convert back to dictionary of 'mean': mean, 'std': std, for compatibility with the other results
             results2 = []
             for result in results:
                 if np.isnan(result).any():
                     results2.append(None)
                 else:
-                    results2.append({
-                        'mean': result[0],
-                        'std': result[1]
-                    })
-
+                    if results.shape[1] == 2:
+                        results2.append({
+                            'mean': result[0],
+                            'std': result[1]
+                        })
+                    else:
+                        results2.append({
+                            'mean': result[0],
+                            'std': 0
+                        })
 
         results = results2
 
@@ -695,11 +699,11 @@ def plot_4way_comparison(args):
         ax.set_xticks(ticks)
         ax.set_yticks(ticks)
 
-    nn_results = load_results(get_results_path(args.Ngrid, args.version))
-    eq_results = load_results(get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection))
-    petit_results = load_results(get_results_path(args.Ngrid, use_petit=True))
-    # megno_results = load_results(get_results_path(args.Ngrid, use_megno=True))
-    ground_truth_results = load_results(get_results_path(args.Ngrid, ground_truth=True))
+    nn_results = load_pickle(get_results_path(args.Ngrid, args.version))
+    eq_results = load_pickle(get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection))
+    petit_results = load_pickle(get_results_path(args.Ngrid, use_petit=True))
+    # megno_results = load_pickle(get_results_path(args.Ngrid, use_megno=True))
+    ground_truth_results = load_pickle(get_results_path(args.Ngrid, ground_truth=True))
 
     # model_results = [nn_results, eq_results, petit_results, megno_results]
     # names = ['nn', 'eq', 'petit', 'megno']
@@ -755,7 +759,7 @@ def plot_4way_comparison(args):
     fig.set_constrained_layout(True)
     # fig.set_constrained_layout(True)
 
-    path = get_results_path(args.Ngrid, args.version)[:-4] + '_comparison3'
+    path = get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version)[:-4] + '_comparison3'
     os.makedirs(os.path.dirname(path), exist_ok=True)
     img_path = path + ('.pdf' if args.pdf else '.png')
     plt.savefig(img_path, dpi=800)
@@ -764,7 +768,7 @@ def plot_4way_comparison(args):
 
 
 def plot_exprs(args):
-    results = load_results(get_results_path(args.Ngrid, args.version))
+    results = load_pickle(get_results_path(args.Ngrid, args.version))
     n_features = results[0]['f1'].shape[0] // 2
 
     P12s, P23s = get_period_ratios(args.Ngrid)
@@ -852,7 +856,7 @@ def plot_exprs(args):
 
 
 def plot_f1_features(args):
-    results = load_results(get_results_path(args.Ngrid, args.version))
+    results = load_pickle(get_results_path(args.Ngrid, args.version))
     n_features = results[0]['f1'].shape[0] // 2
 
     P12s, P23s = get_period_ratios(args.Ngrid)
@@ -926,7 +930,7 @@ def plot_4way_pysr_comparison(args):
 
     for i, model_selection in enumerate(model_selections):
         args.pysr_model_selection = model_selection
-        results = load_results(get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection=str(model_selection)))
+        results = load_pickle(get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection=str(model_selection)))
 
         P12s, P23s = get_period_ratios(args.Ngrid)
 
@@ -960,14 +964,14 @@ def plot_4way_pysr_comparison(args):
 
 def calculate_rmse(args):
     pysr_model_selections = get_pysr_model_selections(args)
-    ground_truth = load_results(get_results_path(args.Ngrid, ground_truth=True))
-    nn = load_results(get_results_path(args.Ngrid, args.version))
-    petit = load_results(get_results_path(args.Ngrid, use_petit=True))
-    eqs = [load_results(get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection=pysr_model_selection))
+    ground_truth = load_pickle(get_results_path(args.Ngrid, ground_truth=True))
+    nn = load_pickle(get_results_path(args.Ngrid, args.version))
+    petit = load_pickle(get_results_path(args.Ngrid, use_petit=True))
+    eqs = [load_pickle(get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection=pysr_model_selection))
            for pysr_model_selection in pysr_model_selections]
     input_cache = load_input_cache(args.Ngrid)
 
-    # pure_sr = load_results(get_results_path(Ngrid, pure_sr_version))
+    # pure_sr = load_pickle(get_results_path(Ngrid, pure_sr_version))
 
     ground_truth = np.array([d['ground_truth'] if d is not None else np.nan for d in ground_truth])
     ground_truth = np.log10(ground_truth)

@@ -151,7 +151,8 @@ def save_pickle(data, filename):
 
 def calculate_all_results(args):
     results = {}
-    for dataset in ['val', 'test', 'random']:
+    datasets = [args.dataset] if args.dataset != 'all' else ['val', 'test', 'random']
+    for dataset in datasets:
         args.dataset = dataset
 
         if args.eval_type in ['nn', 'petit']:
