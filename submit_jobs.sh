@@ -1,5 +1,16 @@
 #!/usr/bin/env bash
 
+# May 7 2025
+sbatch -J 20_1 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 12318 --target f2 --seed 20
+sbatch -J 20_2 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 13535 --target f2 --seed 20
+sbatch -J 20_3 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 10970 --target f2 --seed 20
+sbatch -J 19_1 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 12318 --target f2 --seed 19
+sbatch -J 19_2 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 13535 --target f2 --seed 19
+sbatch -J 19_3 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 10970 --target f2 --seed 19
+sbatch -J 18_1 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 12318 --target f2 --seed 18
+sbatch -J 18_2 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 13535 --target f2 --seed 18
+sbatch -J 18_3 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 10970 --target f2 --seed 18
+
 # May 5 2025
 # sbatch -J 2_8 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2_direct --seed 2
 # sbatch -J 3_8 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2_direct --seed 3
