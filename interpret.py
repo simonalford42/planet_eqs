@@ -383,7 +383,7 @@ def overall_complexity(entry: pd.Series, k: int):
     complexity = entry['complexity'].item()
     # return complexity
     num_variables = number_of_variables_in_expression(entry.equation)
-    return complexity + (3 * k - 2) * num_variables
+    return complexity + (2*k - 1) * num_variables
 
 
 def f1_latex_string2(feature_nn, include_ssx=False, include_ssx_bias=True, pysr_results=None, important_complexities=None):
@@ -491,10 +491,10 @@ def f2_latex_str(results, important_complexities=None, mapping_dict=None, add_rm
 
     return s
 
-def save_latex(latex_str, output_file, format='svg', font_family='serif'):
+def save_latex(latex_str, output_file, format='svg', font_family='serif', color='black'):
     fig, ax = plt.subplots()
     ax.set_axis_off()
-    text = ax.text(0.5, 0.5, latex_str, fontsize=20, ha='center', va='center', family=font_family)
+    text = ax.text(0.5, 0.5, latex_str, fontsize=20, ha='center', va='center', family=font_family, color=color)
 
     fig.canvas.draw()  # update text positions
     renderer = fig.canvas.get_renderer()

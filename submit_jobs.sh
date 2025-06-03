@@ -1,15 +1,34 @@
 #!/usr/bin/env bash
 
+# May 22 2025
+# sbatch -J f1id_45 --partition gpu -t 01:00:00 run.sh calc_rmse.py --version 28114 --pysr_version 93890 --eval_type pysr --dataset all
+# sbatch -J f1id_60 --partition gpu -t 01:00:00 run.sh calc_rmse.py --version 28114 --pysr_version 50620 --eval_type pysr --dataset all
+# sbatch -J f1id_45sp --partition gpu -t 01:00:00 run.sh calc_rmse.py --version 28114 --pysr_version 41564 --eval_type pysr --dataset all
+# sbatch -J f1id_60sp --partition gpu -t 01:00:00 run.sh calc_rmse.py --version 28114 --pysr_version 32888 --eval_type pysr --dataset all
+
+# May 21 2025
+# sbatch -J f1id_45 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 28114 --target f2_direct --seed 42 --max_size 45
+# sbatch -J f1id_60 --partition ellis -t 09:00:00 sr.sh --time_in_hours 8 --version 28114 --target f2_direct --seed 42 --max_size 60
+# sbatch -J f1id_45sp --partition ellis -t 09:00:00 sr.sh --time_in_hours 8 --version 28114 --target f2_direct --seed 42 --max_size 45 --loss_fn ll
+# sbatch -J f1id_60sp --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 28114 --target f2_direct --seed 42 --max_size 60 --loss_fn ll
+
 # May 7 2025
-sbatch -J 20_1 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 12318 --target f2 --seed 20
-sbatch -J 20_2 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 13535 --target f2 --seed 20
-sbatch -J 20_3 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 10970 --target f2 --seed 20
-sbatch -J 19_1 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 12318 --target f2 --seed 19
-sbatch -J 19_2 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 13535 --target f2 --seed 19
-sbatch -J 19_3 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 10970 --target f2 --seed 19
-sbatch -J 18_1 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 12318 --target f2 --seed 18
-sbatch -J 18_2 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 13535 --target f2 --seed 18
-sbatch -J 18_3 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 10970 --target f2 --seed 18
+# sbatch -J 20_1 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 12318 --target f2 --seed 20
+# sbatch -J 20_2 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 13535 --target f2 --seed 20
+# sbatch -J 20_3 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 10970 --target f2 --seed 20
+# sbatch -J 19_1 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 12318 --target f2 --seed 19
+# sbatch -J 19_2 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 13535 --target f2 --seed 19
+# sbatch -J 19_3 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 10970 --target f2 --seed 19
+# sbatch -J 18_1 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 12318 --target f2 --seed 18
+# sbatch -J 18_2 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 13535 --target f2 --seed 18
+# sbatch -J 18_3 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 10970 --target f2 --seed 18
+# sbatch -J f1id_60 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --target f2_direct --seed 0 --version 28114 --max_size 60
+# sbatch -J 248_45 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --target f2_direct --seed 0 --version 24880 --max_size 45
+# sbatch -J 123_45 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --target f2 --seed 0 --version 12318 --max_size 45
+# sbatch -J 135_45 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --target f2 --seed 0 --version 13535 --max_size 45
+# sbatch -J 109_45 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --target f2 --seed 0 --version 10970 --max_size 45
+
+# run f1_id with
 
 # May 5 2025
 # sbatch -J 2_8 --partition gpu -t 09:00:00 sr.sh --time_in_hours 8 --version 24880 --target f2_direct --seed 2

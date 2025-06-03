@@ -46,8 +46,13 @@ def load(version, seed=None):
 
 def load_with_pysr_f2(version, pysr_version, pysr_model_selection='accuracy', pysr_dir='sr_results/'):
     model = load(version)
-    model.regress_nn = modules.get_pysr_regress_nn(pysr_version, pysr_model_selection, results_dir=pysr_dir)
+    pysr_net = modules.get_pysr_regress_nn(pysr_version, pysr_model_selection, results_dir=pysr_dir)
+    model.regress_nn = pysr_net
     return model
+    # from modules import AddStdPredNN, Pred1StdNN
+    # model2 = load(version)
+    # model = AddStdPredNN(model.cuda(), Pred1StdNN().cuda())
+    # return model
 
 
 class BioLinear(nn.Module):

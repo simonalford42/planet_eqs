@@ -149,7 +149,9 @@ def lambdify_pure_sr_expression(expr: str, var_names):
     def f(x: np.ndarray):
         try:
             # x (B, 100, 41)
-            x_every_10th = x[:, ::10].numpy()
+            x_every_10th = x[:, ::10]
+            if type(x_every_10th) is not np.ndarray:
+                x_every_10th = x_every_10th.numpy()
             f1_inp = {v: x_every_10th[..., i] for i, v in enumerate(var_names)}
             if left_code == "":  # no left and right, just right
                 f1_out = np.zeros((x.shape[0], 1))

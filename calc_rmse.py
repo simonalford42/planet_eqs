@@ -1,5 +1,3 @@
-h#!/usr/bin/env python
-# coding: utf-8
 import argparse
 import numpy as np
 import spock_reg_model

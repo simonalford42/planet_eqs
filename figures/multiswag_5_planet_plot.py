@@ -120,6 +120,65 @@ def make_plot2(cleaned, path=None):
     print('Saved to', path)
 
 
+def make_plot_separate2(cleaned, path=None):
+    plt.rc('font', family='serif')
+
+    scale = 1
+    lw=1.2
+    fig, axarr = plt.subplots(3, 1, figsize=(9.5*scale, 8*scale), dpi=400, sharex=True)
+    plt.subplots_adjust(hspace=0.2)
+    tmp = cleaned
+    tmp2 = tmp.query('true > 4 & delta > 5')
+    # decrease buffer around plot in image
+    plt.subplots_adjust(left=0.15, right=0.9, top=0.9, bottom=0.1)
+
+
+    for i, label in enumerate(['Ours', 'Pure SR']):
+        ax = axarr[i]
+
+        tmp.plot('delta', 'true', ax=ax, label='True', c='k', linewidth=lw)
+        if label == 'BNN':
+            tmp.plot('delta', 'bnn_median', ax=ax, label='Neural network', c=colors[2, 3], linewidth=lw)
+            ax.fill_between(
+                tmp2['delta'], tmp2['bnn_l'], tmp2['bnn_u'], color=colors[2, [3]], alpha=0.2, linewidth=lw)
+        if label == 'Ours':
+            tmp.plot('delta', 'median', ax=ax, label='Distilled equations', c=colors[3, 3], linewidth=lw)
+            ax.fill_between(
+                tmp2['delta'], tmp2['l'], tmp2['u'], color=colors[3, [3]], alpha=0.2, linewidth=lw)
+        elif label == 'Petit+20':
+            tmp.plot('delta', 'petitf', ax=ax, label='Petit+20', c=colors[0, 3], linewidth=lw)
+
+        if label != 'Petit+20':
+            # ax.annotate('Training range', (12, 4.5))
+            ax.annotate('Training range', (12, 4.5), fontsize=9)
+            ax.plot([0, 14], [9, 9], '--k', linewidth=0.9)
+            ax.plot([0, 14], [4, 4], '--k', linewidth=0.9)
+
+        ax.set_xlim(1, 14)
+        ax.set_ylim(0, 12)
+        # ax.set_xlabel(r'$\Delta$')
+        ax.set_xlabel(r'Interplanetary separation $\Delta$')
+        ax.set_ylabel(r'Instability Time')
+        leg = ax.legend(loc='upper left', frameon=True, fontsize=8, framealpha=1)
+        for line in leg.get_lines():
+            line.set_linewidth(3)
+
+        major_ticks = [0, 5, 10]
+        ax.set_yticks(major_ticks)
+        ax.set_yticks(np.arange(1, 15), minor=True)
+        ax.set_xticks(np.arange(1, 14), minor=True)
+        ax.tick_params(axis='y', which='major', direction='in')
+        ax.tick_params(axis='y', which='minor', direction='in')
+        ax.tick_params(axis='x', which='major', direction='in')
+        ax.tick_params(axis='x', which='minor', direction='in')
+        ax.annotate(f'({chr(97 + i)})', (-0.14, 1.05), xycoords='axes fraction', fontsize=10)
+
+    if path == None:
+        # datetime in readable format
+        t = time.strftime('%Y%m%d_%H%M%S')
+        path = f'five_planet_figures/five_planet_{t}.png'
+    fig.savefig(path)
+    print('Saved to', path)
 def make_plot_separate(cleaned, path=None):
     plt.rc('font', family='serif')
 

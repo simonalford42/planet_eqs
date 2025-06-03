@@ -203,7 +203,7 @@ class NonSwagFeatureRegressor():
         return self.model(X_sample, noisy_val=False)
 
     @profile
-    def sample(self, sim, indices=None, samples=1000):
+    def sample(self, sim, indices=None):
         if sim.N_real < 4:
             raise AttributeError("SPOCK Error: SPOCK only works for systems with 3 or more planets")
         if indices:

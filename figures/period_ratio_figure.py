@@ -419,10 +419,9 @@ def plot_results(args, metric=None):
     fig, ax = plt.subplots(figsize=(5,4.5))
     ax.set_aspect('equal', adjustable='box')
 
-    if not args.minimal_plot:
-        ticks = [0.55, 0.60, 0.65, 0.70, 0.75]
-        ax.set_xticks(ticks)
-        ax.set_yticks(ticks)
+    ticks = [0.55, 0.60, 0.65, 0.70, 0.75]
+    ax.set_xticks(ticks)
+    ax.set_yticks(ticks)
 
     # get the results for the specific metric
     if args.petit:
@@ -521,8 +520,9 @@ def plot_results(args, metric=None):
 
 
     if args.minimal_plot:
-        ax.set_xticks([])
-        ax.set_yticks([])
+        # ax.set_xticks([])
+        # ax.set_yticks([])
+        ax.tick_params(labelbottom=False, labelleft=False)
         ax.set_xlabel("")
         ax.set_ylabel("")
     else:
@@ -725,6 +725,8 @@ def plot_4way_comparison(args):
             results = [d['megno'] if d is not None else np.nan for d in results]
         elif name == 'ground_truth':
             results = [np.log10(d['ground_truth']) if d is not None else np.nan for d in results]
+            # we want to color times < 4 white
+            results = [r if r >= 4 else np.nan for r in results]
         else:
             results = [d['mean'] if d is not None else np.nan for d in results]
 
@@ -759,7 +761,7 @@ def plot_4way_comparison(args):
     fig.set_constrained_layout(True)
     # fig.set_constrained_layout(True)
 
-    path = get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version)[:-4] + '_comparison3'
+    path = get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection)[:-4] + '_comparison3'
     os.makedirs(os.path.dirname(path), exist_ok=True)
     img_path = path + ('.pdf' if args.pdf else '.png')
     plt.savefig(img_path, dpi=800)

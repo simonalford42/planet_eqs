@@ -352,6 +352,18 @@ class DirectPySRNet(nn.Module):
         return out
 
 
+def add_std_pred_nn(mean_net):
+    return mean_net
+
+class AddStdPredNN2(nn.Module):
+    def __init__(self, net):
+        super().__init__()
+        self.net = net
+
+    def forward(self, x):
+        return self.net(x)
+
+
 class AddStdPredNN(nn.Module):
     '''
     Uses one NN to predict the mean, and another NN for predicting the std.
@@ -360,17 +372,15 @@ class AddStdPredNN(nn.Module):
         super().__init__()
         self.mean_net = mean_net
         self.std_net = std_net
-        # hack for plotting equal spaced
-        # self.megno_location = mean_net.megno_location
 
-    def forward(self, x):
+    def forward(self, x, noisy_val):
         B = x.shape[0]
-        out = self.mean_net(x)
-        mean = out[:, 0:1]
+        mean_out = self.mean_net(x, noisy_val=noisy_val)
+        mean = mean_out[:, 0:1]
         utils.assert_equal(mean.shape, (B, 1))
-        std = self.std_net(x)
-        utils.assert_equal(std.shape[0], B)
-        std = std[:, 1:]
+        std_out = self.std_net(x, noisy_val=noisy_val)
+        utils.assert_equal(std_out.shape[0], B)
+        std = std_out[:, 1:]
         utils.assert_equal(std.shape, (B, 1))
         out = einops.rearrange([mean[:, 0], std[:, 0]], 'two B -> B two')
         utils.assert_equal(out.shape, (B, 2))
@@ -378,9 +388,23 @@ class AddStdPredNN(nn.Module):
 
 
 class Pred1StdNN(nn.Module):
-    def forward(self, x):
+    def forward(self, x, noisy_val=None):
         B = x.shape[0]
-        return torch.ones((B, 1), device=x.device)
+        return torch.ones((B, 2), device=x.device)
+
+
+class PureSRNet(nn.Module):
+    def __init__(self, pure_sr_predict_fn):
+        super().__init__()
+        self.pure_sr_predict_fn = pure_sr_predict_fn
+
+    def forward(self, x, noisy_val=None):
+        x_np = x.detach().cpu().numpy()
+        out = self.pure_sr_predict_fn(x_np)
+        # clamp out betweewn 4 and 12
+        out = np.clip(out, 4.0, 12.0)
+        out = torch.tensor(out[:, None], device=x.device)
+        return out
 
 
 class PySRNet(nn.Module):
@@ -396,13 +420,15 @@ class PySRNet(nn.Module):
         # input: [B, d]
         # output: [B, n]
         out = [module(x) for module in self.module_list]
-        # if the pysr equation is a constant, it returns a scalar for some reason
-        # repeat [,] to [B, ]
-        if len(out[0].shape) == 0:
-            out = einops.repeat(torch.tensor(out, device=x.device), 'n -> B n', B=x.shape[0])
-        else:
-            out = einops.rearrange(out, 'n B -> B n')
 
+        # if the pysr equation is a constant, it returns a scalar for some reason
+        for i in range(len(out)):
+            if len(out[i].shape) == 0:
+                if type(out[i]) != torch.Tensor:
+                    out[i] = torch.tensor(out[i], device=x.device)
+                out[i] = einops.repeat(out[i], ' -> b', b=x.shape[0])
+
+        out = einops.rearrange(out, 'n B -> B n')
         return out
 
 
@@ -427,7 +453,8 @@ def get_pysr_regress_nn(version, model_selection='accuracy', results_dir='sr_res
     pysr_path = os.path.join(results_dir, f'{version}.pkl')
 
     # detect if the model was direct_f2, if so load other module.
-    reg = pickle.load(open(pysr_path, 'rb'))
+    with open(pysr_path, 'rb') as f:
+        reg = pickle.load(f)
     from sr import LL_LOSS
     is_direct_f2 = hasattr(reg, 'elementwise_loss') and reg.elementwise_loss == LL_LOSS
     is_direct_f2 = is_direct_f2 or type(reg.equations_) != list

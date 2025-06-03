@@ -418,7 +418,7 @@ def run():
     }
     results_path = f'sr_results/33936.pkl'
     reg = pickle.load(open(results_path, 'rb'))
-    X, y, _ = load_inputs_and_targets(config)
+    X, y, _ = load_inputs_and_targets(configh)
     return X, y, reg
 
 

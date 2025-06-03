@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+sbatch -J pure5p2 --partition ellis five_planet.sh --extrapolate --turbo --N 200 --pysr_version 83941 --pure_sr
+sbatch -J pure5p --partition ellis five_planet.sh --extrapolate --turbo --N 5000 --pysr_version 83941 --pure_sr
+
 # sbatch -J pysr300 --partition ellis run.sh --Ngrid 300 --version 24880 --pysr_version 93102 --compute
 
 # sbatch -J five29 --partition ellis five_planet.sh --version 24880 --pysr_version 58106 --paper-ready --pysr_model_selection 29
