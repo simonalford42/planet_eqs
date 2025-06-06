@@ -245,7 +245,7 @@ def remap_latex_str(s, mapping_dict):
     return pattern.sub(repl, s)
 
 
-def feature_string(feature_nn, i, include_ssx=False, latex=False, include_ssx_bias=True):
+def feature_string(feature_nn, i, include_ssx=False, latex=False, include_ssx_bias=True, asterisk=False):
     transformation = linear_transformation(feature_nn, i)
     bias = feature_nn.input_bias[i]
 
@@ -349,16 +349,26 @@ def get_k_rmse_values():
     return k_results
 
 
-def f1_latex_string(feature_nn, include_ssx=False, include_ssx_bias=True, mapping_dict=None):
-    s = ('\\begin{align*}\n'
-        + 'f_1& \\text{ features:} \\\\ \n')
+def uses_variable(pysr_results: pd.DataFrame, i: int):
+    """
+    Check if any of the equations use the specified variable.
+    """
+    return (any(f'm{i}' in eq for eq in pysr_results['equation'])
+            or any(f's{i}' in eq for eq in pysr_results['equation']))
+
+
+def f1_latex_string(feature_nn, include_ssx=False, include_ssx_bias=True, mapping_dict=None, pysr_results=None):
+    s = '\\begin{align*}\n'
+        # + 'f_1& \\text{ features:} \\\\ \n')
 
     # if mapping_dict is provided, (1) only print variables in the dict, (2) remap the variable numbers
     if mapping_dict is None:
         mapping_dict = {i: i for i in range(feature_nn.input_linear.shape[0])}
 
     for i in mapping_dict:
-        s += f'    &{mapping_dict[i]}: {feature_string(feature_nn, i, include_ssx, latex=True, include_ssx_bias=include_ssx_bias)} \\\\ \n'
+        feature_str = feature_string(feature_nn, i, include_ssx, latex=True, include_ssx_bias=include_ssx_bias)
+        asterisk = '^*' if not uses_variable(pysr_results, i) else ''
+        s += f'    &{mapping_dict[i]}{asterisk}: {feature_str} \\\\ \n'
 
     s += '''\end{align*}'''
     return s
