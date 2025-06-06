@@ -43,6 +43,9 @@ def load(version, seed=None):
     if os.path.exists(f):
         return VarModel.load_from_checkpoint(f)
 
+    import pdb; pdb.set_trace()
+    raise ValueError(f'Could not find model for version {version} and seed {seed}')
+
 
 def load_with_pysr_f2(version, pysr_version, pysr_model_selection='accuracy', pysr_dir='sr_results/'):
     model = load(version)

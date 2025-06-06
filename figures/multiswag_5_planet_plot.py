@@ -85,7 +85,8 @@ def make_plot2(cleaned, path=None):
     # )
 
     # Petit+20
-    tmp.plot('delta', 'petitf', ax=ax, label='Petit+20', c=colors[0, 3], linewidth=lw)
+    # tmp.plot('delta', 'petitf', ax=ax, label='Petit+20', c=colors[0, 3], linewidth=lw)
+    tmp.plot('delta', 'pperiodetitf', ax=ax, label='Petit+20', c=colors[0, 3], linewidth=lw)
 
     # Training range
     ax.annotate('Training range', (12, 4.5), fontsize=9)
@@ -385,12 +386,14 @@ def make_plot(cleaned, version, pysr_version=None, t20=True, pysr_model_selectio
 
 
 if __name__ == '__main__':
-    path = 'five_planet_figures/five_planet2_v24880_pysr11003_ms=30_N=5000_samps=10000_turbo'
-    time = '1739990877.3044198'
+    # path = 'five_planet_figures/five_planet2_v24880_pysr11003_ms=30_N=5000_samps=10000_turbo'
+    # time = '1739990877.3044198'
 
     # path = 'five_planet_figures/five_planet2_v24880_pysr11003_ms=26_N=5000_samps=10000_turbo'
     # time = '1740510166.2667198'
 
-    csv_path = f'cur_plot_datasets/{path}_{time}.csv'
+    # csv_path = f'cur_plot_datasets/{path}_{time}.csv'
+    path = 'new_petit'
+    csv_path = 'cur_plot_datasets/five_planet_figures/five_planet2_v24880_pysr11003_ms=29_N=5000_samps=10000_turbo_1739990742.5953946.csv'
     cleaned = pd.read_csv(csv_path)
     make_plot2(cleaned, path=path + '.png')

@@ -11,6 +11,7 @@ import spock_reg_model
 import numpy as np
 import torch.nn.functional as F
 from petit20_survival_time import Tsurv
+from pure_sr_evaluation import pure_sr_predict_fn
 
 
 class Products(nn.Module):
@@ -398,6 +399,16 @@ class PureSRNet(nn.Module):
         super().__init__()
         self.pure_sr_predict_fn = pure_sr_predict_fn
 
+    @classmethod
+    def from_path(cls, filepath, model_selection):
+        with open(filepath, 'rb') as f:
+            reg = pickle.load(f)
+        results = reg.equations_
+        results.feature_names_in_ = reg.feature_names_in_
+
+        pure_sr_predict = pure_sr_predict_fn(results, model_selection)
+        return cls(pure_sr_predict)
+
     def forward(self, x, noisy_val=None):
         x_np = x.detach().cpu().numpy()
         out = self.pure_sr_predict_fn(x_np)
@@ -424,8 +435,11 @@ class PySRNet(nn.Module):
         # if the pysr equation is a constant, it returns a scalar for some reason
         for i in range(len(out)):
             if len(out[i].shape) == 0:
-                if type(out[i]) != torch.Tensor:
+                if type(out[i]) == nn.Parameter:
+                    out[i] = out[i].detach()
+                elif type(out[i]) != torch.Tensor:
                     out[i] = torch.tensor(out[i], device=x.device)
+
                 out[i] = einops.repeat(out[i], ' -> b', b=x.shape[0])
 
         out = einops.rearrange(out, 'n B -> B n')

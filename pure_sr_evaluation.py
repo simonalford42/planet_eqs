@@ -214,7 +214,8 @@ def pure_sr_predict_fn(results, complexity=None):
 
 
 def get_pure_sr_results(version):
-    reg = pickle.load(open(f'sr_results/{version}.pkl', 'rb'))
+    with open(f'sr_results/{version}.pkl', 'rb') as f:
+        reg = pickle.load(f)
     results = reg.equations_
     results.feature_names_in_ = reg.feature_names_in_
     return results

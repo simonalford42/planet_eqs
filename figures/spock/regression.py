@@ -42,7 +42,8 @@ class NonSwagFeatureRegressor():
 
         if type(model) == int:
             version = model
-            self.model = spock_reg_model.load(version, seed=0)
+            self.model = spock_reg_model.load(version)
+            import pdb; pdb.set_trace()
         else:
             self.model = model
 

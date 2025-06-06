@@ -1,6 +1,4 @@
-import pysr
 import warnings
-# import spock_reg_model
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 import sys
@@ -22,9 +20,12 @@ from utils2 import assert_equal, load_pickle
 import multiprocessing as mp
 import argparse
 import time
+import spock_reg_model
+from pure_sr_evaluation import pure_sr_predict_fn
 
 import warnings
 warnings.filterwarnings("ignore", category=ResourceWarning)
+warnings.filterwarnings("default", category=UserWarning)
 
 INSTABILITY_TIME_LABEL = r"$\log_{10}(T_{\rm inst})$"
 MEGNO_LABEL = r"$\log_{10}(\rm MEGNO-2)$"
@@ -79,9 +80,12 @@ scopy bnn_chaos_model/figures/period_results/v=43139_ngrid=6.pkl ~/code/bnn_chao
 
 def load_model(args):
     if args.pure_sr:
-        return spock.NonSwagFeatureRegressor(modules.PureSRNet(pysr_path=args.pysr_path))
+
+        pure_sr_net = modules.PureSRNet.from_path(args.pysr_path, args.pysr_model_selection)
+        return spock.NonSwagFeatureRegressor(pure_sr_net)
     else:
-        return spock.NonSwagFeatureRegressor(args.version)
+        model = spock_reg_model.load(args.version, args.seed)
+        return spock.NonSwagFeatureRegressor(model)
 
 
 def get_simulation(par):
@@ -237,10 +241,17 @@ def get_list_chunk(lst, ix, total):
     return lst[start:end]
 
 
-def predict_from_cached_input(model, cached_input):
+def predict_from_cached_input(model, cached_input, pure_sr=False):
     if cached_input is None:
         # the simulation messed up somehow, return None just like in get_model_prediction
         return None
+
+    if pure_sr:
+        out = model.model(cached_input)
+        return {
+            'mean': out[0, 0].detach().cpu().numpy(),
+        }
+
     out_dict = model.model(cached_input, noisy_val=False, return_intermediates=True, deterministic=True)
 
     return {
@@ -284,7 +295,7 @@ def compute_results(args):
         for par in parameters:
             assert par in input_cache, f'Input cache missing for {par}'
 
-        results = [predict_from_cached_input(model, input_cache[par]) for par in parameters]
+        results = [predict_from_cached_input(model, input_cache[par], pure_sr=args.pure_sr) for par in parameters]
 
     else:
         results = compute_results_for_parameters(parameters, model, use_petit=args.petit, use_megno=args.megno, create_input_cache=args.create_input_cache, ground_truth=args.ground_truth)
@@ -545,7 +556,7 @@ def plot_results(args, metric=None):
     if metric == 'mean2':
         path += '_mean2'
 
-    if args.pysr_model_selection is not None:
+    if args.pysr_version is not None:
         path += f'_pysr_f2_v={args.pysr_version}/{args.pysr_model_selection}'
 
     path += '.png' if not args.pdf else '.pdf'
@@ -651,26 +662,27 @@ def get_pysr_model_selections(args):
     otherwise, returns all available model selections.
     """
     # get the model selections by grepping for the files
-    path = get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection='*')
+    path = get_results_path(args.Ngrid,
+                            args.version,
+                            pysr_version=args.pysr_version,
+                            pysr_model_selection='*')
     files = os.listdir(os.path.dirname(path))
-
-    # filter to those of form f'{i}.pkl'
-    files = [file for file in files if file.endswith('.pkl')]
+    files = [f for f in files if f.endswith('.pkl')]
 
     # go from f'{model_selection}.pkl' to model_selection
-    model_selections = sorted([int(f.split('.')[0]) for f in files])
-    # model_selections = [1, 3, 5, 7, 9, 11, 14, 18, 20, 27, 29]
+    model_selections = [
+        None if f[:-4] == 'None' else int(f.split('.')[0])
+        for f in files
+    ]
+    model_selections = sorted(model_selections)
 
     # if model selection is provided, filter to those
     if args.pysr_model_selection is not None:
         if args.pysr_model_selection == 'accuracy':
             model_selections = [model_selections[-1]]
         else:
-            files = [file for file in files if str(file) == f'{args.pysr_model_selection}.pkl']
+            model_selections = [m for m in model_selections if str(m) == args.pysr_model_selection]
 
-    # go from f'{model_selection}.pkl' to model_selection
-    model_selections = [int(f.split('.')[0]) for f in files]
-    model_selections = sorted(model_selections)
     return model_selections
 
 
@@ -971,6 +983,9 @@ def calculate_rmse(args):
     petit = load_pickle(get_results_path(args.Ngrid, use_petit=True))
     eqs = [load_pickle(get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection=pysr_model_selection))
            for pysr_model_selection in pysr_model_selections]
+
+    pure_sr = load_pickle(get_results_path(args.Ngrid, 24880, pysr_version=83941))
+    f1_id = load_pickle(get_results_path(args.Ngrid, 28114, pysr_version=9054, pysr_model_selection=27))
     input_cache = load_input_cache(args.Ngrid)
 
     # pure_sr = load_pickle(get_results_path(Ngrid, pure_sr_version))
@@ -983,17 +998,19 @@ def calculate_rmse(args):
     petit = np.array([d['petit'] if d is not None else np.nan for d in petit])
     eqs = [np.array([d['mean'] if d is not None else np.nan for d in eq])
            for eq in eqs]
-    # pure_sr = np.array([d['pure_sr'] if d is not None else np.nan for d in petit])
+    pure_sr = np.array([d['mean'] if d is not None else np.nan for d in pure_sr])
+    f1_id = np.array([d['mean'] if d is not None else np.nan for d in f1_id])
 
     # assert_equal(ground_truth.shape, nn.shape, petit.shape, eq.shape)
-    assert_equal(ground_truth.shape, nn.shape, petit.shape, *[eq.shape for eq in eqs])
+    assert_equal(ground_truth.shape, nn.shape, petit.shape, pure_sr.shape, f1_id.shape, *[eq.shape for eq in eqs])
     assert_equal(len(nn.shape), 1)
 
     data = {
         'ground_truth': ground_truth,
         'nn': nn,
         'petit': petit,
-        # 'pure_sr': pure_sr,
+        'pure_sr': pure_sr,
+        'f1_id': f1_id,
     }
     for i, pysr_model_selection in enumerate(pysr_model_selections):
         data['eq' + str(pysr_model_selection)] = eqs[i]
@@ -1039,6 +1056,7 @@ def get_args():
     parser.add_argument('--pure_sr', action='store_true')
     parser.add_argument('--create_input_cache', action='store_true')
     parser.add_argument('--pdf', action='store_true')
+    parser.add_argument('--seed', type=int, default=0, help='seed for loading NN model')
 
     parser.add_argument('--pysr_version', type=str, default=None) # sr_results/11003.pkl
     parser.add_argument('--pysr_dir', type=str, default='../sr_results/')  # folder containing pysr results pkl
