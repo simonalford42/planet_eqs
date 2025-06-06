@@ -22,7 +22,6 @@ from petit20_survival_time import Tsurv
 #!/usr/bin/env python
 # coding: utf-8
 
-import glob
 import seaborn as sns
 import matplotlib as mpl
 mpl.use('agg')
@@ -30,19 +29,10 @@ from matplotlib import pyplot as plt
 import sys
 sys.path.append('..')
 
-import spock_reg_model
-from icecream import ic
-
-import torch
 import numpy as np
-from scipy.stats import truncnorm
 
-import time
 from tqdm.notebook import tqdm
 
-import fit_trunc_dist
-
-from custom_cmap import custom_cmap
 
 
 

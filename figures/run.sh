@@ -12,13 +12,15 @@
  # total limit (hh:mm:ss)
 #SBATCH -t 48:00:00
 #SBATCH --mem=50G
-## #SBATCH --gres=gpu:1
-## #SBATCH --partition=ellis
+# #SBATCH --gres=gpu:1
+# #SBATCH --partition=ellis
 
 source /home/sca63/mambaforge/etc/profile.d/conda.sh
 
 # Enable errexit (exit on error)
 set -e
 
-conda activate bnn_period
-python period_ratio_figure.py "$@"
+# conda activate bnn_period
+# conda activate bnn_chaos_model
+conda activate bnn_new_pysr
+python "$@"
