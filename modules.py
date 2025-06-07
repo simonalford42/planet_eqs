@@ -6,12 +6,372 @@ import os
 import json
 import einops
 import pickle
-import pandas as pd
 import spock_reg_model
 import numpy as np
 import torch.nn.functional as F
-from petit20_survival_time import Tsurv
 from pure_sr_evaluation import pure_sr_predict_fn
+
+
+def mlp(in_n, out_n, hidden, layers, act='relu'):
+    '''
+        layers is the number of "hidden" layers,
+        aka layers besides the input layer (which reduces to hidden dim)
+        and output layer (which changes hidden dim to out dim)
+        so:
+        if layers = -1, returns Linear(in, out)
+        if layers =  0, returns [Linear(in, h), Linear(h, out)
+        if layers =  1, returns [Linear(in, h), Linear(h, h), Linear(h, out)]
+        etc.
+    '''
+    if act == 'relu':
+        act = nn.ReLU
+    elif act == 'softplus':
+        act = nn.Softplus
+    else:
+        raise NotImplementedError('act must be relu or softplus')
+
+    if layers == -1:
+        return nn.Linear(in_n, out_n)
+
+    result = [nn.Linear(in_n, hidden),
+             act()]
+    for i in reversed(range(layers)):
+        result.extend([
+            nn.Linear(hidden, hidden),
+            act()
+            ])
+
+    result.extend([nn.Linear(hidden, out_n)])
+    return nn.Sequential(*result)
+
+
+class MaskedLinear(nn.Module):
+    def __init__(self, linear, mask):
+        super().__init__()
+        self.linear = linear
+        self.mask = nn.Parameter(mask, requires_grad=False)
+
+    def forward(self, x):
+        return F.linear(x, self.masked_weight, self.linear.bias)
+
+    @property
+    def masked_weight(self):
+        return self.linear.weight * self.mask
+
+
+class MaskLayer(nn.Module):
+    def __init__(self, n_features):
+        super().__init__()
+        self.mask = nn.Parameter(torch.ones(n_features))
+
+    def forward(self, x):
+        return x * self.mask
+
+    def l1_cost(self):
+        return torch.sum(torch.abs(self.mask))
+
+def pruned_input_mask(net, top_k):
+    mask_weights = net.mask
+    _, topk_ixs = torch.topk(mask_weights.abs(), k=top_k)
+    new_mask = torch.zeros_like(net.mask)
+    new_mask[topk_ixs] = 1.0
+    new_layer = MaskLayer(mask_weights.shape[0])
+    new_layer.mask.data = new_mask
+    return new_layer
+
+
+def pruned_linear(linear, top_k, top_n=None):
+    '''
+    top_k: prune so that each output feature uses top_k input feature in its combination
+    top_n: prune so that only top_n output features are nonzero.
+    '''
+
+    mask = torch.zeros_like(linear.weight)
+    for r in range(linear.weight.shape[0]):
+        _, ixs = torch.topk(linear.weight[r].abs(), k=top_k)
+        mask[r][ixs] = 1
+
+    if top_n is not None:
+        # take the top_n output features based on their already pruned input features
+        # mask is (n_features, n_inputs)
+        # ixs is the top_n spots to keep
+        _, ixs = torch.topk((mask * linear.weight).abs().sum(dim=-1), k=top_n)
+        # these are the spots to zero out - those not in the top n
+        ixs2 = torch.tensor([i for i in range(mask.shape[0]) if i not in ixs])
+        mask[ixs2] = 0
+
+    return MaskedLinear(linear, mask)
+
+
+class SumModule(nn.Module):
+    def __init__(self, module1, module2):
+        super(SumModule, self).__init__()
+        self.module1 = module1
+        self.module2 = module2
+
+    def forward(self, x):
+        return self.module1(x) + self.module2(x)
+
+
+def load_pysr_module_list(filepath, model_selection):
+    if model_selection in ['best', 'accuracy', 'score']:
+        reg = pysr.PySRRegressor.from_file(filepath, model_selection=model_selection)
+        if reg.nout_ > 1:
+            return nn.ModuleList(reg.pytorch())
+        else:
+            return nn.ModuleList([reg.pytorch()])
+    else:
+        reg = pysr.PySRRegressor.from_file(filepath)
+        # find the ixs with closest complexity equal to model_selection
+
+        if reg.nout_ > 1:
+            ixs = []
+            for i in range(reg.nout_):
+                ix = np.argmin(np.abs(reg.equations_[i]['complexity'] - int(model_selection)))
+                ixs.append(ix)
+        else:
+            ix = np.argmin(np.abs(reg.equations_['complexity'] - int(model_selection)))
+            ixs = [ix]
+
+        modules = reg.pytorch(index=ixs)
+        return nn.ModuleList(modules)
+
+
+class DirectPySRNet(nn.Module):
+    def __init__(self, filepath, model_selection):
+        super().__init__()
+        self.pysr_net = PySRNet(filepath, model_selection)
+
+    def forward(self, x):
+        B = x.shape[0]
+        mean = self.pysr_net(x)
+        utils.assert_equal(mean.shape, (B, 1))
+        std = torch.ones_like(mean)
+        out = einops.rearrange([mean[:, 0], std[:, 0]], 'two B -> B two')
+        return out
+
+
+class PureSRNet(nn.Module):
+    def __init__(self, pure_sr_predict_fn):
+        super().__init__()
+        self.pure_sr_predict_fn = pure_sr_predict_fn
+
+    @classmethod
+    def from_path(cls, filepath, model_selection):
+        with open(filepath, 'rb') as f:
+            reg = pickle.load(f)
+        results = reg.equations_
+        results.feature_names_in_ = reg.feature_names_in_
+
+        pure_sr_predict = pure_sr_predict_fn(results, model_selection)
+        return cls(pure_sr_predict)
+
+    def forward(self, x, noisy_val=None):
+        x_np = x.detach().cpu().numpy()
+        out = self.pure_sr_predict_fn(x_np)
+        # clamp out betweewn 4 and 12
+        out = np.clip(out, 4.0, 12.0)
+        out = torch.tensor(out[:, None], device=x.device)
+        return out
+
+
+class PySRNet(nn.Module):
+    def __init__(self, filepath='sr_results/hall_of_fame_21101_0_1.pkl', model_selection='best'):
+        super().__init__()
+        # something like 'sr_results/hall_of_fame_21101_0_1.pkl'
+        self.filepath = filepath
+        assert os.path.exists(filepath), f'filepath does not exist: {filepath}'
+        self.module_list = load_pysr_module_list(filepath, model_selection)
+        self.model_selection = model_selection
+
+    def forward(self, x):
+        # input: [B, d]
+        # output: [B, n]
+        out = [module(x) for module in self.module_list]
+
+        # if the pysr equation is a constant, it returns a scalar for some reason
+        for i in range(len(out)):
+            if len(out[i].shape) == 0:
+                if type(out[i]) == nn.Parameter:
+                    out[i] = out[i].detach()
+                elif type(out[i]) != torch.Tensor:
+                    out[i] = torch.tensor(out[i], device=x.device)
+
+                out[i] = einops.repeat(out[i], ' -> b', b=x.shape[0])
+
+        out = einops.rearrange(out, 'n B -> B n')
+        return out
+
+
+class PySREQBoundsNet(nn.Module):
+    def __init__(self, pred_net: PySRNet, eq_bounds_net: PySRNet):
+        super().__init__()
+        self.pred_net = pred_net
+        self.eq_bounds_net = eq_bounds_net
+
+
+    def forward(self, x):
+        B = x.shape[0]
+        preds = self.pred_net(x)
+        eq_bounds = self.eq_bounds_net(x)
+        utils.assert_equal(preds.shape, (B, 2))
+        utils.assert_equal(eq_bounds.shape, (B, 1))
+        preds[:, 1] = eq_bounds[:, 0]
+        return preds
+
+
+def get_pysr_regress_nn(version, model_selection='accuracy', results_dir='sr_results/'):
+    pysr_path = os.path.join(results_dir, f'{version}.pkl')
+
+    # detect if the model was direct_f2, if so load other module.
+    with open(pysr_path, 'rb') as f:
+        reg = pickle.load(f)
+    from sr import LL_LOSS
+    is_direct_f2 = hasattr(reg, 'elementwise_loss') and reg.elementwise_loss == LL_LOSS
+    is_direct_f2 = is_direct_f2 or type(reg.equations_) != list
+
+    if is_direct_f2:
+        return DirectPySRNet(pysr_path, model_selection)
+    else:
+        return PySRNet(pysr_path, model_selection)
+
+
+class PySRFeatureNN(torch.nn.Module):
+    def __init__(self, filepath='sr_results/hall_of_fame_1278_1_0.pkl', model_selection='best'):
+        super().__init__()
+        # something like 'sr_results/hall_of_fame_7955_1.pkl'
+        self.filepath = filepath
+        assert os.path.exists(filepath), f'filepath does not exist: {filepath}'
+        indices_path = filepath[:-4] + '_indices.json'
+
+        self.module_list = load_pysr_module_list(filepath, model_selection)
+
+        with open(indices_path, 'r') as f:
+            self.included_indices = json.load(f)
+
+    def forward(self, x):
+        B, T, d = x.shape
+        x = x[..., self.included_indices]
+        # input: [B, T, d]
+        # output: [B, n, d]
+        # the learned features expect a single batch axis as input
+        x = einops.rearrange(x, 'B T d -> (B T) d')
+        # list of length n_features
+        x = [module(x) for module in self.module_list]
+        x = einops.rearrange(x, 'n (B T) -> B T n', B=B, T=T)
+        return x
+
+
+def add_std_pred_nn(mean_net):
+    return mean_net
+
+
+class AddStdPredNN2(nn.Module):
+    def __init__(self, net):
+        super().__init__()
+        self.net = net
+
+    def forward(self, x):
+        return self.net(x)
+
+
+class AddStdPredNN(nn.Module):
+    '''
+    Uses one NN to predict the mean, and another NN for predicting the std.
+    '''
+    def __init__(self, mean_net, std_net):
+        super().__init__()
+        self.mean_net = mean_net
+        self.std_net = std_net
+
+    def forward(self, x, noisy_val):
+        B = x.shape[0]
+        mean_out = self.mean_net(x, noisy_val=noisy_val)
+        mean = mean_out[:, 0:1]
+        utils.assert_equal(mean.shape, (B, 1))
+        std_out = self.std_net(x, noisy_val=noisy_val)
+        utils.assert_equal(std_out.shape[0], B)
+        std = std_out[:, 1:]
+        utils.assert_equal(std.shape, (B, 1))
+        out = einops.rearrange([mean[:, 0], std[:, 0]], 'two B -> B two')
+        utils.assert_equal(out.shape, (B, 2))
+        return out
+
+
+class Pred1StdNN(nn.Module):
+    def forward(self, x, noisy_val=None):
+        B = x.shape[0]
+        return torch.ones((B, 2), device=x.device)
+
+
+class RandomFeatureNN(torch.nn.Module):
+    def __init__(self, in_n, out_n):
+        super().__init__()
+        self.in_n = in_n
+        self.out_n = out_n
+        # not learnable!
+        self.random_projection = nn.Parameter(torch.rand(in_n, out_n) * 2 - 1, requires_grad=False)
+
+    def forward(self, x):
+        B, T, d = x.shape
+        utils.assert_equal(d, self.in_n)
+        # basically double batch matrix multiply
+        out = torch.einsum('ijk, kl', x, self.random_projection)
+        utils.assert_equal(out.shape, (B, T, self.out_n))
+        return out
+
+
+class SpecialLinear(nn.Module):
+    def __init__(self, n_inputs, n_features, init=False):
+        super().__init__()
+        self.n_inputs = n_inputs
+        # number of features we're emulating
+        self.n_features = n_features
+        self.linear = nn.Linear(n_inputs + n_inputs * n_inputs, 2*n_features)
+        if init:
+            linear = spock_reg_model.load(total_steps=300000, seed=0, version=21101).feature_nn
+            utils.assert_equal(type(linear), nn.Linear)
+            self.init_layer(linear)
+
+    def forward(self, x):
+        return self.linear(x)
+
+    def from_linear(linear: nn.Linear):
+        layer = SpecialLinear(n_inputs=linear.weight.shape[1], n_features=linear.weight.shape[0])
+        layer.init_layer(linear)
+        return layer
+
+    def init_layer(self, layer: nn.Linear):
+        # layer to emulate is a [n_inputs, n_features] linear layer.
+        # originally we take the mean and variance of the features.
+        # now we are trying to recreate those features by running a linear transformation the means and variances of the inputs
+        w, b = layer.weight.data, layer.bias.data
+        utils.assert_equal(w.shape, (self.n_features, self.n_inputs))
+        utils.assert_equal(b.shape, (self.n_features,))
+
+        with torch.no_grad():
+            # values outside the mean/var-covar block diagonal are zero
+            self.linear.weight.data[...] = 0
+            # calculating the means from the means.
+            self.linear.weight.data[:self.n_features, :self.n_inputs] = w
+            # calculating the variances from the covariances
+            w2 = torch.einsum('ij, ik -> ijk', w, w)
+            w2 = einops.rearrange(w2, 'i j k -> i (j k)')
+            self.linear.weight[self.n_features:, self.n_inputs:] = w2
+            self.linear.bias.data[:self.n_features] = b
+            self.linear.bias.data[self.n_features:] = 0
+
+
+
+class ZeroNN(torch.nn.Module):
+    def __init__(self, in_n, out_n):
+        super().__init__()
+        self.in_n = in_n
+        self.out_n = out_n
+        assert out_n < in_n
+
+    def forward(self, x):
+        return torch.zeros_like(x)[:, :, :self.out_n]
 
 
 class Products(nn.Module):
@@ -138,38 +498,6 @@ class IfThenNN2(nn.Module):
         return F.softmax(preds / temperature, dim=-1)
 
 
-def mlp(in_n, out_n, hidden, layers, act='relu'):
-    '''
-        layers is the number of "hidden" layers,
-        aka layers besides the input layer (which reduces to hidden dim)
-        and output layer (which changes hidden dim to out dim)
-        so:
-        if layers = -1, returns Linear(in, out)
-        if layers =  0, returns [Linear(in, h), Linear(h, out)
-        if layers =  1, returns [Linear(in, h), Linear(h, h), Linear(h, out)]
-        etc.
-    '''
-    if act == 'relu':
-        act = nn.ReLU
-    elif act == 'softplus':
-        act = nn.Softplus
-    else:
-        raise NotImplementedError('act must be relu or softplus')
-
-    if layers == -1:
-        return nn.Linear(in_n, out_n)
-
-    result = [nn.Linear(in_n, hidden),
-             act()]
-    for i in reversed(range(layers)):
-        result.extend([
-            nn.Linear(hidden, hidden),
-            act()
-            ])
-
-    result.extend([nn.Linear(hidden, out_n)])
-    return nn.Sequential(*result)
-
 class ZeroFeatureAtIx(nn.Module):
     def __init__(self, n_features, ix):
         super().__init__()
@@ -178,105 +506,6 @@ class ZeroFeatureAtIx(nn.Module):
 
     def forward(self, x):
         return torch.cat([x[..., :self.ix], torch.zeros_like(x[..., self.ix:self.ix+1]), x[..., self.ix+1:]], dim=-1)
-
-class SpecialLinear(nn.Module):
-    def __init__(self, n_inputs, n_features, init=False):
-        super().__init__()
-        self.n_inputs = n_inputs
-        # number of features we're emulating
-        self.n_features = n_features
-        self.linear = nn.Linear(n_inputs + n_inputs * n_inputs, 2*n_features)
-        if init:
-            linear = spock_reg_model.load(total_steps=300000, seed=0, version=21101).feature_nn
-            utils.assert_equal(type(linear), nn.Linear)
-            self.init_layer(linear)
-
-    def forward(self, x):
-        return self.linear(x)
-
-    def from_linear(linear: nn.Linear):
-        layer = SpecialLinear(n_inputs=linear.weight.shape[1], n_features=linear.weight.shape[0])
-        layer.init_layer(linear)
-        return layer
-
-    def init_layer(self, layer: nn.Linear):
-        # layer to emulate is a [n_inputs, n_features] linear layer.
-        # originally we take the mean and variance of the features.
-        # now we are trying to recreate those features by running a linear transformation the means and variances of the inputs
-        w, b = layer.weight.data, layer.bias.data
-        utils.assert_equal(w.shape, (self.n_features, self.n_inputs))
-        utils.assert_equal(b.shape, (self.n_features,))
-
-        with torch.no_grad():
-            # values outside the mean/var-covar block diagonal are zero
-            self.linear.weight.data[...] = 0
-            # calculating the means from the means.
-            self.linear.weight.data[:self.n_features, :self.n_inputs] = w
-            # calculating the variances from the covariances
-            w2 = torch.einsum('ij, ik -> ijk', w, w)
-            w2 = einops.rearrange(w2, 'i j k -> i (j k)')
-            self.linear.weight[self.n_features:, self.n_inputs:] = w2
-            self.linear.bias.data[:self.n_features] = b
-            self.linear.bias.data[self.n_features:] = 0
-
-
-class MaskLayer(nn.Module):
-    def __init__(self, n_features):
-        super().__init__()
-        self.mask = nn.Parameter(torch.ones(n_features))
-
-    def forward(self, x):
-        return x * self.mask
-
-    def l1_cost(self):
-        return torch.sum(torch.abs(self.mask))
-
-
-class MaskedLinear(nn.Module):
-    def __init__(self, linear, mask):
-        super().__init__()
-        self.linear = linear
-        self.mask = nn.Parameter(mask, requires_grad=False)
-
-    def forward(self, x):
-        return F.linear(x, self.masked_weight, self.linear.bias)
-
-    @property
-    def masked_weight(self):
-        return self.linear.weight * self.mask
-
-
-def pruned_input_mask(net, top_k):
-    mask_weights = net.mask
-    _, topk_ixs = torch.topk(mask_weights.abs(), k=top_k)
-    new_mask = torch.zeros_like(net.mask)
-    new_mask[topk_ixs] = 1.0
-    new_layer = MaskLayer(mask_weights.shape[0])
-    new_layer.mask.data = new_mask
-    return new_layer
-
-
-def pruned_linear(linear, top_k, top_n=None):
-    '''
-    top_k: prune so that each output feature uses top_k input feature in its combination
-    top_n: prune so that only top_n output features are nonzero.
-    '''
-
-    mask = torch.zeros_like(linear.weight)
-    for r in range(linear.weight.shape[0]):
-        _, ixs = torch.topk(linear.weight[r].abs(), k=top_k)
-        mask[r][ixs] = 1
-
-    if top_n is not None:
-        # take the top_n output features based on their already pruned input features
-        # mask is (n_features, n_inputs)
-        # ixs is the top_n spots to keep
-        _, ixs = torch.topk((mask * linear.weight).abs().sum(dim=-1), k=top_n)
-        # these are the spots to zero out - those not in the top n
-        ixs2 = torch.tensor([i for i in range(mask.shape[0]) if i not in ixs])
-        mask[ixs2] = 0
-
-    return MaskedLinear(linear, mask)
 
 
 class Cyborg(nn.Module):
@@ -304,231 +533,3 @@ class Cyborg(nn.Module):
         utils.assert_equal(out.shape, out1.shape)
         return out
 
-
-class SumModule(nn.Module):
-    def __init__(self, module1, module2):
-        super(SumModule, self).__init__()
-        self.module1 = module1
-        self.module2 = module2
-
-    def forward(self, x):
-        return self.module1(x) + self.module2(x)
-
-
-def load_pysr_module_list(filepath, model_selection):
-    if model_selection in ['best', 'accuracy', 'score']:
-        reg = pysr.PySRRegressor.from_file(filepath, model_selection=model_selection)
-        if reg.nout_ > 1:
-            return nn.ModuleList(reg.pytorch())
-        else:
-            return nn.ModuleList([reg.pytorch()])
-    else:
-        reg = pysr.PySRRegressor.from_file(filepath)
-        # find the ixs with closest complexity equal to model_selection
-
-        if reg.nout_ > 1:
-            ixs = []
-            for i in range(reg.nout_):
-                ix = np.argmin(np.abs(reg.equations_[i]['complexity'] - int(model_selection)))
-                ixs.append(ix)
-        else:
-            ix = np.argmin(np.abs(reg.equations_['complexity'] - int(model_selection)))
-            ixs = [ix]
-
-        modules = reg.pytorch(index=ixs)
-        return nn.ModuleList(modules)
-
-
-class DirectPySRNet(nn.Module):
-    def __init__(self, filepath, model_selection):
-        super().__init__()
-        self.pysr_net = PySRNet(filepath, model_selection)
-
-    def forward(self, x):
-        B = x.shape[0]
-        mean = self.pysr_net(x)
-        utils.assert_equal(mean.shape, (B, 1))
-        std = torch.ones_like(mean)
-        out = einops.rearrange([mean[:, 0], std[:, 0]], 'two B -> B two')
-        return out
-
-
-def add_std_pred_nn(mean_net):
-    return mean_net
-
-class AddStdPredNN2(nn.Module):
-    def __init__(self, net):
-        super().__init__()
-        self.net = net
-
-    def forward(self, x):
-        return self.net(x)
-
-
-class AddStdPredNN(nn.Module):
-    '''
-    Uses one NN to predict the mean, and another NN for predicting the std.
-    '''
-    def __init__(self, mean_net, std_net):
-        super().__init__()
-        self.mean_net = mean_net
-        self.std_net = std_net
-
-    def forward(self, x, noisy_val):
-        B = x.shape[0]
-        mean_out = self.mean_net(x, noisy_val=noisy_val)
-        mean = mean_out[:, 0:1]
-        utils.assert_equal(mean.shape, (B, 1))
-        std_out = self.std_net(x, noisy_val=noisy_val)
-        utils.assert_equal(std_out.shape[0], B)
-        std = std_out[:, 1:]
-        utils.assert_equal(std.shape, (B, 1))
-        out = einops.rearrange([mean[:, 0], std[:, 0]], 'two B -> B two')
-        utils.assert_equal(out.shape, (B, 2))
-        return out
-
-
-class Pred1StdNN(nn.Module):
-    def forward(self, x, noisy_val=None):
-        B = x.shape[0]
-        return torch.ones((B, 2), device=x.device)
-
-
-class PureSRNet(nn.Module):
-    def __init__(self, pure_sr_predict_fn):
-        super().__init__()
-        self.pure_sr_predict_fn = pure_sr_predict_fn
-
-    @classmethod
-    def from_path(cls, filepath, model_selection):
-        with open(filepath, 'rb') as f:
-            reg = pickle.load(f)
-        results = reg.equations_
-        results.feature_names_in_ = reg.feature_names_in_
-
-        pure_sr_predict = pure_sr_predict_fn(results, model_selection)
-        return cls(pure_sr_predict)
-
-    def forward(self, x, noisy_val=None):
-        x_np = x.detach().cpu().numpy()
-        out = self.pure_sr_predict_fn(x_np)
-        # clamp out betweewn 4 and 12
-        out = np.clip(out, 4.0, 12.0)
-        out = torch.tensor(out[:, None], device=x.device)
-        return out
-
-
-class PySRNet(nn.Module):
-    def __init__(self, filepath='sr_results/hall_of_fame_21101_0_1.pkl', model_selection='best'):
-        super().__init__()
-        # something like 'sr_results/hall_of_fame_21101_0_1.pkl'
-        self.filepath = filepath
-        assert os.path.exists(filepath), f'filepath does not exist: {filepath}'
-        self.module_list = load_pysr_module_list(filepath, model_selection)
-        self.model_selection = model_selection
-
-    def forward(self, x):
-        # input: [B, d]
-        # output: [B, n]
-        out = [module(x) for module in self.module_list]
-
-        # if the pysr equation is a constant, it returns a scalar for some reason
-        for i in range(len(out)):
-            if len(out[i].shape) == 0:
-                if type(out[i]) == nn.Parameter:
-                    out[i] = out[i].detach()
-                elif type(out[i]) != torch.Tensor:
-                    out[i] = torch.tensor(out[i], device=x.device)
-
-                out[i] = einops.repeat(out[i], ' -> b', b=x.shape[0])
-
-        out = einops.rearrange(out, 'n B -> B n')
-        return out
-
-
-class PySREQBoundsNet(nn.Module):
-    def __init__(self, pred_net: PySRNet, eq_bounds_net: PySRNet):
-        super().__init__()
-        self.pred_net = pred_net
-        self.eq_bounds_net = eq_bounds_net
-
-
-    def forward(self, x):
-        B = x.shape[0]
-        preds = self.pred_net(x)
-        eq_bounds = self.eq_bounds_net(x)
-        utils.assert_equal(preds.shape, (B, 2))
-        utils.assert_equal(eq_bounds.shape, (B, 1))
-        preds[:, 1] = eq_bounds[:, 0]
-        return preds
-
-
-def get_pysr_regress_nn(version, model_selection='accuracy', results_dir='sr_results/'):
-    pysr_path = os.path.join(results_dir, f'{version}.pkl')
-
-    # detect if the model was direct_f2, if so load other module.
-    with open(pysr_path, 'rb') as f:
-        reg = pickle.load(f)
-    from sr import LL_LOSS
-    is_direct_f2 = hasattr(reg, 'elementwise_loss') and reg.elementwise_loss == LL_LOSS
-    is_direct_f2 = is_direct_f2 or type(reg.equations_) != list
-
-    if is_direct_f2:
-        return DirectPySRNet(pysr_path, model_selection)
-    else:
-        return PySRNet(pysr_path, model_selection)
-
-
-class PySRFeatureNN(torch.nn.Module):
-    def __init__(self, filepath='sr_results/hall_of_fame_1278_1_0.pkl', model_selection='best'):
-        super().__init__()
-        # something like 'sr_results/hall_of_fame_7955_1.pkl'
-        self.filepath = filepath
-        assert os.path.exists(filepath), f'filepath does not exist: {filepath}'
-        indices_path = filepath[:-4] + '_indices.json'
-
-        self.module_list = load_pysr_module_list(filepath, model_selection)
-
-        with open(indices_path, 'r') as f:
-            self.included_indices = json.load(f)
-
-    def forward(self, x):
-        B, T, d = x.shape
-        x = x[..., self.included_indices]
-        # input: [B, T, d]
-        # output: [B, n, d]
-        # the learned features expect a single batch axis as input
-        x = einops.rearrange(x, 'B T d -> (B T) d')
-        # list of length n_features
-        x = [module(x) for module in self.module_list]
-        x = einops.rearrange(x, 'n (B T) -> B T n', B=B, T=T)
-        return x
-
-
-class RandomFeatureNN(torch.nn.Module):
-    def __init__(self, in_n, out_n):
-        super().__init__()
-        self.in_n = in_n
-        self.out_n = out_n
-        # not learnable!
-        self.random_projection = nn.Parameter(torch.rand(in_n, out_n) * 2 - 1, requires_grad=False)
-
-    def forward(self, x):
-        B, T, d = x.shape
-        utils.assert_equal(d, self.in_n)
-        # basically double batch matrix multiply
-        out = torch.einsum('ijk, kl', x, self.random_projection)
-        utils.assert_equal(out.shape, (B, T, self.out_n))
-        return out
-
-
-class ZeroNN(torch.nn.Module):
-    def __init__(self, in_n, out_n):
-        super().__init__()
-        self.in_n = in_n
-        self.out_n = out_n
-        assert out_n < in_n
-
-    def forward(self, x):
-        B, T, d = x.shape
-        return torch.zeros_like(x)[:, :, :self.out_n]

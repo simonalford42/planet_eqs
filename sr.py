@@ -1,7 +1,6 @@
 import subprocess
 import wandb
 import pysr
-from pysr import PySRRegressor
 import random
 
 from matplotlib import pyplot as plt
@@ -17,7 +16,6 @@ import pickle
 from utils import assert_equal
 import einops
 import torch
-import math
 
 
 LL_LOSS = """
