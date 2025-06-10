@@ -16,9 +16,9 @@ def tsurv_inputs(x):
     # semimajor axes at each time step
     # petit paper is the average over the 10k orbits
     ixs = {'a1': 8, 'a2': 17, 'a3': 26, 'm1': 35, 'm2': 36, 'm3': 37}
-    a1, a2, a3 = x[:, ixs['a1']].mean(), x[:, ixs['a2']].mean(), x[:, ixs['a3']].mean()
+    # a1, a2, a3 = x[:, ixs['a1']].mean(), x[:, ixs['a2']].mean(), x[:, ixs['a3']].mean()
     # alternative: in multiswag_5_planet.py, a1/a2/a3 are not averaged, but just the initial value.
-    # a1, a2, a3 = x[0, ixs['a1']], x[0, ixs['a2']], x[0, ixs['a3']]
+    a1, a2, a3 = x[0, ixs['a1']], x[0, ixs['a2']], x[0, ixs['a3']]
     # alternative gets the same rmse when running main_figures.py --petit ...
     nu12 = (a1 / a2) ** (3 / 2)
     nu23 = (a2 / a3) ** (3 / 2)
@@ -48,8 +48,7 @@ def tsurv(x):
     preds = np.array(preds)
     preds = np.nan_to_num(preds, posinf=1e12, neginf=1e12, nan=1e12)
 
-    # also threshold at 1e4 and 1e12
-    preds = np.clip(preds, 1e4, 1e12)
+    # preds = np.clip(preds, 1e4, 1e12)
 
     preds = np.log10(preds)
     return torch.tensor(preds)

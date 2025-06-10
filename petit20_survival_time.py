@@ -11,7 +11,7 @@ def Tsurv(nu12,nu23,masses,m0=1.,fudge=1,res=False):
     Main result from the paper. Return the survival time estimate as a function of the initial period ratios and masses (eq. 81).
     In units of of the innermost orbit
     Returns np.inf if separation wide enough that 3-body MMRs don't overlap.
-    
+
     nu12, nu23 : Initial period ratios
     masses : planet masses
     m0 : star mass
@@ -23,13 +23,13 @@ def Tsurv(nu12,nu23,masses,m0=1.,fudge=1,res=False):
     al23 = nu23**(2/3)
     eta = nu12*(1-nu23)/(1-nu12*nu23)
     plsep = (1-al12)*(1-al23)/(2-al12-al23)
-    
+
 
     try:
         Tnorm = 2**1.5/9*(plsep/plsepov)**6/(1-(plsep/plsepov)**4)*10**(-np.log(1-(plsep/plsepov)**4))
     except:
         return np.inf
-        
+
     A = np.sqrt(38/pi)
     Mfac = get_Mfac(nu12,nu23,masses,m0)
     PrefacD = Mfac*nu12*A*np.sqrt(eta*(1-eta))*fudge**-2
@@ -42,7 +42,7 @@ def Tsurv(nu12,nu23,masses,m0=1.,fudge=1,res=False):
     else:
         Tsurv = (3/2)**2/PrefacD*Tnorm*3/32 #Deta=3/2 in units of plsep
     return np.nan_to_num(Tsurv,nan=np.inf)
-    
+
 def Tnorm(nu12,nu23,masses,fudge=1,exact_F=True):
     "In unit of P_1"
     plsepov = get_plsep_ov(nu12,nu23,masses)*fudge
@@ -50,7 +50,7 @@ def Tnorm(nu12,nu23,masses,fudge=1,exact_F=True):
     al23 = nu23**(2/3)
     eta = nu12*(1-nu23)/(1-nu12*nu23)
     plsep = (1-al12)*(1-al23)/(2-al12-al23)
-    
+
     if exact_F:
         xiov = exact_xiov(nu12,nu23,masses,fudge=fudge)
         F = (1-sc.special.dawsn((xiov/2)**.5)/(xiov/2)**.5)**2
@@ -69,11 +69,11 @@ def _exact_xiov(nu12,nu23,masses,fudge=1):
 
 # Random walk distribution
 def distribution_exittimes(t,u0,du=1.,D=1.,N=100):
-    """Formula for the exit time probability distribution 
-    
-    t is the time 
+    """Formula for the exit time probability distribution
+
+    t is the time
     u0 is the distance to the boundary
-    du and D are units that are set to 1 in  general 
+    du and D are units that are set to 1 in  general
     """
     res = 0
     for k in np.arange(-N-1,N+1):
@@ -124,7 +124,7 @@ def diffusion_direction_curve(nu12,nu23,masses=np.ones(3)):
 def _eventnu23(nu12,nu23):
     return 1-nu23
 _eventnu23.terminal=True
-    
+
 def diffusion_slope(nu12,nu23,masses=np.ones(3)):
     return -nu23/nu12*(1-nu12*nu23+(1-nu12)*masses[0]/masses[1]*nu12**(-1/3))/(1-nu12*nu23+nu12*(1-nu23)*masses[2]/masses[1]*nu23**(1/3))
 

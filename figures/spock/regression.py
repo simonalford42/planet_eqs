@@ -31,8 +31,6 @@ import petit
 
 from numba import jit
 
-import fit_trunc_dist
-
 profile = lambda _: _
 
 class NonSwagFeatureRegressor():

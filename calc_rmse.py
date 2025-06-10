@@ -366,14 +366,14 @@ def get_args():
     parser.add_argument('--pysr_model_selection', type=str, default='accuracy', help='"best", "accuracy", "score", or an integer of the pysr equation complexity.')
 
     args = parser.parse_args()
-    if args.pysr_version is None:
+    if args.pysr_version is None and args.version is not None:
         args.eval_type = 'nn'
     return args
 
 
 if __name__ == '__main__':
     args = get_args()
-    # calculate_all_results(args)
-    comparison_figure(args)
+    calculate_all_results(args)
+    # comparison_figure(args)
     # rmse = calculate_rmse(args)
     # print('RMSE:', rmse)

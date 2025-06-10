@@ -21,7 +21,8 @@ import multiprocessing as mp
 import argparse
 import time
 import spock_reg_model
-from pure_sr_evaluation import pure_sr_predict_fn
+from petit20_survival_time import Tsurv
+# from pure_sr_evaluation import pure_sr_predict_fn
 
 import warnings
 warnings.filterwarnings("ignore", category=ResourceWarning)
@@ -124,14 +125,25 @@ def get_ground_truth_wrapper(par):
     out = get_ground_truth(sim)
     return {'ground_truth': out}
 
+def get_petit_prediction(par):
+    p12, p23 = par
+    t = Tsurv(
+        p12, p23,
+        [1e-4, 1e-4, 1e-4],
+    )
+    t = np.clip(t, 0, 1e9)
+    return np.log10(np.nan_to_num(t, posinf=1e9, neginf=1e9, nan=1e9))
 
-def get_model_prediction(sim, model, use_petit=False, use_megno=False, create_input_cache=False, ground_truth=False):
+
+def get_model_prediction(sim, par, model, use_petit=False, use_megno=False, create_input_cache=False, ground_truth=False):
     '''
     cache: maps simulation id to X.
     '''
 
     if ground_truth:
         return {'ground_truth': get_ground_truth(sim)}
+    elif use_petit:
+        return {'petit': get_petit_prediction(par)}
 
     sim = sim.copy()
     sim.dt = 0.05
@@ -212,7 +224,7 @@ def compute_results_for_parameters(parameters, model, use_petit=False, use_megno
 
     else:
         simulations = [get_simulation(par) for par in parameters]
-        results = [get_model_prediction(sim, model, use_petit=use_petit, use_megno=use_megno, create_input_cache=create_input_cache, ground_truth=ground_truth) for sim in simulations]
+        results = [get_model_prediction(sim, par, model, use_petit=use_petit, use_megno=use_megno, create_input_cache=create_input_cache, ground_truth=ground_truth) for sim, par in zip(simulations, parameters)]
 
     return results
 
@@ -700,22 +712,40 @@ def plot_results_pysr_f2(args):
 def plot_4way_comparison(args):
     # Create the figure and axes
     # fig, axs = plt.subplots(2, 2, figsize=(12, 10))
-    fig, axs = plt.subplots(2, 2, figsize=(9.5, 8))
+    fig, axs = plt.subplots(
+        2, 2,
+        figsize=(12, 10),
+        gridspec_kw={'wspace': 0.1, 'hspace': 0.1},
+    )
     axs = axs.flatten()
+
+    show_xs = [False, False, True, True]
+    show_ys = [True, False, True, False]
 
     for ax in axs:
         ax.set_aspect('equal', adjustable='box')
 
     ticks = [0.55, 0.60, 0.65, 0.70, 0.75]
-    for ax in axs:
+    for ax, show_x, show_y in zip(axs, show_xs, show_ys):
         ax.set_xticks(ticks)
+        if not show_x:
+            ax.set_xticklabels([])
         ax.set_yticks(ticks)
+        if not show_y:
+            ax.set_yticklabels([])
 
-    nn_results = load_pickle(get_results_path(args.Ngrid, args.version))
-    eq_results = load_pickle(get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection))
-    petit_results = load_pickle(get_results_path(args.Ngrid, use_petit=True))
+
+    # nn_results = load_pickle(get_results_path(args.Ngrid, args.version))
+    # eq_results = load_pickle(get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection))
+    # petit_results = load_pickle(get_results_path(args.Ngrid, use_petit=True))
+    # # megno_results = load_pickle(get_results_path(args.Ngrid, use_megno=True))
+    # ground_truth_results = load_pickle(get_results_path(args.Ngrid, ground_truth=True))
+    nn_results = load_pickle(get_results_path(300, version=24880))
+    eq_results = load_pickle(get_results_path(300, version=24880, pysr_version=11003, pysr_model_selection=26))
+    petit_results = load_pickle(get_results_path(300, use_petit=True))
     # megno_results = load_pickle(get_results_path(args.Ngrid, use_megno=True))
-    ground_truth_results = load_pickle(get_results_path(args.Ngrid, ground_truth=True))
+    ground_truth_results = load_pickle(get_results_path(300, ground_truth=True))
+
 
     # model_results = [nn_results, eq_results, petit_results, megno_results]
     # names = ['nn', 'eq', 'petit', 'megno']
@@ -727,8 +757,11 @@ def plot_4way_comparison(args):
     for i in range(4):
         results = model_results[i]
         name = names[i]
+        show_x = show_xs[i]
+        show_y = show_ys[i]
 
-        P12s, P23s = get_period_ratios(args.Ngrid)
+        # P12s, P23s = get_period_ratios(args.Ngrid)
+        P12s, P23s = get_period_ratios(300)
 
         # get the results for the specific metric
         if name == 'petit':
@@ -738,10 +771,11 @@ def plot_4way_comparison(args):
         elif name == 'ground_truth':
             results = [np.log10(d['ground_truth']) if d is not None else np.nan for d in results]
             # we want to color times < 4 white
-            results = [r if r >= 4 else np.nan for r in results]
+            # results = [r if r >= 4 else np.nan for r in results]
         else:
             results = [d['mean'] if d is not None else np.nan for d in results]
 
+        results = [4. if np.isnan(r) else r for r in results]
         results = np.array(results)
         X,Y,Z = get_centered_grid(P12s, P23s, results)
 
@@ -751,32 +785,38 @@ def plot_4way_comparison(args):
             cmap = COLOR_MAP.copy()
             cmap.set_bad(color='white')
             im = axs[i].pcolormesh(X, Y, np.log10(Zfilt-2), vmin=-4, vmax=4, cmap=cmap)
-            label = MEGNO_LABEL
+            # label = MEGNO_LABEL
         else:
             # NaN's get mapped to predicting instant instability
             # Z[np.isnan(Z)] = 4
             cmap = COLOR_MAP.copy().reversed()
             cmap.set_bad(color='white')
             im = axs[i].pcolormesh(X, Y, Z, vmin=4, vmax=9, cmap=cmap)
-            label = INSTABILITY_TIME_LABEL
+            # label = INSTABILITY_TIME_LABEL
 
         # cb = plt.colorbar(im, ax=axs[i], fraction=0.046, pad=0.04)
         # cb.set_label(label)
-        axs[i].set_xlabel("P1/P2")
-        axs[i].set_ylabel("P2/P3")
+        if show_x:
+            axs[i].set_xlabel("P1/P2")
+        else:
+            axs[i].set_xlabel("")
+        if show_y:
+            axs[i].set_ylabel("P2/P3")
+        else:
+            axs[i].set_ylabel("")
+
         axs[i].set_title(titles[i])
-        plt.tight_layout()
 
     # Create a single colorbar
     cb = fig.colorbar(im, ax=axs.ravel().tolist(), shrink=0.6)
     cb.set_label(INSTABILITY_TIME_LABEL)
-    fig.set_constrained_layout(True)
-    # fig.set_constrained_layout(True)
 
-    path = get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection)[:-4] + '_comparison3'
+    # path = get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection)[:-4] + '_comparison3'
+    # path = get_results_path(300, 24880, pysr_version=11003, pysr_model_selection=26)[:-4] + '_comparison3'
+    path = 'period_results/4way'
     os.makedirs(os.path.dirname(path), exist_ok=True)
     img_path = path + ('.pdf' if args.pdf else '.png')
-    plt.savefig(img_path, dpi=800)
+    plt.savefig(img_path, dpi=800, bbox_inches='tight')
     print('Saved figure to', path + '.png')
     plt.close(fig)
 
@@ -1030,8 +1070,8 @@ def calculate_rmse(args):
         if model_name == 'ground_truth': continue
         preds = data[model_name]
         preds = preds[~bad_ixs]
-        preds[np.isnan(preds)] = 4
-        preds[preds < 4] = 4
+        assert not np.isnan(preds).any()
+        # preds[preds < 4] = 4
         preds[preds > 9] = 9
 
         rmse = np.sqrt(np.mean((ground_truth - preds)**2))
@@ -1173,3 +1213,14 @@ if __name__ == '__main__':
     end = time.time()
     formatted_time = time.strftime('%H:%M:%S', time.gmtime(end - start))
     print(f'Done (time taken: {formatted_time})')
+
+
+# if __name__ == '__main__':
+#     args = get_args()
+#     args.petit = True
+#     args.version = 24880
+#     sim = get_simulation((0.60, 0.70))
+#     model = load_model(args)
+#     p = get_model_prediction(sim, None, model, use_petit=True)
+#     print(p)
+#     print(get_petit_prediction((0.6, 0.7)))

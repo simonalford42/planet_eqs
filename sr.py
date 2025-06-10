@@ -310,8 +310,11 @@ def get_config(args):
     path = f'sr_results/{id}.csv'
 
     # https://stackoverflow.com/a/57474787/4383594
-    num_cpus = int(os.environ.get('SLURM_CPUS_ON_NODE')) * int(os.environ.get('SLURM_JOB_NUM_NODES'))
-    # num_cpus = 10
+    try:
+        num_cpus = int(os.environ.get('SLURM_CPUS_ON_NODE')) * int(os.environ.get('SLURM_JOB_NUM_NODES'))
+    except TypeError:
+        num_cpus = 10
+
     pysr_config = dict(
         procs=num_cpus,
         populations=3*num_cpus,
@@ -416,7 +419,7 @@ def run():
     }
     results_path = f'sr_results/33936.pkl'
     reg = pickle.load(open(results_path, 'rb'))
-    X, y, _ = load_inputs_and_targets(configh)
+    X, y, _ = load_inputs_and_targets(config)
     return X, y, reg
 
 
