@@ -14,6 +14,5 @@ models
 *.ckpt
 *.pt
 *.npy
-figures/
 pickles/
 graphics/
