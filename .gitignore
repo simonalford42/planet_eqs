@@ -4,11 +4,10 @@ data
 *.pdf
 __pycache__
 *.sw*
-results
 wandb
 out
 tb_logs
-sr_results
+sr_results/*
 sr_out
 models
 *.ckpt
@@ -16,3 +15,7 @@ models
 *.npy
 pickles/
 graphics/
+# ignore everything in results
+results/**
+# but include a few models we want to upload
+!results/24880_0/

@@ -1,17 +1,5 @@
 import argparse
 
-def get_checkpoint_filename_old(args, glob=False):
-    checkpoint_filename = (
-            "results/steps=%d_megno=%d_angles=%d_power=%d_hidden=%d_latent=%d_nommr=%d" %
-            (args.total_steps, args.megno, args.angles, args.power_transform, args.hidden, args.latent, args.no_mmr)
-        + '_nonan=1_noeplusminus=1_v' + str(args.version) + '_'
-    )
-    if not glob:
-        checkpoint_filename += '%d' %(args.seed,)
-
-    return checkpoint_filename
-
-
 def parse():
     # Instantiate the parser
     parser = argparse.ArgumentParser(description='Optional app description')
@@ -29,9 +17,7 @@ def parse():
     parser.add_argument('--total_steps', type=int, default=300000, help='default=300000')
     parser.add_argument('--hidden_dim', type=int, default=40, help='regress nn and feature nn hidden dim')
     parser.add_argument('--latent', type=int, default=10, help='number of features f1 outputs')
-    parser.add_argument('--swa_steps', type=int, default=50000, help='default=50000')
     # remember that f2_depth = 1 is one hidden layer of (h, h) shape, plus the input and output dim layers.
-    parser.add_argument('--batch_size', type=int, default=2000, help='swag batch size')
     parser.add_argument('--lr', type=float, default=5e-4)
     parser.add_argument('--eval', action='store_true', help='disables optimizer step so no weights are changed')
 

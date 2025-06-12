@@ -12,6 +12,16 @@ plt.rcParams["font.family"] = "serif"
 plt.rcParams['mathtext.fontset']='dejavuserif'
 import pandas as pd
 
+def best_result(all_results):
+    # find complexity that gives best val error
+    # then give the resonant test loss and random loss for that complexity
+    # return (complexity, val, test, random)
+    complexity, val_error = min(all_results['val'].items(), key=lambda e: e[1])
+    test_error = all_results['test'][complexity]
+    random_error = all_results['random'][complexity]
+    print(f'c{complexity}, val: {val_error:.2f}, test: {test_error:.2f}, random: {random_error:.2f}')
+    return complexity, val_error, test_error, random_error
+
 def get_feature_nn(version):
     # load when on the cluster
     model = spock_reg_model.load(version)
@@ -489,7 +499,7 @@ def f2_latex_str(results, important_complexities=None, mapping_dict=None, add_rm
     s = s.replace('s_{', '\\sigma_{')
     s = s.replace('y = ', r'\log_{10} T_{\text{inst}} = ')
 
-    if add_rmse:
+    if add_rmse and 'rmse' in results.columns:
         # add column of rmse scores
         s = s.replace('cc@', 'ccc@')
         s = s.replace('Complexity \\\\', 'Complexity & RMSE \\\\')

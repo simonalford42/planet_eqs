@@ -308,6 +308,8 @@ def get_config(args):
         id = random.randint(0, 100000)
 
     path = f'sr_results/{id}.csv'
+    # create the directory if it doesn't exist
+    os.makedirs(os.path.dirname(path), exist_ok=True)
 
     # https://stackoverflow.com/a/57474787/4383594
     try:
@@ -350,7 +352,6 @@ def get_config(args):
     config['pysr_config'] = pysr_config
     config.update({
         'id': id,
-        'results_cmd': f'vim $(ls {path[:-4]}.csv*)',
         'slurm_id': os.environ.get('SLURM_JOB_ID', None),
         'slurm_name': os.environ.get('SLURM_JOB_NAME', None),
     })
@@ -391,6 +392,7 @@ def run_pysr(config):
         print(f"An error occurred while trying to delete the backup files: {e}")
 
     print(f"Saved to path: {config['equation_file']}")
+    print(f'Finished running pysr with pysr_version {config["id"]}')
 
 
 def parse_args():
@@ -400,17 +402,17 @@ def parse_args():
     parser.add_argument('--no_log', action='store_true', default=False, help='disable wandb logging')
     parser.add_argument('--version', type=int, help='')
 
-    parser.add_argument('--time_in_hours', type=float, default=1)
+    parser.add_argument('--time_in_hours', type=float, default=8)
     parser.add_argument('--niterations', type=float, default=500000) # by default, use time in hours as limit
     parser.add_argument('--max_size', type=int, default=30)
     parser.add_argument('--seed', type=int, default=0)
-    parser.add_argument('--target', type=str, default='f2_direct', choices=['f1', 'f2', 'f2_ifthen', 'f2_direct', 'f2_2', 'equation_bounds'])
+    parser.add_argument('--target', type=str, default='f2', choices=['f1', 'f2', 'f2_ifthen', 'f2_direct', 'f2_2', 'equation_bounds'])
     parser.add_argument('--residual', action='store_true', help='do residual training of your target')
     parser.add_argument('--n', type=int, default=10000, help='number of data points for the SR problem')
     parser.add_argument('--batch_size', type=int, default=1000, help='number of data points for the SR problem')
     parser.add_argument('--sr_residual', action='store_true', help='do residual training of your target with previous sr run as base')
     parser.add_argument('--loss_fn', type=str, choices=['mse', 'll', 'perceptron', 'clipped'], default='mse')
-    parser.add_argument('--previous_sr_path', type=str, default='sr_results/92985.pkl')
+    parser.add_argument('--previous_sr_path', type=str, default='sr_results/92985.pkl', help='path to previous sr run, used for residual/recursive training')
 
     parser.add_argument('--eq_bound_mse_threshold', type=float, default=1, help='mse threshold below which to consider an equation good')
 
