@@ -12,8 +12,8 @@ class FeatureClassifier():
 
     def check_errors(self, sim):
         if sim.N_real < 4:
-            raise AttributeError("SPOCK Error: SPOCK only applicable to systems with 3 or more planets") 
-        
+            raise AttributeError("SPOCK Error: SPOCK only applicable to systems with 3 or more planets")
+
     def predict_stable(self, sim):
         """
         Predict whether passed simulation will be stable over 10^9 orbits of the innermost planet.
@@ -24,20 +24,20 @@ class FeatureClassifier():
 
         Returns:
 
-        float:  Estimated probability of stability. Will return exactly zero if configuration goes 
+        float:  Estimated probability of stability. Will return exactly zero if configuration goes
                 unstable within first 10^4 orbits.
 
         """
         triofeatures, stable = self.generate_features(sim)
         if stable == False:
             return 0
-       
+
         trioprobs = self.predict_from_features(triofeatures)
         return trioprobs.min()          # minimum prob among all trios tested
 
     def generate_features(self, sim):
         """
-        Generates the set of summary features used by the feature classifier for prediction. 
+        Generates the set of summary features used by the feature classifier for prediction.
 
         Parameters:
 
@@ -47,19 +47,19 @@ class FeatureClassifier():
 
         List of OrderedDicts:   A list of sets of features for each adjacent trio of planets in system.
                                 Each set of features is an ordered dictionary of 10 summary features. See paper.
-       
-        stable (int):           An integer for whether the N-body integration survived the 10^4 orbits (1) or 
+
+        stable (int):           An integer for whether the N-body integration survived the 10^4 orbits (1) or
                                 went unstable (0).
         """
         sim = sim.copy()
         init_sim_parameters(sim)
         self.check_errors(sim)
-        
-        trios = [[i,i+1,i+2] for i in range(1,sim.N_real-2)] # list of adjacent trios   
+
+        trios = [[i,i+1,i+2] for i in range(1,sim.N_real-2)] # list of adjacent trios
         featureargs = [10000, 80, trios]
         triofeatures, stable = features(sim, featureargs)    # stable will be 0 if an orbit is hyperbolic
                                                              # sim.dt = nan in init_sim_parameters
-        
+
         return triofeatures, stable
 
     def predict_from_features(self, triofeatures):

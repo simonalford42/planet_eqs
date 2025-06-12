@@ -6,7 +6,6 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 import torch
 import numpy as np
 import sys
-from parse_args import parse
 import utils
 import os
 
@@ -53,6 +52,7 @@ def parse():
     parser.add_argument('--deterministic_summary_stats', action='store_true', help='deterministic summary stats')
     parser.add_argument('--nn_pred_std', action='store_true')
     parser.add_argument('--disable_grad', action='store_true')
+    parser.add_argument('--max_pred', type=float, default=12.0, help='max inst time NN can predict, default is 12')
 
     ########## architecture variant args ##########
     parser.add_argument('--f1_variant', type=str, default='linear',

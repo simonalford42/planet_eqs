@@ -1120,6 +1120,8 @@ class VarModel(pl.LightningModule):
     def predict_instability(self, summary_stats):
         testy = self.regress_nn(summary_stats)
 
+        max_pred = self.hparams['max_pred'] if 'max_pred' in self.hparams else 12.0
+
         if type(self.regress_nn) in [modules.MaskedLinear]:
             # no clamp
             mu = testy[:, [0]]
@@ -1127,10 +1129,11 @@ class VarModel(pl.LightningModule):
         if type(self.regress_nn) in [modules.PySRNet, modules.PySREQBoundsNet, modules.DirectPySRNet]:
             mu = testy[:, [0]]
             std = testy[:, [1]]
-            mu = hard_clamp(mu, 4.0, 12.0)
+
+            mu = hard_clamp(mu, 4.0, max_pred)
             std = hard_clamp(std, self.lowest, 6.0)
         else:
-            mu = soft_clamp(testy[:, [0]], 4.0, 12.0)
+            mu = soft_clamp(testy[:, [0]], 4.0, max_pred)
             std = soft_clamp(testy[:, [1]], self.lowest, 6.0)
 
         return mu, std

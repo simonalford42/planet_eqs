@@ -13,8 +13,6 @@ from torch.nn import Parameter
 from torch.autograd import Variable
 from torch.functional import F
 
-from icecream import ic
-
 import glob
 import seaborn as sns
 from matplotlib import pyplot as plt
@@ -212,7 +210,6 @@ class NonSwagFeatureRegressor():
         else:
             trios = [[i,i+1,i+2] for i in range(1,sim.N_real-2)] # list of adjacent trios
 
-        ic(trios)
         kwargs = OrderedDict()
         kwargs['Norbits'] = int(1e4)
         kwargs['Nout'] = 1000
@@ -359,7 +356,6 @@ class FeatureRegressor(object):
         else:
             trios = [[i,i+1,i+2] for i in range(1,sim.N_real-2)] # list of adjacent trios
 
-        ic(trios)
         kwargs = OrderedDict()
         kwargs['Norbits'] = int(1e4)
         kwargs['Nout'] = 1000
