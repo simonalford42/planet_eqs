@@ -60,7 +60,7 @@ def get_args():
     print(utils2.get_script_execution_command())
     parser = argparse.ArgumentParser()
     parser.add_argument('--N', type=int, default=50)
-    parser.add_argument('--samples', type=int, default=100)
+    parser.add_argument('--samples', type=int, default=1) # don't need samples since our model is basically deterministic
     parser.add_argument('--version', '-v', type=int, default=24880)
 
     parser.add_argument('--paper-ready', '-p', action='store_true')
@@ -77,7 +77,6 @@ def get_args():
 
     if args.paper_ready:
         args.N = 5000
-        args.samples = 10000
 
     return args
 

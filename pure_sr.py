@@ -242,7 +242,7 @@ def option(*param_decls, **attrs):
 @option("--parsimony", type=float, default=0.01)
 @option("--maxsize", type=int, default=50)
 @option("--no-log", default=False)
-@option("--time-in-hours", type=float, default=240)
+@option("--time-in-hours", type=float, default=8)
 @option("--heap-size-hint-in-bytes", type=int, default=300_000_000)
 @option("--n", type=int, default=1000)
 @option(
