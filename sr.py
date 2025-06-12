@@ -150,9 +150,14 @@ def load_inputs_and_targets(config):
         X = out_dict['summary_stats']  # [B, 40]
         # outputs are the (mean, std) predictions of the nn
         y = out_dict['prediction']  # [B, 2]
+        y = y[:, 0:1]  # stop predicting std too haha
+
+        if config['elementwise_loss'] == LL_LOSS:
+            # clip targets to be <= 9 so classification loss works properly
+            y = torch.clamp(y, max=9)
 
         in_dim = model.summary_dim
-        out_dim = 2
+        out_dim = 1
 
         n = X.shape[1] // 2
         variable_names = [f'm{i}' for i in range(n)] + [f's{i}' for i in range(n)]
@@ -321,10 +326,9 @@ def get_config(args):
         procs=num_cpus,
         populations=3*num_cpus,
         batching=True,
-        # cluster_manager='slurm',
+        batch_size=args.batch_size,
         equation_file=path,
         niterations=args.niterations,
-        # multithreading=False,
         binary_operators=["+", "*", '/', '-', '^'],
         # unary_operators=['sin'],
         maxsize=args.max_size,
@@ -338,7 +342,6 @@ def get_config(args):
     )
 
     if args.loss_fn == 'll':
-        assert args.target == 'f2_direct', 'log likelihood loss only useful for f2_direct'
         pysr_config['elementwise_loss'] = LL_LOSS
     elif args.loss_fn == 'clipped':
         pysr_config['elementwise_loss'] = CLIPPED_LOSS

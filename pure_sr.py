@@ -10,8 +10,9 @@ import random
 import spock_reg_model
 import torch
 import einops
+from sr import LL_LOSS
 
-def special_loss(T):
+def ll_loss_with_f1(T):
     s = """
         function my_loss(tree, dataset::Dataset{T,L}, options)::L where {T,L}
             if tree.degree != 2
@@ -113,7 +114,7 @@ def special_loss(T):
     return s.replace("NUM_TIMES", str(T))
 
 
-def mse_loss(T):
+def mse_loss_with_f1(T):
     s = """
         function my_loss(tree, dataset::Dataset{T,L}, options)::L where {T,L}
             if tree.degree != 2
@@ -184,8 +185,7 @@ def mse_loss(T):
     return s.replace("NUM_TIMES", str(T))
 
 
-
-def load_data(n):
+def load_data(n, use_prior=False):
     # use input data that's the same as the neural network (already normalized, etc)
     # this makes it easier to evaluate and compare to my other approaches
     model = spock_reg_model.load(24880)
@@ -219,7 +219,6 @@ def load_data(n):
     yflat = einops.repeat(y, "B  -> (B T)", T=X.shape[1])
 
     Xflat, yflat = Xflat.cpu().detach().numpy(), yflat.cpu().detach().numpy()
-
     return X, Xflat, yflat
 
 
@@ -228,93 +227,50 @@ def option(*param_decls, **attrs):
     return click.option(*param_decls, **attrs)
 
 @click.command()
-@option("--procs", type=int, default=1)
 @option("--niterations", type=int, default=100000)
-@option("--populations", type=int, default=1)
-@option("--population-size", type=int, default=33)
-@option("--ncycles-per-iteration", type=int, default=550)
-@option("--distributed/--no-distributed", default=True)
-@option("--multithreading/--no-multithreading", default=False)
-@option("--weight-optimize", type=float, default=0.001)
 @option("--seed", type=int, default=0)
-# choices = ['mse', 'special']
-@option("--loss_fn", type=str, default='mse')
-@option("--parsimony", type=float, default=0.01)
-@option("--maxsize", type=int, default=50)
-@option("--no-log", default=False)
+@option("--loss_fn", type=click.Choice(['mse', 'll']))
+@option("--maxsize", type=int, default=60)
+@option("--batch-size", type=int, default=1000)
+@option("--n", type=int, default=10000)
+@option("--log/--no-log", default=True)
 @option("--time-in-hours", type=float, default=8)
-@option("--heap-size-hint-in-bytes", type=int, default=300_000_000)
-@option("--n", type=int, default=1000)
-@option(
-    "--binary-operators",
-    type=str,
-    default="+;*;/;^",
-    help="List of binary operators to use.",
-)
-@option(
-    "--unary-operators",
-    type=str,
-    default="sin",
-    help="List of unary operators to use.",
-)
+@option("--use-prior/--no-use-prior", default=False)
+@option("--f1/--no-f1", default=True)
 def main(
-    procs,
     niterations,
-    populations,
-    population_size,
-    ncycles_per_iteration,
-    distributed,
-    multithreading,
-    weight_optimize,
     maxsize,
-    heap_size_hint_in_bytes,
-    parsimony,
-    binary_operators,
-    unary_operators,
-    no_log,
+    batch_size,
+    log,
     time_in_hours,
     n,
     seed,
     loss_fn,
+    use_prior,
+    f1,
 ):
 
-    # split into lists
-    unary_operators = unary_operators.split(';')
-    binary_operators = binary_operators.split(';')
+    X, Xflat, yflat = load_data(n, use_prior=use_prior)
 
-    X, Xflat, yflat = load_data(n)
-
-    if loss_fn == 'mse':
-        loss_f = mse_loss
+    if f1:
+        loss_f = mse_loss_with_f1 if loss_fn == 'mse' else ll_loss_with_f1
+        jl.seval(loss_f(X.shape[1]))
+        kwargs = {'loss_function': 'my_loss'}
     else:
-        assert loss_fn == 'special', "loss_fn must be 'mse' or 'special'"
-        loss_f = special_loss
-
-    jl.seval(
-        loss_f(X.shape[1]),
-    )
-
-    # default_nested = {op: 1 for op in unary_operators}
-    # default_interactions = {
-    #     "cos": {**default_nested, "cos": 0},
-    #     "sqrt": {**default_nested, "sqrt": 0, "cbrt": 0},
-    #     "cbrt": {**default_nested, "cbrt": 0, "sqrt": 0},
-    #     "square": {**default_nested, "square": 1, "cube": 1},
-    #     "cube": {**default_nested, "cube": 1, "square": 1},
-    #     "exp": {**default_nested, "exp": 0, "log": 0},
-    #     "log": {**default_nested, "log": 0, "exp": 0, "cos": 0, "cbrt": 0},
-    # }
-    # nested_constraints = {}
-    # for op in unary_operators:
-    #     nested_constraints[op] = {
-    #         nest_op: nestedness
-    #         for nest_op, nestedness in default_interactions[op].items()
-    #         if nest_op in unary_operators
-    #     }
+        if loss_fn == 'll':
+            kwargs = {'elementwise_loss': LL_LOSS}
+        else:
+            # mse is default
+            kwargs = {}
 
     id = random.randint(0, 100000)
     while os.path.exists(f'sr_results/{id}.pkl'):
         id = random.randint(0, 100000)
+
+    try:
+        num_cpus = int(os.environ.get('SLURM_CPUS_ON_NODE')) * int(os.environ.get('SLURM_JOB_NUM_NODES'))
+    except TypeError:
+        num_cpus = 10
 
     config = {
         'equation_file': f'sr_results/{id}.csv',
@@ -324,40 +280,40 @@ def main(
         'slurm_name': os.environ.get('SLURM_JOB_NAME', None),
         'time_in_hours': time_in_hours,
         'loss_fn': loss_fn,
+        'seed': seed,
     }
 
     try:
-        if not no_log:
+        if log:
             wandb.init(
                 entity='bnn-chaos-model',
                 project='planets-sr',
                 config=config,
             )
 
+        if f1:
+            kwargs = {'loss_function': 'my_loss'}
+        elif loss_fn == 'special':
+            kwargs = {'elementwise_loss': LL_LOSS}
+
         model = PySRRegressor(
+            procs=num_cpus,
+            populations=3*num_cpus,
+            batching=True,
+            batch_size=batch_size,
             equation_file=config['equation_file'],
             niterations=niterations,
-            populations=populations,
-            population_size=population_size,
-            ncycles_per_iteration=ncycles_per_iteration,
-            procs=procs,
-            multithreading=multithreading,
-            # cluster_manager="slurm" if distributed else None,
-            binary_operators=binary_operators,
-            unary_operators=unary_operators,
+            binary_operators=["+", "*", '/', '-', '^'],
+            # unary_operators=['sin'],
             maxsize=maxsize,
-            weight_optimize=weight_optimize,
-            parsimony=parsimony,
-            adaptive_parsimony_scaling=1000.0,
-            # turbo=False,
-            # bumper=False,
-            # nested_constraints=nested_constraints,
-            constraints={'^': (-1, 1)},
-            nested_constraints={"sin": {"sin": 0}},
-            random_state=seed,
-            loss_function="my_loss",
-            heap_size_hint_in_bytes=heap_size_hint_in_bytes,
             timeout_in_seconds=int(60*60*time_in_hours),
+            constraints={'^': (-1, 1)},
+            # prevent ^ from using complex exponents, nesting power laws is expressive but uninterpretable
+            # base can have any complexity, exponent can have max 1 complexity
+            # nested_constraints={"sin": {"sin": 0}},
+            ncycles_per_iteration=1000,
+            random_state=seed,
+            **kwargs,
         )
 
         labels = pkl.load(open("./data/combined.pkl", "rb"))["labels"]
@@ -368,7 +324,7 @@ def main(
         model.fit(Xflat, yflat, variable_names=clean_variables)
 
         losses = [min(eqs['loss']) for eqs in model.equation_file_contents_]
-        if not no_log:
+        if log:
             wandb.log({'avg_loss': sum(losses)/len(losses),
                        'losses': losses,
                        })

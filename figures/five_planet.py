@@ -37,7 +37,7 @@ from tseries_feature_functions import get_extended_tseries
 from pure_sr_evaluation import pure_sr_predict_fn
 from modules import PureSRNet
 
-from five_planet_plot import make_plot, make_plot_separate, make_plot2
+from five_planet_plot import make_plot, make_plot_separate, make_main_plot
 
 import warnings
 warnings.filterwarnings("default", category=UserWarning)
@@ -493,28 +493,27 @@ for i in range(len(outs)):
         cleaned['ll'].append(4.)
         cleaned['uu'].append(4.)
 
-    if bnn_model:
-        if log_t_exit[i] <= 4.0:
-            cleaned['bnn_average'].append(log_t_exit[i])
-            cleaned['bnn_median'].append(log_t_exit[i])
-            cleaned['bnn_l'].append(log_t_exit[i])
-            cleaned['bnn_u'].append(log_t_exit[i])
-            cleaned['bnn_ll'].append(log_t_exit[i])
-            cleaned['bnn_uu'].append(log_t_exit[i])
-        elif bnn_outs[i] is not None:
-            cleaned['bnn_average'].append(np.average(bnn_outs[i]))
-            cleaned['bnn_median'].append(np.median(bnn_outs[i]))
-            cleaned['bnn_l'].append(np.percentile(bnn_outs[i], 50+68/2))
-            cleaned['bnn_u'].append(np.percentile(bnn_outs[i], 50-68/2))
-            cleaned['bnn_ll'].append(np.percentile(bnn_outs[i], 50+95/2))
-            cleaned['bnn_uu'].append(np.percentile(bnn_outs[i], 50-95/2))
-        else:
-            cleaned['bnn_average'].append(4.)
-            cleaned['bnn_median'].append(4.)
-            cleaned['bnn_l'].append(4.)
-            cleaned['bnn_u'].append(4.)
-            cleaned['bnn_ll'].append(4.)
-            cleaned['bnn_uu'].append(4.)
+    if log_t_exit[i] <= 4.0:
+        cleaned['bnn_average'].append(log_t_exit[i])
+        cleaned['bnn_median'].append(log_t_exit[i])
+        cleaned['bnn_l'].append(log_t_exit[i])
+        cleaned['bnn_u'].append(log_t_exit[i])
+        cleaned['bnn_ll'].append(log_t_exit[i])
+        cleaned['bnn_uu'].append(log_t_exit[i])
+    elif bnn_outs[i] is not None:
+        cleaned['bnn_average'].append(np.average(bnn_outs[i]))
+        cleaned['bnn_median'].append(np.median(bnn_outs[i]))
+        cleaned['bnn_l'].append(np.percentile(bnn_outs[i], 50+68/2))
+        cleaned['bnn_u'].append(np.percentile(bnn_outs[i], 50-68/2))
+        cleaned['bnn_ll'].append(np.percentile(bnn_outs[i], 50+95/2))
+        cleaned['bnn_uu'].append(np.percentile(bnn_outs[i], 50-95/2))
+    else:
+        cleaned['bnn_average'].append(4.)
+        cleaned['bnn_median'].append(4.)
+        cleaned['bnn_l'].append(4.)
+        cleaned['bnn_u'].append(4.)
+        cleaned['bnn_ll'].append(4.)
+        cleaned['bnn_uu'].append(4.)
 
 cleaned = pd.DataFrame(cleaned)
 
@@ -589,6 +588,6 @@ print('saved data to', filename)
 path += '.png'
 
 # make_plot_separate(cleaned, path=path)
-make_plot2(cleaned, path=path)
+make_main_plot(cleaned, path=path)
 
 print('made plot')

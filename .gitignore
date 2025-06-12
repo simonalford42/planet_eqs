@@ -17,5 +17,5 @@ pickles/
 graphics/
 # ignore everything in results
 results/**
-# but include a few models we want to upload
+# but include a few models we want to upload, results, etc
 !results/24880_0/

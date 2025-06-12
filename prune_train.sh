@@ -16,7 +16,7 @@
 #SBATCH --partition=ellis
 
 source /home/sca63/mambaforge/etc/profile.d/conda.sh
-conda activate bnn_chaos_model
+conda activate new_bnn
 
 # Enable errexit (exit on error)
 set -e
