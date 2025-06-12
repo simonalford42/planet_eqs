@@ -12,7 +12,7 @@
  # total limit (hh:mm:ss)
 #SBATCH -t 48:00:00
 #SBATCH --mem=50G
-# #SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:1
 # #SBATCH --partition=ellis
 
 source /home/sca63/mambaforge/etc/profile.d/conda.sh
@@ -21,6 +21,6 @@ source /home/sca63/mambaforge/etc/profile.d/conda.sh
 set -e
 
 # conda activate bnn_period
-# conda activate bnn_chaos_model
-conda activate bnn_new_pysr
+conda activate bnn_chaos_model
+# conda activate bnn_new_pysr
 python "$@"

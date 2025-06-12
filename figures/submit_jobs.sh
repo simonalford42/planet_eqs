@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+
+# sbatch -J nn_extra --partition ellis run.sh five_planet.py --extrapolate --turbo --N 5000 --version 24880
+# sbatch -J extra29 --partition ellis run.sh five_planet.py --extrapolate --turbo --N 5000 --version 24880 --pysr_version 11003 --pysr_model_selection 29
+# sbatch -J extra26 --partition ellis run.sh five_planet.py --extrapolate --turbo --N 5000 --version 24880 --pysr_version 11003 --pysr_model_selection 26
+
 # sbatch -J f1id_5p2 --partition ellis five_planet.sh --extrapolate --turbo --N 200 --version 28114 --pysr_version 9054 --pysr_model_selection 27
 # sbatch -J f1id_5p --partition ellis five_planet.sh --extrapolate --turbo --N 5000 --version 28114 --pysr_version 9054 --pysr_model_selection 27
 # sbatch -J pure5p2 --partition ellis five_planet.sh --extrapolate --turbo --N 200 --pysr_version 83941 --pure_sr

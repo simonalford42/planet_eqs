@@ -319,12 +319,11 @@ def get_config(args):
         procs=num_cpus,
         populations=3*num_cpus,
         batching=True,
-        # cluster_manager='slurm',
+        batch_size=args.batch_size,
         equation_file=path,
         niterations=args.niterations,
-        # multithreading=False,
         binary_operators=["+", "*", '/', '-', '^'],
-        # unary_operators=['sin'],  # removed "log"
+        # unary_operators=['sin'],
         maxsize=args.max_size,
         timeout_in_seconds=int(60*60*args.time_in_hours),
         # prevent ^ from using complex exponents, nesting power laws is expressive but uninterpretable
@@ -364,6 +363,7 @@ def run_pysr(config):
     print(command)
 
     X, y, variable_names = load_inputs_and_targets(config)
+    import pdb; pdb.set_trace()
 
     model = pysr.PySRRegressor(**config['pysr_config'])
 
@@ -391,36 +391,6 @@ def run_pysr(config):
         print(f"An error occurred while trying to delete the backup files: {e}")
 
     print(f"Saved to path: {config['equation_file']}")
-
-
-def plot_pareto(path):
-    results = pickle.load(open(path, 'rb'))
-    results = results.equations_[0]
-    x = results['complexity']
-    y = results['loss']
-    # plot the pareto frontier
-    plt.scatter(x, y)
-    plt.xlabel('complexity')
-    plt.ylabel('loss')
-    plt.title('pareto frontier for' + path)
-    # save the plot
-    plt.savefig('pareto.png')
-
-
-def run():
-    config = {
-        'version': 24880,
-        'previous_sr_path': 'sr_results/11003.pkl',
-        'sr_residual': False,
-        'residual': False,
-        'target': 'equation_bounds',
-        'eq_bound_mse_threshold': 5,
-        'n': 1000,
-    }
-    results_path = f'sr_results/33936.pkl'
-    reg = pickle.load(open(results_path, 'rb'))
-    X, y, _ = load_inputs_and_targets(config)
-    return X, y, reg
 
 
 def parse_args():

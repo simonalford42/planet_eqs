@@ -465,7 +465,7 @@ if __name__ == '__main__':
 
     # csv_path = f'cur_plot_datasets/{path}_{time}.csv'
     # path = 'new_petit'
-    csv_path = 'cur_plot_datasets/five_planet_figures/five_planet2_v24880_pysr11003_ms=29_N=5000_samps=10000_turbo_1739990742.5953946.csv'
+    csv_path = 'cur_plot_datasets/five_planet_figures/five_planet2_v24880_pysr11003_ms=29_N=5000_turbo_extrapolate_1749663354.199567.csv'
     cleaned = pd.read_csv(csv_path)
     make_plot2(cleaned, path='five_planet_figures/five_planet_main.pdf')
 

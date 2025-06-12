@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 
+
+# June 11 2025
+# sbatch -J dir_np sr.sh pure_sr.py --time-in-hours 0.1 --no-log --use-prior
+sbatch -J t13 --partition gpu prune_train.sh --max_pred 13
+sbatch -J t14 --partition gpu prune_train.sh --max_pred 14
+sbatch -J t15 --partition gpu prune_train.sh --max_pred 15
+
 # May 22 2025
 # sbatch -J f1id_45 --partition gpu -t 01:00:00 run.sh calc_rmse.py --version 28114 --pysr_version 93890 --eval_type pysr --dataset all
 # sbatch -J f1id_60 --partition gpu -t 01:00:00 run.sh calc_rmse.py --version 28114 --pysr_version 50620 --eval_type pysr --dataset all
