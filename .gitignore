@@ -14,7 +14,7 @@ models
 *.pt
 *.npy
 pickles/
-graphics/
+graphics
 # ignore everything in results
 results/**
 # but include a few models we want to upload, results, etc
