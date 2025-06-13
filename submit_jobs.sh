@@ -5,9 +5,14 @@
 # sbatch -J class_dir --partition gpu sr.sh sr.py --time_in_hours 8 --version 24880 --target f2_direct --loss_fn ll --max_size 45 --seed 5
 # sbatch -J class_nn2 --partition gpu sr.sh sr.py --time_in_hours 8 --version 24880 --target f2 --loss_fn ll --max_size 45 --seed 5
 # sbatch -J sr15 --partition gpu sr.sh sr.py --time_in_hours 8 --version 76432 --target f2 --max_size 45 --seed 5
-
 # sbatch -J sr14 --partition gpu sr.sh sr.py --time_in_hours 8 --version 24880 --target f2 --max_size 45 --seed 5
 # sbatch -J sr13 --partition gpu sr.sh sr.py --time_in_hours 8 --version 24880 --target f2 --max_size 45 --seed 5
+sbatch -J f2_1 --partition gpu f2_prune_train.sh --prune_f2_topk 1
+sbatch -J f2_2 --partition gpu f2_prune_train.sh --prune_f2_topk 2
+sbatch -J f2_5 --partition gpu f2_prune_train.sh --prune_f2_topk 5
+sbatch -J f2_10 --partition gpu f2_prune_train.sh --prune_f2_topk 10
+sbatch -J f2_15 --partition gpu f2_prune_train.sh --prune_f2_topk 15
+sbatch -J f2_20 --partition gpu f2_prune_train.sh --prune_f2_topk 20
 
 # June 11 2025
 # sbatch -J t13_2 --partition ellis prune_train.sh --max_pred 13

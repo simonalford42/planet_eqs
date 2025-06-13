@@ -233,6 +233,7 @@ def option(*param_decls, **attrs):
 @option("--maxsize", type=int, default=60)
 @option("--batch-size", type=int, default=1000)
 @option("--n", type=int, default=10000)
+@option("--version", type=int, default=None)
 @option("--log/--no-log", default=True)
 @option("--time-in-hours", type=float, default=8)
 @option("--use-prior/--no-use-prior", default=False)
@@ -248,6 +249,7 @@ def main(
     loss_fn,
     use_prior,
     f1,
+    version,
 ):
 
     X, Xflat, yflat = load_data(n, use_prior=use_prior)
@@ -263,9 +265,10 @@ def main(
             # mse is default
             kwargs = {}
 
-    id = random.randint(0, 100000)
-    while os.path.exists(f'sr_results/{id}.pkl'):
-        id = random.randint(0, 100000)
+    if version is None:
+        version = random.randint(0, 100000)
+        while os.path.exists(f'sr_results/{version}.pkl'):
+            version = random.randint(0, 100000)
 
     try:
         num_cpus = int(os.environ.get('SLURM_CPUS_ON_NODE')) * int(os.environ.get('SLURM_JOB_NUM_NODES'))
@@ -273,8 +276,8 @@ def main(
         num_cpus = 10
 
     config = {
-        'equation_file': f'sr_results/{id}.csv',
-        'id': id,
+        'equation_file': f'sr_results/{version}.csv',
+        'version': version,
         'pure_sr': True,
         'slurm_id': os.environ.get('SLURM_JOB_ID', None),
         'slurm_name': os.environ.get('SLURM_JOB_NAME', None),
