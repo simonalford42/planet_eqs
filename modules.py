@@ -166,11 +166,12 @@ class PureSRNet(nn.Module):
         pure_sr_predict = pure_sr_predict_fn(results, model_selection)
         return cls(pure_sr_predict)
 
+    # need noisy val so that we can replace spock reg model
     def forward(self, x, noisy_val=None):
         x_np = x.detach().cpu().numpy()
         out = self.pure_sr_predict_fn(x_np)
         # clamp out betweewn 4 and 12
-        out = np.clip(out, 4.0, 12.0)
+        # out = np.clip(out, 4.0, 12.0)
         out = torch.tensor(out[:, None], device=x.device)
         return out
 

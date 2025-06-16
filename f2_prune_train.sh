@@ -27,4 +27,4 @@ version=$(python versions.py)
 python -u find_minima.py --version $version --total_steps 150000 --f2_variant linear --load_f1 24880 --freeze_f1 --l1_reg f2_weights --l1_coeff 2
 version2=$(python versions.py)
 # now apply prune and fine tune f2
-python -u find_minima.py --version $version2 --total_steps 150000 --f2_variant linear --load_f1_f2 $version
+python -u find_minima.py --version $version2 --total_steps 150000 --f2_variant linear --load_f1_f2 $version --prune_f2_topk 10 "$@"

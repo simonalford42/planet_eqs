@@ -47,17 +47,18 @@ p period_ratio_figure.py --Ngrid 300 --pure_sr --pysr_version 4 --pysr_model_sel
 # topk comparisons
 for k in {3..5} do
     python -u find_minima.py --version $(10+k) --total_steps 150000 --l1_reg weights --l1_coeff 2
-    python -u find_minima.py --version k --total_steps 150000 --load_f1_f2 $(10+k) --prune_f1_topk $k
+    python -u find_minima.py --version $k --total_steps 150000 --load_f1_f2 $(10+k) --prune_f1_topk $k
+    python sr.py --nn_version $k --version $(10+k)
+    python calc_rmse.py --version $k --pysr_version $(10+k) --eval_type pysr --dataset all
 end
 
 # f2 linear models
 for k in (0 2 5 10 20) do
-    version=$(python versions.py)
-    python -u find_minima.py --version $version --total_steps 150000 --f2_variant linear --load_f1 24880 --freeze_f1 --l1_reg f2_weights --l1_coeff 2
-    version2=$(python versions.py)
-    python -u find_minima.py --version $version2 --total_steps 150000 --f2_variant linear --load_f1_f2 $version --prune_f2_topk $k
+    python -u find_minima.py --version $(100+k) --total_steps 150000 --f2_variant linear --load_f1 24880 --freeze_f1 --l1_reg f2_weights --l1_coeff 2
+    python -u find_minima.py --version $(200+k) --total_steps 150000 --f2_variant linear --load_f1_f2 $(100+k) --prune_f2_topk $k
+    python calc_rmse.py --version $(200+k) --eval_type nn --dataset all
 end
 
-# then run topk_plots.ipynb to make the last two plots.
-
+# plot the pareto comparisons
+python ablations.py --version_json ablation_versions2.json --path graphics/pareto_comparison.pdf
 

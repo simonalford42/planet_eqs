@@ -1081,6 +1081,19 @@ def calculate_rmse(args):
     with open('period_ratio_rmse.pkl', 'wb') as f:
         pickle.dump(rmse_dict, f)
 
+
+
+def get_citation():
+    sim = rebound.Simulation()
+    sim.integrator = "whfast"
+    sim.ri_whfast.safe_mode = 0
+    sim.add(m=1.) # Star
+    sim.add(m=1e-4, P=1, theta='uniform')
+    sim.add(m=1e-4, P=1/0.75, theta='uniform')
+    sim.add(m=1e-4, P=1/0.75/0.75, theta='uniform')
+    sim.cite()
+
+
 def get_args():
     print(utils2.get_script_execution_command())
     parser = argparse.ArgumentParser()
@@ -1156,17 +1169,6 @@ def get_args():
             args.pysr_model_selection = 26
 
     return args
-
-
-def get_citation():
-    sim = rebound.Simulation()
-    sim.integrator = "whfast"
-    sim.ri_whfast.safe_mode = 0
-    sim.add(m=1.) # Star
-    sim.add(m=1e-4, P=1, theta='uniform')
-    sim.add(m=1e-4, P=1/0.75, theta='uniform')
-    sim.add(m=1e-4, P=1/0.75/0.75, theta='uniform')
-    sim.cite()
 
 
 if __name__ == '__main__':

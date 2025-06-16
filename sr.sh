@@ -15,7 +15,6 @@
 #SBATCH --partition=ellis
 
 source /home/sca63/mambaforge/etc/profile.d/conda.sh
-# conda activate bnn_chaos_model
-conda activate bnn_new_pysr
+conda activate new_bnn
 
 python -u "$@"

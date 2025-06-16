@@ -277,7 +277,7 @@ def main(
 
     config = {
         'equation_file': f'sr_results/{version}.csv',
-        'version': version,
+        ' version': version,
         'pure_sr': True,
         'slurm_id': os.environ.get('SLURM_JOB_ID', None),
         'slurm_name': os.environ.get('SLURM_JOB_NAME', None),

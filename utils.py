@@ -6,12 +6,19 @@ import uuid
 import pickle
 import itertools
 import sys
+import json
 
 import matplotlib.pyplot as plt
 
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 WARNINGS = set()
+
+
+def load_json(path):
+    with open(path, 'r') as f:
+        data = json.load(f)
+    return data
 
 
 def freeze_module(model: torch.nn.Module):
