@@ -10,7 +10,7 @@ python sr.py --nn_version 2 --version 3
 # run pure sr (w/ or w/o psi)
 # we ran with 32 cores for 8 hours
 python pure_sr.py --f1 --version 4
-python pure_sr.py --no-f1 --version 5
+python pure_sr.py --no_f1 --version 5
 
 # calculate rmse scores for neural network
 python calc_rmse.py --version 2 --eval_type nn --dataset all
@@ -30,19 +30,21 @@ python calc_rmse.py --eval_type pure_sr --dataset all --pysr_version 5
 cd figures
 
 # calculate five planet results
-p five_planet.py --version 2 --pysr_version 3 --pysr_model_selection $sr_c --paper-ready --turbo --extrapolate
-p five_planet.py --pure_sr --pysr_version 4 --pysr_model_selection $puresr_c --paper-ready --turbo --extrapolate
-p five_planet.py --pure_sr --pysr_version 5 --pysr_model_selection $puresr2_c --paper-ready --turbo --extrapolate
+python five_planet.py --version 2 --pysr_version 3 --pysr_model_selection $sr_c --paper-ready --turbo --extrapolate
+python five_planet.py --pure_sr --pysr_version 4 --pysr_model_selection $puresr_c --paper-ready --turbo --extrapolate
+python five_planet.py --pure_sr --pysr_version 5 --pysr_model_selection $puresr2_c --paper-ready --turbo --extrapolate
 
 # calculate and plot period ratio results
-p period_ratio_figure.py --Ngrid 300 --version 2 --compute
-p period_ratio_figure.py --Ngrid 300 --version 2 --pysr_version 3 --compute
-p period_ratio_figure.py --Ngrid 300 --version 2 --pysr_version 3 --plot
-p period_ratio_figure.py --special 4way --Ngrid 300 --version 2 --pysr_version 3 --pysr_model_selection $sr_c
-p period_ratio_figure.py --Ngrid 300 --pure_sr --pysr_version 4 --pysr_model_selection $puresr_c --compute
-p period_ratio_figure.py --Ngrid 300 --pure_sr --pysr_version 4 --pysr_model_selection $puresr2_c --compute
-p period_ratio_figure.py --Ngrid 300 --pure_sr --pysr_version 4 --pysr_model_selection $puresr_c --plot
-p period_ratio_figure.py --Ngrid 300 --pure_sr --pysr_version 4 --pysr_model_selection $puresr2_c --plot
+python period_ratio_figure.py --Ngrid 300 --version 2 --compute
+python period_ratio_figure.py --Ngrid 300 --version 2 --pysr_version 3 --compute
+python period_ratio_figure.py --Ngrid 300 --version 2 --pysr_version 3 --plot
+python period_ratio_figure.py --special 4way --Ngrid 300 --version 2 --pysr_version 3 --pysr_model_selection $sr_c
+python period_ratio_figure.py --Ngrid 300 --pure_sr --pysr_version 4 --pysr_model_selection $puresr_c --compute
+python period_ratio_figure.py --Ngrid 300 --pure_sr --pysr_version 4 --pysr_model_selection $puresr2_c --compute
+python period_ratio_figure.py --Ngrid 300 --pure_sr --pysr_version 4 --pysr_model_selection $puresr_c --plot
+python period_ratio_figure.py --Ngrid 300 --pure_sr --pysr_version 4 --pysr_model_selection $puresr2_c --plot
+
+cd ..
 
 # topk comparisons
 for k in {3..5} do

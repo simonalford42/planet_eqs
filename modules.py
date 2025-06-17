@@ -9,7 +9,6 @@ import pickle
 import spock_reg_model
 import numpy as np
 import torch.nn.functional as F
-from pure_sr_evaluation import pure_sr_predict_fn
 
 
 def mlp(in_n, out_n, hidden, layers, act='relu'):
@@ -152,9 +151,9 @@ class DirectPySRNet(nn.Module):
 
 
 class PureSRNet(nn.Module):
-    def __init__(self, pure_sr_predict_fn):
+    def __init__(self, pure_sr_fn):
         super().__init__()
-        self.pure_sr_predict_fn = pure_sr_predict_fn
+        self.pure_sr_fn = pure_sr_fn
 
     @classmethod
     def from_path(cls, filepath, model_selection):
@@ -163,13 +162,14 @@ class PureSRNet(nn.Module):
         results = reg.equations_
         results.feature_names_in_ = reg.feature_names_in_
 
-        pure_sr_predict = pure_sr_predict_fn(results, model_selection)
-        return cls(pure_sr_predict)
+        from pure_sr_evaluation import pure_sr_predict_fn
+        pure_sr_fn = pure_sr_predict_fn(results, model_selection)
+        return cls(pure_sr_fn)
 
     # need noisy val so that we can replace spock reg model
     def forward(self, x, noisy_val=None):
         x_np = x.detach().cpu().numpy()
-        out = self.pure_sr_predict_fn(x_np)
+        out = self.pure_sr_fn(x_np)
         # clamp out betweewn 4 and 12
         # out = np.clip(out, 4.0, 12.0)
         out = torch.tensor(out[:, None], device=x.device)

@@ -9,6 +9,7 @@ SPLIT = 'test'
 def get_k_results(k_version_dict):
     k_results = {}
     for k, v in k_version_dict.items():
+        k = int(k)
         # load the original PySR table
         pysr_version = v['pysr_version']
         version = v['version']
@@ -40,7 +41,7 @@ def overall_complexity_f2_linear(n_features):
 
 def get_f2_linear_results(f2_linear_models):
     return {
-        overall_complexity_f2_linear(k): nn_test_rmse(v) for k, v in f2_linear_models.items()
+        overall_complexity_f2_linear(int(k)): nn_test_rmse(v) for k, v in f2_linear_models.items()
     }
 
 
@@ -120,6 +121,7 @@ def plot_combined_pareto(
 
     # --- Save & return ------------------------------------------------------
     fig.savefig(path, bbox_inches = "tight", dpi = 400)
+    print('Saved combined figure to', path)
     plt.close(fig)
     return fig, axs
 
@@ -137,6 +139,8 @@ def main():
     k_results = get_k_results(version_dict['k'])
     f2_linear_results = get_f2_linear_results(version_dict['f2_linear'])
     pure_sr_results = load_pickle(f'pickles/pure_sr_results_all_{version_dict["pure_sr_version"]}.pkl')[SPLIT]
+    # get rid of entries with rmse over 2.0, because they were probably invalid equations
+    pure_sr_results = {k: v for k, v in pure_sr_results.items() if v < 2.0}
     plot_combined_pareto(k_results, f2_linear_results, pure_sr_results, args.path)
 
 

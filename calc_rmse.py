@@ -6,16 +6,13 @@ import petit
 import pickle
 from pure_sr_evaluation import pure_sr_predict_fn, get_pure_sr_results
 from interpret import get_pysr_results
-from utils import assert_equal
+from utils import assert_equal, load_pickle
 from sklearn.preprocessing import StandardScaler
-from spock_reg_model import get_data
 import seaborn as sns
-
-
+from figures import period_ratio_figure
 from matplotlib import pyplot as plt
 # to fix the fonts?
 plt.rcParams.update(plt.rcParamsDefault)
-
 
 
 ###############################################################################
@@ -282,9 +279,14 @@ def save_pickle(data, filename):
     print(f'Saved {filename}')
 
 
-def calculate_all_results(args):
+def calculate_results(args):
+    if args.dataset != 'all':
+        rmse = calculate_rmse(args)
+        print(f'RMSE for {args.dataset} dataset: {rmse}')
+        return
+
     results = {}
-    datasets = [args.dataset] if args.dataset != 'all' else ['val', 'test', 'random']
+    datasets = ['val', 'test', 'random']
     for dataset in datasets:
         args.dataset = dataset
 
@@ -316,31 +318,6 @@ def calculate_all_results(args):
     save_pickle(results, filename)
 
 
-def calculate_k_results():
-    d = {
-        2:  {
-            'version': 24880,
-            'pysr_version': 11003,
-            'val_loss': 1.62794,
-        },
-        3:  {
-            'version': 74649,
-            'pysr_version': 83278,
-            'val_loss': 1.67736,
-        },
-        4:  {
-            'version': 11566,
-            'pysr_version': 51254,
-            'val_loss': 1.63825,
-        },
-        5:  {
-            'version': 72646,
-            'pysr_version': 55894,
-            'val_loss': 1.66181,
-        }
-    }
-
-
 def get_prediction_fn(args):
     if args.eval_type == 'petit':
         return petit.tsurv
@@ -361,7 +338,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--version', type=int, default=None)
     parser.add_argument('--pysr_version', type=int, default=None)
-    parser.add_argument('--dataset', type=str, default='val', choices=['train','val','test','random', 'all'])
+    parser.add_argument('--dataset', type=str, default='val', choices=['train','val','test', 'random', 'all'])
     parser.add_argument('--eval_type', type=str, default='pysr', choices=['pure_sr', 'pysr', 'nn', 'petit'])
     parser.add_argument('--pysr_model_selection', type=str, default='accuracy', help='"best", "accuracy", "score", or an integer of the pysr equation complexity.')
 
@@ -373,7 +350,8 @@ def get_args():
 
 if __name__ == '__main__':
     args = get_args()
-    calculate_all_results(args)
-    # comparison_figure(args)
-    # rmse = calculate_rmse(args)
-    # print('RMSE:', rmse)
+    args.eval_type = 'nn'
+    args.dataset = 'all'
+    for version in [91541, 22676, 44530, 38137, 42062]:
+        args.version = version
+        calculate_results(args)

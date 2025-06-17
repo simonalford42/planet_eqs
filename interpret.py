@@ -11,6 +11,7 @@ import matplotlib.ticker as ticker
 plt.rcParams["font.family"] = "serif"
 plt.rcParams['mathtext.fontset']='dejavuserif'
 import pandas as pd
+import argparse
 
 def best_result(all_results):
     # find complexity that gives best val error
@@ -546,8 +547,6 @@ def f2_latex_strings(results, important_complexities=None, mapping_dict=None):
     return {c: s for c, s in zip(important_complexities, latex_strs)}
 
 
-
-
 def plot_period_ratio_rmse():
     period_ratio_rmse = pickle.load(open('pickles/period_ratio_rmse.pkl', 'rb'))
     eqs = [int(s[2:]) for s in period_ratio_rmse.keys() if s[0:2] == 'eq']
@@ -562,3 +561,105 @@ def plot_period_ratio_rmse():
     plt.gca().xaxis.set_minor_locator(ticker.MultipleLocator(1))
     plt.show()
     return plt
+
+
+def make_pareto_plot(results, important_complexities=None, rmse=True, plot_unimportant=False):
+    plt.rcParams["font.family"] = "serif"
+    plt.figure(figsize=(8, 4.8))  # Width = 10 inches, Height = 6 inches
+    ax = plt.gca()
+
+    if plot_unimportant:
+        ax.scatter(results['complexity'], results['rmse' if rmse else 'loss'], s=12)
+
+    ax.set_xlabel('Equation complexity', fontsize=12, labelpad=10)
+
+    ax.set_ylabel('RMSE' if rmse else 'Loss', fontsize=12, labelpad=10)
+
+    if important_complexities:
+        important_ixs = get_important_ixs(results, important_complexities)
+        important_ys = [results['rmse' if rmse else 'loss'][i] for i in important_ixs]
+        ax.scatter(important_complexities, important_ys, color='red' if plot_unimportant else None, s=22)
+        ax.plot(important_complexities, important_ys, color='red' if plot_unimportant else None, label='Ours')
+
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+    ax.tick_params(axis='both', which='major', labelsize=10)
+    # add minor tick marks
+    ax.xaxis.set_minor_locator(ticker.MultipleLocator(1))
+    # Make minor ticks point outward
+    ax.tick_params(axis="x", which="minor", direction="out")
+
+    plt.ylim(1.25, 1.75)
+    return plt
+
+
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--version', type=int, default=24880)
+    parser.add_argument('--pysr_version', type=int, default=11003)
+    parser.add_argument('--mse_nn_version', type=int, default=12318)
+    parser.add_argument('--mse_pysr_version', type=int, default=93102)
+    parser.add_argument('--pure_sr_version', type=int, default=83941)
+    # parser.add_argument('--pure_sr2_version', type=int, default=28114)
+    args = parser.parse_args()
+    return args
+
+
+def official_stuff():
+    args = get_args()
+    feature_nn = get_feature_nn(args.version)
+    results = get_pysr_results(args.pysr_version, version=args.version, include_ssx=False, feature_nn=feature_nn)
+
+    test_results = load_pickle(f'pickles/pysr_results_all_{args.version}_{args.pysr_version}.pkl')
+    complexity, _ = min(test_results['val'].items(), key=lambda e: e[1])
+    test_error = test_results['test'][complexity]
+    random_error = test_results['random'][complexity]
+
+    print('Equation complexity with best error on validation set:', complexity)
+    print(f'Error for best equation on resonant test set: {test_error:.3f}, random: {random_error:.3f}')
+    print()
+
+    print('phi features latex string:\n')
+    f1_str = f1_latex_string(feature_nn, include_ssx=True, include_ssx_bias=True, pysr_results=results)
+    print(f1_str)
+    print()
+
+    print('psi table latex string:\n')
+    f2_str = f2_latex_str(results, mapping_dict=None)
+    print(f2_str)
+    print()
+
+    nn_results = load_pickle(f'pickles/nn_results_all_{args.mse_nn_version}.pkl')
+    petit_results = load_pickle('pickles/petit_results_all.pkl')
+    pure_sr_results = load_pickle(f'pickles/pure_sr_results_all_{args.pure_sr_version}.pkl')
+    # direct_sr_results = load_pickle(f'pickles/pysr_results_all_{28114_9054.pkl')
+    pysr_results = load_pickle(f'pickles/pysr_results_all_{args.version}_{args.mse_pysr_version}.pkl')
+
+    pysr_c, _ = min(pysr_results['val'].items(), key=lambda e: e[1])
+    pure_c, _ = min(pure_sr_results['val'].items(), key=lambda e: e[1])
+    # direct_c, _ = min(direct_sr_results['val'].items(), key=lambda e: e[1])
+
+    print()
+    print('Best equation complexity for ours:', pysr_c)
+    print('Best equation complexity for pure sr:', pure_c)
+    print()
+
+    # table for paper
+    print('Table of results:\n')
+    print(f'NN: resonant: {nn_results["test"]:.3f}, random {nn_results["random"]:.3f}')
+    print(f'Ours: resonant: {pysr_results["test"][pysr_c]:.3f}, random {pysr_results["random"][pysr_c]:.3f}')
+    print(f'Petit: resonant: {petit_results["test"]:.3f}, random {petit_results["random"]:.3f}')
+    # print(f'Direct SR: resonant: {direct_sr_results["test"][direct_c]:.3f}, random {direct_sr_results["random"][direct_c]:.3f}')
+    print(f'Pure SR: resonant: {pure_sr_results["test"][pure_c]:.3f}, random {pure_sr_results["random"][pure_c]:.3f}')
+
+    important_complexities = results['complexity'].tolist()
+    important_complexities, _ = paretoize(important_complexities, results['rmse'].tolist(), replace=False)
+
+    plot = make_pareto_plot(results, important_complexities=important_complexities, rmse=True, plot_unimportant=False)
+    plot.savefig('graphics/pareto_fig1.svg')
+    print('Saved pareto plot to graphics/pareto_fig1.svg')
+
+
+if __name__ == '__main__':
+    official_stuff()

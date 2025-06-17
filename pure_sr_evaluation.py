@@ -139,12 +139,12 @@ def lambdify_pure_sr_expression(expr: str, var_names):
     expr is the result of reg.equations_.iloc[-1].equation or similar
     returns function which takes in (B, 100, 41) of X and returns (B, ) of predictions
     '''
-    print('Original expression: ', expr)
+    # print('Original expression: ', expr)
     left_expr, right_expr = parse_left_right(expr)
     left_code = transform_expression(left_expr, var_names)
     right_code = transform_expression(right_expr, var_names)
-    print("Left code:", left_code)
-    print("Right code:", right_code)
+    # print("Left code:", left_code)
+    # print("Right code:", right_code)
 
     def f(x: np.ndarray):
         try:
@@ -205,9 +205,12 @@ def pure_sr_predict_fn(results, complexity=None):
     if complexity is None:
         # use highest complexity
         complexity = results['complexity'].max()
+
+    if type(complexity) == str:
+        complexity = int(complexity)
+
     result = results[results['complexity'] == complexity].iloc[0]
     expr = result.equation
-    print(expr)
     var_names = results.feature_names_in_
     expr_fn = lambdify_pure_sr_expression(expr, var_names)
     return expr_fn

@@ -13,10 +13,15 @@ plt.rcParams['mathtext.fontset']='dejavuserif'
 
 import torch
 import modules
-import spock
-import utils2
+try:
+    import spock
+except ImportError:
+    import figures.spock as spock
 import pickle
-from utils2 import assert_equal, load_pickle
+try:
+    from utils2 import assert_equal, load_pickle, get_script_execution_command
+except ImportError:
+    from utils import assert_equal, load_pickle, get_script_execution_command
 import multiprocessing as mp
 import argparse
 import time
@@ -81,7 +86,6 @@ scopy bnn_chaos_model/figures/period_results/v=43139_ngrid=6.pkl ~/code/bnn_chao
 
 def load_model(args):
     if args.pure_sr:
-
         pure_sr_net = modules.PureSRNet.from_path(args.pysr_path, args.pysr_model_selection)
         return spock.NonSwagFeatureRegressor(pure_sr_net)
     else:
@@ -143,7 +147,7 @@ def get_model_prediction(sim, par, model, use_petit=False, use_megno=False, crea
     if ground_truth:
         return {'ground_truth': get_ground_truth(sim)}
     elif use_petit:
-        return {'petit': get_petit_prediction(par)}
+        return {'mean': get_petit_prediction(par)}
 
     sim = sim.copy()
     sim.dt = 0.05
@@ -162,18 +166,12 @@ def get_model_prediction(sim, par, model, use_petit=False, use_megno=False, crea
         if create_input_cache:
             return model.predict_up_to_cached_input(sim)
         else:
-            out_dict = model.predict(sim, use_petit=use_petit)
-            if use_petit:
-                assert_equal(out_dict['petit'].shape, (1,))
-                return {
-                    'petit': out_dict['petit'][0].detach().cpu().numpy(),
-                }
-            else:
-                return {
-                    'mean': out_dict['mean'][0,0].detach().cpu().numpy(),
-                    'std': out_dict['std'][0,0].detach().cpu().numpy(),
-                    'f1': out_dict['summary_stats'][0].detach().cpu().numpy(),
-                }
+            out_dict = model.predict(sim)
+            return {
+                'mean': out_dict['mean'][0,0].detach().cpu().numpy(),
+                'std': out_dict['std'][0,0].detach().cpu().numpy(),
+                'f1': out_dict['summary_stats'][0].detach().cpu().numpy(),
+            }
     except rebound.Escape:
         return None
     except Exception as e:
@@ -232,11 +230,14 @@ def compute_results_for_parameters(parameters, model, use_petit=False, use_megno
 def load_input_cache(Ngrid):
     path = get_results_path(Ngrid, input_cache=True)
 
-    if os.path.exists(path):
-        with open(path, 'rb') as f:
-            return pickle.load(f)
-    else:
-        return None
+    if not os.path.exists(path):
+        path = 'figures/' + path
+
+        if not os.path.exists(path):
+            return None
+
+    with open(path, 'rb') as f:
+        return pickle.load(f)
 
 
 def get_list_chunk(lst, ix, total):
@@ -313,7 +314,7 @@ def compute_results(args):
         results = compute_results_for_parameters(parameters, model, use_petit=args.petit, use_megno=args.megno, create_input_cache=args.create_input_cache, ground_truth=args.ground_truth)
 
     # save the results
-    path = get_results_path(args.Ngrid, args.version, args.parallel_ix, args.parallel_total, args.pysr_version, args.pysr_model_selection, args.petit, args.megno, input_cache=args.create_input_cache, ground_truth=args.ground_truth)
+    path = get_results_path(args.Ngrid, args.version, args.parallel_ix, args.parallel_total, args.pysr_version, args.pysr_model_selection, args.petit, args.megno, input_cache=args.create_input_cache, ground_truth=args.ground_truth, pure_sr=args.pure_sr)
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
     with open(path, 'wb') as f:
@@ -323,7 +324,7 @@ def compute_results(args):
     return results
 
 
-def get_results_path(Ngrid, version=None, parallel_ix=None, parallel_total=None, pysr_version=None, pysr_model_selection=None, use_petit=False, use_megno=False, input_cache=False, ground_truth=False, rmse_diff=False, minimal_plot=False):
+def get_results_path(Ngrid, version=None, parallel_ix=None, parallel_total=None, pysr_version=None, pysr_model_selection=None, use_petit=False, use_megno=False, input_cache=False, ground_truth=False, rmse_diff=False, minimal_plot=False, pure_sr=False):
     if use_petit:
         path = f'period_results/petit/petit_ngrid={Ngrid}'
     elif use_megno:
@@ -334,7 +335,8 @@ def get_results_path(Ngrid, version=None, parallel_ix=None, parallel_total=None,
         T = GROUND_TRUTH_MAX_T
         T_str = f'{T:.0e}'.replace('e+0', 'e')
         path = f'period_results/ground_truth/ground_truth_ngrid={Ngrid}_T={T_str}'
-
+    elif pure_sr:
+        path = f'period_results/pure_sr/v={pysr_version}_ngrid={Ngrid}_{pysr_model_selection}'
     else:
         path = f'period_results/v={version}/v={version}_ngrid={Ngrid}'
 
@@ -366,9 +368,9 @@ def collate_parallel_results(args):
     results = []
     if args.parallel_total is None:
         # try to detect the total
-        path = get_results_path(args.Ngrid, args.version, use_petit=args.petit, input_cache=args.create_input_cache, use_megno=args.megno, ground_truth=args.ground_truth)
+        path = get_results_path(args.Ngrid, args.version, use_petit=args.petit, input_cache=args.create_input_cache, use_megno=args.megno, ground_truth=args.ground_truth, pure_sr=args.pure_sr)
 
-        files = os.listdir(get_results_path(args.Ngrid, args.version, use_petit=args.petit, input_cache=args.create_input_cache, use_megno=args.megno, ground_truth=args.ground_truth)[:-4])
+        files = os.listdir(get_results_path(args.Ngrid, args.version, use_petit=args.petit, input_cache=args.create_input_cache, use_megno=args.megno, ground_truth=args.ground_truth, pure_sr=args.pure_sr)[:-4])
         # filter to those of form f'{ix}-{total}.pkl'
         files = [file for file in files if file.endswith('.pkl')]
         # get the total. use the largest possible total
@@ -386,7 +388,7 @@ def collate_parallel_results(args):
     missing = False
     for ix in range(total):
         # print(ix)
-        path = get_results_path(args.Ngrid, args.version, ix, total, use_petit=args.petit, input_cache=args.create_input_cache, use_megno=args.megno, ground_truth=args.ground_truth)
+        path = get_results_path(args.Ngrid, args.version, ix, total, use_petit=args.petit, input_cache=args.create_input_cache, use_megno=args.megno, ground_truth=args.ground_truth, pure_sr=args.pure_sr)
         # print(f'path={path}')
 
         try:
@@ -422,7 +424,7 @@ def collate_parallel_results(args):
 
     # concatenate into one big list of results, maintaining ordering
     results = [result for sub_results in results for result in sub_results]
-    path = get_results_path(args.Ngrid, args.version, use_petit=args.petit, use_megno=args.megno, ground_truth=args.ground_truth)
+    path = get_results_path(args.Ngrid, args.version, use_petit=args.petit, use_megno=args.megno, ground_truth=args.ground_truth, pure_sr=args.pure_sr)
     with open(path, 'wb') as f:
         pickle.dump(results, f)
     print('Saved results to', path)
@@ -436,7 +438,7 @@ def plot_results(args, metric=None):
         # just plot mean by default, don't need std
         metric = 'mean'
 
-    results = load_pickle(get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection, use_petit=args.petit, use_megno=args.megno, ground_truth=args.ground_truth))
+    results = load_pickle(get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection, use_petit=args.petit, use_megno=args.megno, ground_truth=args.ground_truth, pure_sr=args.pure_sr))
     P12s, P23s = get_period_ratios(args.Ngrid)
 
     fig, ax = plt.subplots(figsize=(5,4.5))
@@ -448,7 +450,7 @@ def plot_results(args, metric=None):
 
     # get the results for the specific metric
     if args.petit:
-        results = [d['petit'] if d is not None else np.nan for d in results]
+        results = [d['mean'] if d is not None else np.nan for d in results]
     elif args.megno:
         results = [d['megno'] if d is not None else np.nan for d in results]
     elif args.equation_bounds:
@@ -556,7 +558,7 @@ def plot_results(args, metric=None):
 
     plt.tight_layout()
 
-    path = get_results_path(args.Ngrid, args.version, use_petit=args.petit, use_megno=args.megno, ground_truth=args.ground_truth, rmse_diff=args.rmse_diff, minimal_plot=args.minimal_plot)
+    path = get_results_path(args.Ngrid, args.version, use_petit=args.petit, use_megno=args.megno, ground_truth=args.ground_truth, rmse_diff=args.rmse_diff, minimal_plot=args.minimal_plot, pure_sr=args.pure_sr, pysr_version=args.pysr_version)
     # get rid of .pkl
     path = path[:-4]
     path += '_plot'
@@ -765,7 +767,7 @@ def plot_4way_comparison(args):
 
         # get the results for the specific metric
         if name == 'petit':
-            results = [d['petit'] if d is not None else np.nan for d in results]
+            results = [d['mean'] if d is not None else np.nan for d in results]
         elif name == 'megno':
             results = [d['megno'] if d is not None else np.nan for d in results]
         elif name == 'ground_truth':
@@ -1016,6 +1018,39 @@ def plot_4way_pysr_comparison(args):
     plt.close(fig)
 
 
+def get_truths_and_preds(Ngrid, version, pysr_version, pysr_model_selection, petit, pure_sr, clip=True):
+    results_path = get_results_path(Ngrid, version, pysr_version=pysr_version, pysr_model_selection=pysr_model_selection, use_petit=petit, pure_sr=args.pure_sr)
+    truth_path = get_results_path(Ngrid, ground_truth=True)
+    if not os.path.exists(results_path):
+        results_path = 'figures/' + results_path
+        truth_path = 'figures/' + truth_path
+
+    preds = load_pickle(results_path)
+    truths = load_pickle(truth_path)
+
+    truths = np.array([d['ground_truth'] if d is not None else np.nan for d in truths])
+    truths = np.log10(truths)
+
+    preds = np.array([d['mean'] if d is not None else np.nan for d in preds])
+    assert_equal(truths.shape, preds.shape)
+
+    # ignore entries where ground_truth is nan or input_cache is None
+    # input_cache being None signals that simulating to 10^4 failed (aka early collision)
+    input_cache = load_input_cache(Ngrid)
+    bad_input_ixs = np.array([inp is None for inp in input_cache])
+    nan_ixs = np.isnan(truths)
+    bad_ixs = bad_input_ixs | nan_ixs
+    truths = truths[~bad_ixs]
+    preds = preds[~bad_ixs]
+    assert not np.isnan(preds).any()
+
+    if clip:
+        preds = np.clip(preds, 4, 9)
+        truths = np.clip(truths, 4, 9)
+
+    return truths, preds
+
+
 def calculate_rmse(args):
     pysr_model_selections = get_pysr_model_selections(args)
     ground_truth = load_pickle(get_results_path(args.Ngrid, ground_truth=True))
@@ -1024,7 +1059,7 @@ def calculate_rmse(args):
     eqs = [load_pickle(get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection=pysr_model_selection))
            for pysr_model_selection in pysr_model_selections]
 
-    pure_sr = load_pickle(get_results_path(args.Ngrid, 24880, pysr_version=83941))
+    pure_sr = load_pickle(get_results_path(args.Ngrid, pysr_version=83941, pure_sr=True))
     f1_id = load_pickle(get_results_path(args.Ngrid, 28114, pysr_version=9054, pysr_model_selection=27))
     input_cache = load_input_cache(args.Ngrid)
 
@@ -1035,7 +1070,7 @@ def calculate_rmse(args):
     # ground_truth[ground_truth < 4] = 4
 
     nn = np.array([d['mean'] if d is not None else np.nan for d in nn])
-    petit = np.array([d['petit'] if d is not None else np.nan for d in petit])
+    petit = np.array([d['mean'] if d is not None else np.nan for d in petit])
     eqs = [np.array([d['mean'] if d is not None else np.nan for d in eq])
            for eq in eqs]
     pure_sr = np.array([d['mean'] if d is not None else np.nan for d in pure_sr])
@@ -1095,10 +1130,10 @@ def get_citation():
 
 
 def get_args():
-    print(utils2.get_script_execution_command())
+    print(get_script_execution_command())
     parser = argparse.ArgumentParser()
-    parser.add_argument('--Ngrid', '-n', type=int, default=1600)
-    parser.add_argument('--version', '-v', type=int, default=24880)
+    parser.add_argument('--Ngrid', '-n', type=int, default=300)
+    parser.add_argument('--version', '-v', type=int, default=None)
 
     parser.add_argument('--plot', action='store_true')
     parser.add_argument('--compute', action='store_true')
@@ -1193,7 +1228,7 @@ if __name__ == '__main__':
         collate_parallel_results(args)
 
     if args.plot:
-        if args.pysr_path:
+        if args.pysr_path and not args.pure_sr:
             plot_results_pysr_f2(args)
             # pysr_error_analysis(args)
         else:
@@ -1215,14 +1250,3 @@ if __name__ == '__main__':
     end = time.time()
     formatted_time = time.strftime('%H:%M:%S', time.gmtime(end - start))
     print(f'Done (time taken: {formatted_time})')
-
-
-# if __name__ == '__main__':
-#     args = get_args()
-#     args.petit = True
-#     args.version = 24880
-#     sim = get_simulation((0.60, 0.70))
-#     model = load_model(args)
-#     p = get_model_prediction(sim, None, model, use_petit=True)
-#     print(p)
-#     print(get_petit_prediction((0.6, 0.7)))

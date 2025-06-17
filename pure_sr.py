@@ -14,7 +14,7 @@ from sr import LL_LOSS
 
 def ll_loss_with_f1(T):
     s = """
-        function my_loss(tree, dataset::Dataset{T,L}, options)::L where {T,L}
+        function my_loss(tree, dataset::Dataset{T,L}, options, idx)::L where {T,L}
             if tree.degree != 2
                 return L(1_000_000)
             end
@@ -116,7 +116,7 @@ def ll_loss_with_f1(T):
 
 def mse_loss_with_f1(T):
     s = """
-        function my_loss(tree, dataset::Dataset{T,L}, options)::L where {T,L}
+        function my_loss(tree, dataset::Dataset{T,L}, options, idx)::L where {T,L}
             if tree.degree != 2
                 return L(1_000_000)
             end
@@ -229,15 +229,15 @@ def option(*param_decls, **attrs):
 @click.command()
 @option("--niterations", type=int, default=100000)
 @option("--seed", type=int, default=0)
-@option("--loss_fn", type=click.Choice(['mse', 'll']))
+@option("--loss_fn", type=click.Choice(['mse', 'll']), default='ll')
 @option("--maxsize", type=int, default=60)
 @option("--batch-size", type=int, default=1000)
 @option("--n", type=int, default=10000)
 @option("--version", type=int, default=None)
-@option("--log/--no-log", default=True)
-@option("--time-in-hours", type=float, default=8)
-@option("--use-prior/--no-use-prior", default=False)
-@option("--f1/--no-f1", default=True)
+@option("--log/--no_log", default=True)
+@option("--time_in_hours", type=float, default=8)
+@option("--use_prior/--no_use_prior", default=False)
+@option("--f1/--no_f1", default=True)
 def main(
     niterations,
     maxsize,

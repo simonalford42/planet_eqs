@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+# June 17 2025
+# sbatch -J f1 --partition ellis sr.sh pure_sr.py --f1 --loss_fn ll
+# sbatch -J no_f1 --partition ellis sr.sh pure_sr.py --f1 --loss_fn ll
+# sbatch -J f1_mse --partition gpu sr.sh pure_sr.py --f1 --loss_fn mse
+# sbatch -J no_f1_mse --partition gpu sr.sh pure_sr.py --f1 --loss_fn mse
+
 # June 16 2025
 # sbatch -J f2_1 --partition gpu f2_prune_train.sh --prune_f2_topk 1
 # sbatch -J f2_2 --partition gpu f2_prune_train.sh --prune_f2_topk 2
@@ -7,9 +13,6 @@
 # sbatch -J f2_10 --partition gpu f2_prune_train.sh --prune_f2_topk 10
 # sbatch -J f2_15 --partition gpu f2_prune_train.sh --prune_f2_topk 15
 # sbatch -J f2_20 --partition gpu f2_prune_train.sh --prune_f2_topk 20
-
-# sbatch -J f1 sr.sh pure_sr.py --f1 --version 4
-# sbatch -J no_f1 sr.sh pure_sr.py --f1 --version 4
 
 # June 12 2025
 # sbatch -J class_dir --partition gpu sr.sh sr.py --time_in_hours 8 --version 24880 --target f2_direct --loss_fn ll --max_size 45 --seed 5

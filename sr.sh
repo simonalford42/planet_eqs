@@ -10,8 +10,9 @@
 #SBATCH -n 32
 #SBATCH --requeue
  # total limit (hh:mm:ss)
-#SBATCH -t 02:00:00
+#SBATCH -t 09:00:00
 #SBATCH --mem=200G
+#SBATCH --gres=gpu:1
 #SBATCH --partition=ellis
 
 source /home/sca63/mambaforge/etc/profile.d/conda.sh

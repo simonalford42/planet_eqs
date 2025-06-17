@@ -1,17 +1,16 @@
 {
     "k": {
-        "2": {"version": 24880, "pysr_version": 11003},
-        "3": {"version": 24880, "pysr_version": 11003},
-        "4": {"version": 24880, "pysr_version": 11003},
-        "5": {"version": 24880, "pysr_version": 11003}
+        "2": {"version": 24880, "pysr_version": 93102},
+        "3": {"version": 74649, "pysr_version": 49636},
+        "4": {"version": 11566, "pysr_version": 94842},
+        "5": {"version": 72646, "pysr_version": 42503}
     },
     "f2_linear": {
-        "1": 24880,
-        "2": 24880,
-        "5": 24880,
-        "10": 24880,
-        "15": 24880,
-        "20": 24880
+        "1": 91541,
+        "5": 38137,
+        "10": 22676,
+        "15": 44530,
+        "20": 42062
     },
     "pure_sr_version": 83941
 }
