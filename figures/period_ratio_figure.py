@@ -1018,8 +1018,8 @@ def plot_4way_pysr_comparison(args):
     plt.close(fig)
 
 
-def get_truths_and_preds(Ngrid, version, pysr_version, pysr_model_selection, petit, pure_sr, clip=True):
-    results_path = get_results_path(Ngrid, version, pysr_version=pysr_version, pysr_model_selection=pysr_model_selection, use_petit=petit, pure_sr=args.pure_sr)
+def get_truths_and_preds(Ngrid, version=None, pysr_version=None, pysr_model_selection=None, petit=False, pure_sr=False, clip=True):
+    results_path = get_results_path(Ngrid, version, pysr_version=pysr_version, pysr_model_selection=pysr_model_selection, use_petit=petit, pure_sr=pure_sr)
     truth_path = get_results_path(Ngrid, ground_truth=True)
     if not os.path.exists(results_path):
         results_path = 'figures/' + results_path
@@ -1051,71 +1051,22 @@ def get_truths_and_preds(Ngrid, version, pysr_version, pysr_model_selection, pet
     return truths, preds
 
 
-def calculate_rmse(args):
-    pysr_model_selections = get_pysr_model_selections(args)
-    ground_truth = load_pickle(get_results_path(args.Ngrid, ground_truth=True))
-    nn = load_pickle(get_results_path(args.Ngrid, args.version))
-    petit = load_pickle(get_results_path(args.Ngrid, use_petit=True))
-    eqs = [load_pickle(get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection=pysr_model_selection))
-           for pysr_model_selection in pysr_model_selections]
+def calculate_rmse(Ngrid, version=None, pysr_version=None, pysr_model_selection=None, petit=False, pure_sr=False, clip=True):
+    truths, preds = get_truths_and_preds(Ngrid, version, pysr_version, pysr_model_selection, petit, pure_sr, clip=clip)
+    rmse = np.average(np.square(truths - preds))**0.5
+    return rmse
 
-    pure_sr = load_pickle(get_results_path(args.Ngrid, pysr_version=83941, pure_sr=True))
-    f1_id = load_pickle(get_results_path(args.Ngrid, 28114, pysr_version=9054, pysr_model_selection=27))
-    input_cache = load_input_cache(args.Ngrid)
 
-    # pure_sr = load_pickle(get_results_path(Ngrid, pure_sr_version))
-
-    ground_truth = np.array([d['ground_truth'] if d is not None else np.nan for d in ground_truth])
-    ground_truth = np.log10(ground_truth)
-    # ground_truth[ground_truth < 4] = 4
-
-    nn = np.array([d['mean'] if d is not None else np.nan for d in nn])
-    petit = np.array([d['mean'] if d is not None else np.nan for d in petit])
-    eqs = [np.array([d['mean'] if d is not None else np.nan for d in eq])
-           for eq in eqs]
-    pure_sr = np.array([d['mean'] if d is not None else np.nan for d in pure_sr])
-    f1_id = np.array([d['mean'] if d is not None else np.nan for d in f1_id])
-
-    # assert_equal(ground_truth.shape, nn.shape, petit.shape, eq.shape)
-    assert_equal(ground_truth.shape, nn.shape, petit.shape, pure_sr.shape, f1_id.shape, *[eq.shape for eq in eqs])
-    assert_equal(len(nn.shape), 1)
-
-    data = {
-        'ground_truth': ground_truth,
-        'nn': nn,
-        'petit': petit,
-        'pure_sr': pure_sr,
-        'f1_id': f1_id,
-    }
-    for i, pysr_model_selection in enumerate(pysr_model_selections):
-        data['eq' + str(pysr_model_selection)] = eqs[i]
-
-    rmse_dict = {}
-    # ignore entries where ground_truth is nan or input_cache is None
-    # input_cache being None signals that simulating to 10^4 failed (aka early collision)
-    bad_input_ixs = np.array([inp is None for inp in input_cache])
-    nan_ixs = np.isnan(ground_truth)
-    bad_ixs = bad_input_ixs | nan_ixs
-    ground_truth = ground_truth[~bad_ixs]
-
-    # 1. ignore entries where ground_truth is nan
-    # 2. replace remaining nan entries with 4
-    # 3. calculate mse
-    for model_name in data:
-        if model_name == 'ground_truth': continue
-        preds = data[model_name]
-        preds = preds[~bad_ixs]
-        assert not np.isnan(preds).any()
-        # preds[preds < 4] = 4
-        preds[preds > 9] = 9
-
-        rmse = np.sqrt(np.mean((ground_truth - preds)**2))
-        rmse_dict[model_name] = rmse
-        print(f'RMSE {model_name}: {rmse:.2f}')
-
-    with open('period_ratio_rmse.pkl', 'wb') as f:
-        pickle.dump(rmse_dict, f)
-
+def calculate_rmse_official():
+    nn_rmse = calculate_rmse(300, version=24880)
+    petit_rmse = calculate_rmse(300, petit=True)
+    pure_sr = calculate_rmse(300, pure_sr=True, pysr_version=83941, pysr_model_selection=40)
+    our_rmse = calculate_rmse(300, version=24880, pysr_version=11003, pysr_model_selection=26)
+    # pure2_sr = calculate_rmse(300, pure_sr=True, pysr_version=11003, pysr_model_selection=26)
+    print(f'NN RMSE: {nn_rmse:.3f}')
+    print(f'Petit+2020 RMSE: {petit_rmse:.3f}')
+    print(f'Pure SR RMSE: {pure_sr:.3f}')
+    print(f'Our SR RMSE: {our_rmse:.3f}')
 
 
 def get_citation():
@@ -1137,6 +1088,7 @@ def get_args():
 
     parser.add_argument('--plot', action='store_true')
     parser.add_argument('--compute', action='store_true')
+    parser.add_argument('--rmse', action='store_true')
     parser.add_argument('--collate', action='store_true')
     parser.add_argument('--petit', action='store_true')
     parser.add_argument('--megno', action='store_true')
@@ -1159,7 +1111,7 @@ def get_args():
     parser.add_argument('--equation_bounds', action='store_true')
     parser.add_argument('--job_array', action='store_true')
     parser.add_argument('--max_t', type=float, default=1e9, help='Maximum integration time for ground truth')
-    parser.add_argument('--special', type=str, default=None, choices=['4way', '4way_pysr', 'calculate_rmse', 'f1_features', 'exprs'])
+    parser.add_argument('--special', type=str, default=None, choices=['4way', '4way_pysr', 'f1_features', 'exprs', 'rmse_official'])
     parser.add_argument('--minimal_plot', action='store_true')
     parser.add_argument('--rmse_diff', action='store_true')
 
@@ -1235,17 +1187,21 @@ if __name__ == '__main__':
             plot_results(args)
             # plot_summary_stats(args)
 
+    if args.rmse:
+        rmse = calculate_rmse(args.Ngrid, args.version, args.pysr_version, args.pysr_model_selection, args.petit, args.pure_sr, clip=True)
+        print('RMSE:', rmse)
+
     if args.special:
         if args.special == '4way':
             plot_4way_comparison(args)
         elif args.special == '4way_pysr':
             plot_4way_pysr_comparison(args)
-        elif args.special == 'calculate_rmse':
-            calculate_rmse(args)
         elif args.special == 'f1_features':
             plot_f1_features(args)
         elif args.special == 'exprs':
             plot_exprs(args)
+        elif args.special == 'rmse_official':
+            calculate_rmse_official()
 
     end = time.time()
     formatted_time = time.strftime('%H:%M:%S', time.gmtime(end - start))
