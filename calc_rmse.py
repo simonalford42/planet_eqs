@@ -354,4 +354,5 @@ if __name__ == '__main__':
     args.dataset = 'all'
     for version in [91541, 22676, 44530, 38137, 42062]:
         args.version = version
+        args.dataset = 'all'
         calculate_results(args)
