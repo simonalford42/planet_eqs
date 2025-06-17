@@ -280,6 +280,8 @@ def save_pickle(data, filename):
 
 
 def calculate_results(args):
+    print(args)
+    return
     if args.dataset != 'all':
         rmse = calculate_rmse(args)
         print(f'RMSE for {args.dataset} dataset: {rmse}')
