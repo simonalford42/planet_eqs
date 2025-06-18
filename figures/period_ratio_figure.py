@@ -866,11 +866,15 @@ def plot_pure_sr_comparison(args):
         results = model_results[i]
         show_x = show_xs[i]
         show_y = show_ys[i]
+        title = titles[i]
 
         # P12s, P23s = get_period_ratios(args.Ngrid)
         P12s, P23s = get_period_ratios(300)
 
-        results = [d['mean'] if d is not None else np.nan for d in results]
+        if title == 'Ground truth':
+            results = [np.log10(d['ground_truth']) if d is not None else np.nan for d in results]
+        else:
+            results = [d['mean'] if d is not None else np.nan for d in results]
         results = [4. if np.isnan(r) else r for r in results]
         results = np.array(results)
         X,Y,Z = get_centered_grid(P12s, P23s, results)
@@ -888,7 +892,7 @@ def plot_pure_sr_comparison(args):
         else:
             axs[i].set_ylabel("")
 
-        axs[i].set_title(titles[i])
+        axs[i].set_title(title)
 
     # Create a single colorbar
     cb = fig.colorbar(im, ax=axs.ravel().tolist(), shrink=0.6)

@@ -104,13 +104,13 @@ def official_plots():
     cleaned = pd.read_csv(main_path)
     make_main_plot(cleaned, path='five_planet_figures/five_planet_main.pdf')
 
-    pure_sr_path = 'five_planet_figures/five_planet2_v24880_pysr83941_ms=40_N=5000_turbo_extrapolate.csv'
+    pure_sr_path = 'five_planet_figures/v24880_pysr83941_ms=40_N=5000_turbo_extrapolate.csv'
     pure_sr = pd.read_csv(pure_sr_path)
     cleaned['pure_sr'] = pure_sr['median']
 
-    pure_sr2_path = 'five_planet_figures/five_planet2_v28114_pysr41564_ms=35_N=5000_turbo_extrapolate.csv'
+    pure_sr2_path = 'five_planet_figures/v24880_pysr83941_ms=40_N=5000_turbo_extrapolate.csv'
     pure_sr2 = pd.read_csv(pure_sr2_path)
-    cleaned['pure_sr2'] = pure_sr['median']
+    cleaned['pure_sr2'] = pure_sr2['median']
     make_separate_comparison_plot(cleaned, path='five_planet_figures/five_planet_all.pdf')
 
 
