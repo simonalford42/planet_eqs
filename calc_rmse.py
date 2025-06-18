@@ -3,13 +3,11 @@ import numpy as np
 import spock_reg_model
 from tqdm.notebook import tqdm
 import petit
-import pickle
 from pure_sr_evaluation import pure_sr_predict_fn, get_pure_sr_results
 from interpret import get_pysr_results
-from utils import assert_equal, load_pickle
+from utils import assert_equal, load_pickle, save_pickle
 from sklearn.preprocessing import StandardScaler
 import seaborn as sns
-from figures import period_ratio_figure
 from matplotlib import pyplot as plt
 # to fix the fonts?
 plt.rcParams.update(plt.rcParamsDefault)
@@ -273,15 +271,7 @@ def const_predict_fn(const):
     return lambda *_: const
 
 
-def save_pickle(data, filename):
-    with open(filename, 'wb') as f:
-        pickle.dump(data, f)
-    print(f'Saved {filename}')
-
-
 def calculate_results(args):
-    print(args)
-    return
     if args.dataset != 'all':
         rmse = calculate_rmse(args)
         print(f'RMSE for {args.dataset} dataset: {rmse}')
@@ -310,6 +300,11 @@ def calculate_results(args):
 
             results[dataset] = dataset_results
 
+    results_path = get_results_path(args)
+    save_pickle(results, results_path)
+
+
+def get_results_path(args):
     results_tag = ''
     if args.version is not None:
         results_tag += f'_{args.version}'
@@ -317,7 +312,7 @@ def calculate_results(args):
         results_tag += f'_{args.pysr_version}'
 
     filename = f'pickles/{args.eval_type}_results_all{results_tag}.pkl'
-    save_pickle(results, filename)
+    return filename
 
 
 def get_prediction_fn(args):
@@ -343,6 +338,7 @@ def get_args():
     parser.add_argument('--dataset', type=str, default='val', choices=['train','val','test', 'random', 'all'])
     parser.add_argument('--eval_type', type=str, default='pysr', choices=['pure_sr', 'pysr', 'nn', 'petit'])
     parser.add_argument('--pysr_model_selection', type=str, default='accuracy', help='"best", "accuracy", "score", or an integer of the pysr equation complexity.')
+    parser.add_argument('--best_complexity', action='store_true')
 
     args = parser.parse_args()
     if args.pysr_version is None and args.version is not None:
@@ -352,9 +348,16 @@ def get_args():
 
 if __name__ == '__main__':
     args = get_args()
-    args.eval_type = 'nn'
-    args.dataset = 'all'
-    for version in [91541, 22676, 44530, 38137, 42062]:
-        args.version = version
-        args.dataset = 'all'
+    if args.best_complexity:
+        results = load_pickle(get_results_path(args))
+        # find complexity that gives lowest val rmse
+        best_complexity, val_loss = min(results['val'].items(), key=lambda x: x[1])
+        print(best_complexity)
+    else:
         calculate_results(args)
+    # args.eval_type = 'nn'
+    # args.dataset = 'all'
+    # for version in [91541, 22676, 44530, 38137, 42062]:
+    #     args.version = version
+    #     args.dataset = 'all'
+    #     calculate_results(args)

@@ -23,8 +23,7 @@ set -e
 
 # gets the next available version number
 version=$(python versions.py)
-# train linear f2, using 24880 as sparse linear f1
-python -u find_minima.py --version $version --total_steps 150000 --f2_variant linear --load_f1 24880 --freeze_f1 --l1_reg f2_weights --l1_coeff 2
+python -u find_minima.py --version $version --total_steps 150000 --l1_reg both_weights --l1_coeff 2
 version2=$(python versions.py)
-# now apply prune and fine tune f2
-python -u find_minima.py --version $version2 --total_steps 150000 --f2_variant linear --load_f1_f2 $version --prune_f2_topk 10 "$@"
+# now apply prune and fine tune f1 and f2
+python -u find_minima.py --version $version2 --total_steps 150000 --f2_variant linear --load_f1_f2 $version --prune_f1_topk 2 --prune_f2_topk 10 "$@"

@@ -37,7 +37,6 @@ from tseries_feature_functions import get_extended_tseries
 from pure_sr_evaluation import pure_sr_predict_fn
 from modules import PureSRNet
 
-from five_planet_plot import make_plot, make_plot_separate, make_main_plot
 
 import warnings
 warnings.filterwarnings("default", category=UserWarning)
@@ -541,34 +540,9 @@ cleaned['pperiodetitf'] = np.log10(pd.Series([Tsurv(
      for i in range(len(cleaned))]))
 
 mse = ((cleaned['true'] - cleaned['median'])**2).mean()
-print('rmse: ', mse**0.5)
 bnn_mse = ((cleaned['true'] - cleaned['bnn_median'])**2).mean()
-print('bnn rmse: ', bnn_mse**0.5)
 
-# trying to compare rmse to petit
-# ix1 = cleaned[cleaned['true'] != cleaned['bnn_median']].index
-# ix2 = cleaned[cleaned['petitf'] <= 10].index
-# ix3 = ix1.intersection(ix2)
-# c2 = cleaned.loc[ix3]
-# rmse_eq = np.sqrt(np.mean((c2['true'] - c2['median'])**2))
-# 1.1543915552024004
-# rmse_bnn = np.sqrt(np.mean((c2['true'] - c2['bnn_median'])**2))
-# 0.3554099783721814
-# rmse_petit = np.sqrt(np.mean((c2['true'] - c2['petitf'])**2))
-# 1.0603360947824365
-
-
-# +
-# petit = Tsurv(p12, p23, [m1, m2, m3])
-# petit = np.nan_to_num(np.log10(Tsurv), posinf=1e9, neginf=0.0)
-# cleaned['petit'].append(petit)
-# petit = Tsurv(p12, p23, [m1, m2, m3], fudge=2)
-# petit = np.nan_to_num(np.log10(Tsurv), posinf=1e9, neginf=0.0)
-# cleaned['petitf'].append(petit)
-# -
-
-path = f'five_planet_figures/five_planet2_v{args.version}_pysr{args.pysr_version}'
-# path = f'five_planet_v{args.version}_pysr{args.pysr_version}'
+path = f'five_planet_figures/v{args.version}_pysr{args.pysr_version}'
 if args.pysr_model_selection != 'accuracy':
     path += f'_ms={args.pysr_model_selection}'
 
@@ -581,13 +555,10 @@ else:
 if args.extrapolate:
     path += '_extrapolate'
 
-filename = f'cur_plot_datasets/{path}_{time.time()}.csv'
+filename = path + '.csv'
 cleaned.to_csv(filename)
 print('saved data to', filename)
 
-path += '.png'
-
-# make_plot_separate(cleaned, path=path)
-make_main_plot(cleaned, path=path)
-
-print('made plot')
+filename = path + '.pdf'
+from five_planet_plot import make_main_plot
+make_main_plot(cleaned, path=filename)

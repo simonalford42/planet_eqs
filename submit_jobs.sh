@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 
 # June 17 2025
-# sbatch -J f1 --partition ellis sr.sh pure_sr.py --f1 --loss_fn ll
-# sbatch -J no_f1 --partition ellis sr.sh pure_sr.py --f1 --loss_fn ll
-# sbatch -J f1_mse --partition gpu sr.sh pure_sr.py --f1 --loss_fn mse
-# sbatch -J no_f1_mse --partition gpu sr.sh pure_sr.py --f1 --loss_fn mse
+sbatch -J f1 --partition ellis sr.sh pure_sr.py --loss_fn ll
+sbatch -J f1_mse --partition ellis sr.sh pure_sr.py --loss_fn mse
 
 # June 16 2025
+# sbatch -J f2_0 --partition gpu f2_prune_train.sh --prune_f2_topk 0
 # sbatch -J f2_1 --partition gpu f2_prune_train.sh --prune_f2_topk 1
 # sbatch -J f2_2 --partition gpu f2_prune_train.sh --prune_f2_topk 2
 # sbatch -J f2_5 --partition gpu f2_prune_train.sh --prune_f2_topk 5

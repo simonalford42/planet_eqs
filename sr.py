@@ -410,15 +410,14 @@ def parse_args():
     parser.add_argument('--max_size', type=int, default=30)
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--target', type=str, default='f2', choices=['f1', 'f2', 'f2_ifthen', 'f2_direct', 'f2_2', 'equation_bounds'])
+    parser.add_argument('--f1_identity', action='store_true')
     parser.add_argument('--residual', action='store_true', help='do residual training of your target')
     parser.add_argument('--n', type=int, default=10000, help='number of data points for the SR problem')
     parser.add_argument('--batch_size', type=int, default=1000, help='number of data points for the SR problem')
     parser.add_argument('--sr_residual', action='store_true', help='do residual training of your target with previous sr run as base')
     parser.add_argument('--loss_fn', type=str, choices=['mse', 'll', 'perceptron', 'clipped'], default='mse')
     parser.add_argument('--previous_sr_path', type=str, default='sr_results/92985.pkl', help='path to previous sr run, used for residual/recursive training')
-
     parser.add_argument('--eq_bound_mse_threshold', type=float, default=1, help='mse threshold below which to consider an equation good')
-
 
     args = parser.parse_args()
     return args

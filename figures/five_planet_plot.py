@@ -49,12 +49,12 @@ def make_main_plot(cleaned, path=None):
     print('Saved to', path)
 
 
-def make_separate_comparison_plot(cleaned, path=None):
+def make_separate_comparison_plot(cleaned, path):
     plt.rc('font', family='serif')
 
     scale = 8
     lw=1.2
-    fig, axarr = plt.subplots(4, 1, figsize=(scale, scale), dpi=300, sharex=True)
+    fig, axarr = plt.subplots(5, 1, figsize=(scale, scale), dpi=300, sharex=True)
     plt.subplots_adjust(hspace=0.2)
     tmp = cleaned
     # tmp2 = tmp.query('true > 4 & delta > 5')
@@ -63,7 +63,7 @@ def make_separate_comparison_plot(cleaned, path=None):
     plt.subplots_adjust(left=0.08, right=0.95, top=0.95, bottom=0.05)
 
 
-    for i, label in enumerate(['Petit+20', 'Neural Network', 'Distilled Equations', 'Pure SR']):
+    for i, label in enumerate(['Petit+20', 'Neural Network', 'Distilled Equations', 'Pure SR', 'Pure SR (no intermediate features)']):
         ax = axarr[i]
 
         tmp.plot('delta', 'true', ax=ax, label='True', c='k', linewidth=lw)
@@ -75,6 +75,8 @@ def make_separate_comparison_plot(cleaned, path=None):
             tmp.plot('delta', 'pperiodetitf', ax=ax, label='Petit+20', c='tab:red', linewidth=lw)
         elif label == 'Pure SR':
             tmp2.plot('delta', 'pure_sr', ax=ax, label='Pure SR', c='tab:green', linewidth=lw)
+        elif label == 'Pure SR (no intermediate features)':
+            tmp2.plot('delta', 'pure_sr', ax=ax, label='Pure SR (no intermediate features)', c='tab:blue', linewidth=lw)
 
         ax.set_xlabel(r'Interplanetary separation $\Delta$')
         ax.set_ylabel(r'Instability Time')
@@ -93,21 +95,38 @@ def make_separate_comparison_plot(cleaned, path=None):
         ax.tick_params(axis='y', which='major', direction='in')
         ax.tick_params(axis='y', which='minor', direction='in')
 
-    if path == None:
-        t = time.strftime('%Y%m%d_%H%M%S')
-        path = f'five_planet_figures/five_planet_{t}.png'
     fig.savefig(path)
     print('Saved to', path)
 
 
-if __name__ == '__main__':
-    main_path = 'cur_plot_datasets/five_planet_figures/five_planet2_v24880_pysr11003_ms=29_N=5000_turbo_extrapolate_1749663354.199567.csv'
+def official_plots():
+    main_path = 'five_planet_figures/v24880_pysr11003_ms=29_N=5000_turbo_extrapolate.csv'
     cleaned = pd.read_csv(main_path)
     make_main_plot(cleaned, path='five_planet_figures/five_planet_main.pdf')
 
-    pure_sr_path = 'cur_plot_datasets/five_planet_figures/five_planet2_v24880_pysr83941_ms=None_N=5000_turbo_extrapolate_1748898353.284526.csv'
+    pure_sr_path = 'five_planet_figures/five_planet2_v24880_pysr83941_ms=40_N=5000_turbo_extrapolate.csv'
     pure_sr = pd.read_csv(pure_sr_path)
     cleaned['pure_sr'] = pure_sr['median']
+
+    pure_sr2_path = 'five_planet_figures/five_planet2_v28114_pysr41564_ms=35_N=5000_turbo_extrapolate.csv'
+    pure_sr2 = pd.read_csv(pure_sr2_path)
+    cleaned['pure_sr2'] = pure_sr['median']
     make_separate_comparison_plot(cleaned, path='five_planet_figures/five_planet_all.pdf')
+
+
+if __name__ == '__main__':
+    import sys
+    if len(sys.argv) == 1:
+        official_plots()
+
+    # main_path = sys.argv[1]
+    # cleaned = pd.read_csv(main_path)
+    # make_main_plot(cleaned, path=main_path[:-4] + '.pdf')
+
+    # if len(sys.argv) > 2:
+    #     pure_sr_path = sys.argv[2]
+    #     pure_sr = pd.read_csv(pure_sr_path)
+    #     cleaned['pure_sr'] = pure_sr['median']
+    #     make_separate_comparison_plot(cleaned, path='kkkk
 
 

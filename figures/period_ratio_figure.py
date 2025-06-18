@@ -41,6 +41,8 @@ GROUND_TRUTH_MAX_T = 1e9 # Assigned in get_args function
 # COLOR_MAP = COLOR_MAP
 COLOR_MAP = plt.cm.plasma
 
+USE_SUBFOLDERS = False
+
 
 '''
 Example commands:
@@ -326,19 +328,37 @@ def compute_results(args):
 
 def get_results_path(Ngrid, version=None, parallel_ix=None, parallel_total=None, pysr_version=None, pysr_model_selection=None, use_petit=False, use_megno=False, input_cache=False, ground_truth=False, rmse_diff=False, minimal_plot=False, pure_sr=False):
     if use_petit:
-        path = f'period_results/petit/petit_ngrid={Ngrid}'
+        if USE_SUBFOLDERS:
+            path = f'period_results/petit/petit_ngrid={Ngrid}'
+        else:
+            path = f'period_results/petit_ngrid={Ngrid}'
     elif use_megno:
-        path = f'period_results/megno/megno_ngrid={Ngrid}'
+        if USE_SUBFOLDERS:
+            path = f'period_results/megno/megno_ngrid={Ngrid}'
+        else:
+            path = f'period_results/megno_ngrid={Ngrid}'
     elif input_cache:
-        path = f'period_results/caches/cache_ngrid={Ngrid}'
+        if USE_SUBFOLDERS:
+            path = f'period_results/caches/cache_ngrid={Ngrid}'
+        else:
+            path = f'period_results/cache_ngrid={Ngrid}'
     elif ground_truth:
         T = GROUND_TRUTH_MAX_T
         T_str = f'{T:.0e}'.replace('e+0', 'e')
-        path = f'period_results/ground_truth/ground_truth_ngrid={Ngrid}_T={T_str}'
+        if USE_SUBFOLDERS:
+            path = f'period_results/ground_truth/ground_truth_ngrid={Ngrid}_T={T_str}'
+        else:
+            path = f'period_results/ground_truth_ngrid={Ngrid}_T={T_str}'
     elif pure_sr:
-        path = f'period_results/pure_sr/v={pysr_version}_ngrid={Ngrid}_{pysr_model_selection}'
+        if USE_SUBFOLDERS:
+            path = f'period_results/pure_sr/v={pysr_version}_ngrid={Ngrid}_{pysr_model_selection}'
+        else:
+            path = f'period_results/v={pysr_version}_ngrid={Ngrid}_{pysr_model_selection}'
     else:
-        path = f'period_results/v={version}/v={version}_ngrid={Ngrid}'
+        if USE_SUBFOLDERS:
+            path = f'period_results/v={version}/v={version}_ngrid={Ngrid}'
+        else:
+            path = f'period_results/v={version}_ngrid={Ngrid}'
 
         if pysr_version is not None:
             if pysr_model_selection == 'accuracy':
@@ -762,7 +782,6 @@ def plot_4way_comparison(args):
         show_x = show_xs[i]
         show_y = show_ys[i]
 
-        # P12s, P23s = get_period_ratios(args.Ngrid)
         P12s, P23s = get_period_ratios(300)
 
         # get the results for the specific metric
@@ -781,23 +800,12 @@ def plot_4way_comparison(args):
         results = np.array(results)
         X,Y,Z = get_centered_grid(P12s, P23s, results)
 
-        if name == 'megno':
-            Zfilt = Z
-            Zfilt[Zfilt <= 2] = 2.01
-            cmap = COLOR_MAP.copy()
-            cmap.set_bad(color='white')
-            im = axs[i].pcolormesh(X, Y, np.log10(Zfilt-2), vmin=-4, vmax=4, cmap=cmap)
-            # label = MEGNO_LABEL
-        else:
-            # NaN's get mapped to predicting instant instability
-            # Z[np.isnan(Z)] = 4
-            cmap = COLOR_MAP.copy().reversed()
-            cmap.set_bad(color='white')
-            im = axs[i].pcolormesh(X, Y, Z, vmin=4, vmax=9, cmap=cmap)
-            # label = INSTABILITY_TIME_LABEL
+        # NaN's get mapped to predicting instant instability
+        # Z[np.isnan(Z)] = 4
+        cmap = COLOR_MAP.copy().reversed()
+        cmap.set_bad(color='white')
+        im = axs[i].pcolormesh(X, Y, Z, vmin=4, vmax=9, cmap=cmap, rasterized=True)
 
-        # cb = plt.colorbar(im, ax=axs[i], fraction=0.046, pad=0.04)
-        # cb.set_label(label)
         if show_x:
             axs[i].set_xlabel("P1/P2")
         else:
@@ -813,13 +821,82 @@ def plot_4way_comparison(args):
     cb = fig.colorbar(im, ax=axs.ravel().tolist(), shrink=0.6)
     cb.set_label(INSTABILITY_TIME_LABEL)
 
-    # path = get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection)[:-4] + '_comparison3'
-    # path = get_results_path(300, 24880, pysr_version=11003, pysr_model_selection=26)[:-4] + '_comparison3'
     path = 'period_results/4way'
     os.makedirs(os.path.dirname(path), exist_ok=True)
     img_path = path + ('.pdf' if args.pdf else '.png')
     plt.savefig(img_path, dpi=800, bbox_inches='tight')
-    print('Saved figure to', path + '.png')
+    print('Saved figure to', img_path)
+    plt.close(fig)
+
+
+def plot_2way_comparison(args):
+    # Create the figure and axes
+    # fig, axs = plt.subplots(2, 2, figsize=(12, 10))
+    fig, axs = plt.subplots(
+        1, 2,
+        figsize=(12, 5),
+        gridspec_kw={'wspace': 0.1, 'hspace': 0.1},
+    )
+    axs = axs.flatten()
+
+    show_xs = [True, True]
+    show_ys = [True, False]
+
+    for ax in axs:
+        ax.set_aspect('equal', adjustable='box')
+
+    ticks = [0.55, 0.60, 0.65, 0.70, 0.75]
+    for ax, show_x, show_y in zip(axs, show_xs, show_ys):
+        ax.set_xticks(ticks)
+        if not show_x:
+            ax.set_xticklabels([])
+        ax.set_yticks(ticks)
+        if not show_y:
+            ax.set_yticklabels([])
+
+    pure_sr_results = load_pickle(get_results_path(300, pysr_version=83941, pysr_model_selection=40, pure_sr=True))
+    pure_sr2_results = load_pickle(get_results_path(300, version=28114, pysr_version=41564, pysr_model_selection=35))
+
+    model_results = [pure_sr_results, pure_sr2_results]
+    titles = ['Pure SR', 'Pure SR (no intermediate features)']
+
+    for i in range(2):
+        results = model_results[i]
+        show_x = show_xs[i]
+        show_y = show_ys[i]
+
+        # P12s, P23s = get_period_ratios(args.Ngrid)
+        P12s, P23s = get_period_ratios(300)
+
+        results = [d['mean'] if d is not None else np.nan for d in results]
+        # results = [4. if np.isnan(r) else r for r in results]
+        results = np.array(results)
+        X,Y,Z = get_centered_grid(P12s, P23s, results)
+
+        cmap = COLOR_MAP.copy().reversed()
+        cmap.set_bad(color='white')
+        im = axs[i].pcolormesh(X, Y, Z, vmin=4, vmax=9, cmap=cmap, rasterized=True)
+
+        if show_x:
+            axs[i].set_xlabel("P1/P2")
+        else:
+            axs[i].set_xlabel("")
+        if show_y:
+            axs[i].set_ylabel("P2/P3")
+        else:
+            axs[i].set_ylabel("")
+
+        axs[i].set_title(titles[i])
+
+    # Create a single colorbar
+    cb = fig.colorbar(im, ax=axs.ravel().tolist())
+    cb.set_label(INSTABILITY_TIME_LABEL)
+
+    path = 'period_results/2way'
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    img_path = path + ('.pdf' if args.pdf else '.png')
+    plt.savefig(img_path, dpi=800, bbox_inches='tight')
+    print('Saved figure to', img_path)
     plt.close(fig)
 
 
@@ -1059,14 +1136,14 @@ def calculate_rmse(Ngrid, version=None, pysr_version=None, pysr_model_selection=
 
 def calculate_rmse_official():
     nn_rmse = calculate_rmse(300, version=24880)
+    our_rmse = calculate_rmse(300, version=24880, pysr_version=11003, pysr_model_selection=26)
     petit_rmse = calculate_rmse(300, petit=True)
     pure_sr = calculate_rmse(300, pure_sr=True, pysr_version=83941, pysr_model_selection=40)
-    our_rmse = calculate_rmse(300, version=24880, pysr_version=11003, pysr_model_selection=26)
     # pure2_sr = calculate_rmse(300, pure_sr=True, pysr_version=11003, pysr_model_selection=26)
     print(f'NN RMSE: {nn_rmse:.3f}')
+    print(f'Distilled EQs RMSE: {our_rmse:.3f}')
     print(f'Petit+2020 RMSE: {petit_rmse:.3f}')
     print(f'Pure SR RMSE: {pure_sr:.3f}')
-    print(f'Our SR RMSE: {our_rmse:.3f}')
 
 
 def get_citation():
@@ -1111,7 +1188,7 @@ def get_args():
     parser.add_argument('--equation_bounds', action='store_true')
     parser.add_argument('--job_array', action='store_true')
     parser.add_argument('--max_t', type=float, default=1e9, help='Maximum integration time for ground truth')
-    parser.add_argument('--special', type=str, default=None, choices=['4way', '4way_pysr', 'f1_features', 'exprs', 'rmse_official'])
+    parser.add_argument('--special', type=str, default=None, choices=['4way', '2way', '4way_pysr', 'f1_features', 'exprs', 'rmse_official'])
     parser.add_argument('--minimal_plot', action='store_true')
     parser.add_argument('--rmse_diff', action='store_true')
 
@@ -1194,6 +1271,8 @@ if __name__ == '__main__':
     if args.special:
         if args.special == '4way':
             plot_4way_comparison(args)
+        elif args.special == '2way':
+            plot_2way_comparison(args)
         elif args.special == '4way_pysr':
             plot_4way_pysr_comparison(args)
         elif args.special == 'f1_features':

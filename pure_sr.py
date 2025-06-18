@@ -12,7 +12,7 @@ import torch
 import einops
 from sr import LL_LOSS
 
-def ll_loss_with_f1(T):
+def ll_loss(T):
     s = """
         function my_loss(tree, dataset::Dataset{T,L}, options, idx)::L where {T,L}
             if tree.degree != 2
@@ -114,7 +114,7 @@ def ll_loss_with_f1(T):
     return s.replace("NUM_TIMES", str(T))
 
 
-def mse_loss_with_f1(T):
+def mse_loss(T):
     s = """
         function my_loss(tree, dataset::Dataset{T,L}, options, idx)::L where {T,L}
             if tree.degree != 2
@@ -185,7 +185,7 @@ def mse_loss_with_f1(T):
     return s.replace("NUM_TIMES", str(T))
 
 
-def load_data(n, use_prior=False):
+def load_data(n):
     # use input data that's the same as the neural network (already normalized, etc)
     # this makes it easier to evaluate and compare to my other approaches
     model = spock_reg_model.load(24880)
@@ -236,8 +236,6 @@ def option(*param_decls, **attrs):
 @option("--version", type=int, default=None)
 @option("--log/--no_log", default=True)
 @option("--time_in_hours", type=float, default=8)
-@option("--use_prior/--no_use_prior", default=False)
-@option("--f1/--no_f1", default=True)
 def main(
     niterations,
     maxsize,
@@ -247,28 +245,24 @@ def main(
     n,
     seed,
     loss_fn,
-    use_prior,
-    f1,
     version,
 ):
 
-    X, Xflat, yflat = load_data(n, use_prior=use_prior)
+    X, Xflat, yflat = load_data(n)
 
-    if f1:
-        loss_f = mse_loss_with_f1 if loss_fn == 'mse' else ll_loss_with_f1
-        jl.seval(loss_f(X.shape[1]))
-        kwargs = {'loss_function': 'my_loss'}
-    else:
-        if loss_fn == 'll':
-            kwargs = {'elementwise_loss': LL_LOSS}
-        else:
-            # mse is default
-            kwargs = {}
+    loss_f = mse_loss if loss_fn == 'mse' else ll_loss
+    jl.seval(loss_f(X.shape[1]))
+    kwargs = {'loss_function': 'my_loss'}
 
     if version is None:
         version = random.randint(0, 100000)
         while os.path.exists(f'sr_results/{version}.pkl'):
             version = random.randint(0, 100000)
+
+        # touch the pkl file so that it exists
+        with open(f'sr_results/{version}.pkl', 'wb') as f:
+            pkl.dump({}, f)
+
 
     try:
         num_cpus = int(os.environ.get('SLURM_CPUS_ON_NODE')) * int(os.environ.get('SLURM_JOB_NUM_NODES'))
@@ -294,10 +288,7 @@ def main(
                 config=config,
             )
 
-        if f1:
-            kwargs = {'loss_function': 'my_loss'}
-        elif loss_fn == 'special':
-            kwargs = {'elementwise_loss': LL_LOSS}
+        kwargs = {'loss_function': 'my_loss'}
 
         model = PySRRegressor(
             procs=num_cpus,
