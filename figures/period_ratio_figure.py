@@ -829,18 +829,18 @@ def plot_4way_comparison(args):
     plt.close(fig)
 
 
-def plot_2way_comparison(args):
+def plot_pure_sr_comparison(args):
     # Create the figure and axes
     # fig, axs = plt.subplots(2, 2, figsize=(12, 10))
     fig, axs = plt.subplots(
-        1, 2,
-        figsize=(12, 5),
+        2, 2,
+        figsize=(12, 10),
         gridspec_kw={'wspace': 0.1, 'hspace': 0.1},
     )
     axs = axs.flatten()
 
-    show_xs = [True, True]
-    show_ys = [True, False]
+    show_xs = [False, False, True, True]
+    show_ys = [True, False, True, False]
 
     for ax in axs:
         ax.set_aspect('equal', adjustable='box')
@@ -854,13 +854,15 @@ def plot_2way_comparison(args):
         if not show_y:
             ax.set_yticklabels([])
 
+    ground_truth_results = load_pickle(get_results_path(300, ground_truth=True))
+    eq_results = load_pickle(get_results_path(300, version=24880, pysr_version=11003, pysr_model_selection=26))
     pure_sr_results = load_pickle(get_results_path(300, pysr_version=83941, pysr_model_selection=40, pure_sr=True))
     pure_sr2_results = load_pickle(get_results_path(300, version=28114, pysr_version=41564, pysr_model_selection=35))
 
-    model_results = [pure_sr_results, pure_sr2_results]
-    titles = ['Pure SR', 'Pure SR (no intermediate features)']
+    model_results = [ground_truth_results, eq_results, pure_sr_results, pure_sr2_results]
+    titles = ['Ground truth', 'Distilled equations', 'Pure SR', 'Pure SR (no intermediate features)']
 
-    for i in range(2):
+    for i in range(4):
         results = model_results[i]
         show_x = show_xs[i]
         show_y = show_ys[i]
@@ -869,12 +871,12 @@ def plot_2way_comparison(args):
         P12s, P23s = get_period_ratios(300)
 
         results = [d['mean'] if d is not None else np.nan for d in results]
-        # results = [4. if np.isnan(r) else r for r in results]
+        results = [4. if np.isnan(r) else r for r in results]
         results = np.array(results)
         X,Y,Z = get_centered_grid(P12s, P23s, results)
 
         cmap = COLOR_MAP.copy().reversed()
-        cmap.set_bad(color='white')
+        # cmap.set_bad(color='white')
         im = axs[i].pcolormesh(X, Y, Z, vmin=4, vmax=9, cmap=cmap, rasterized=True)
 
         if show_x:
@@ -889,10 +891,10 @@ def plot_2way_comparison(args):
         axs[i].set_title(titles[i])
 
     # Create a single colorbar
-    cb = fig.colorbar(im, ax=axs.ravel().tolist())
+    cb = fig.colorbar(im, ax=axs.ravel().tolist(), shrink=0.6)
     cb.set_label(INSTABILITY_TIME_LABEL)
 
-    path = 'period_results/2way'
+    path = 'period_results/pure_sr'
     os.makedirs(os.path.dirname(path), exist_ok=True)
     img_path = path + ('.pdf' if args.pdf else '.png')
     plt.savefig(img_path, dpi=800, bbox_inches='tight')
@@ -1188,7 +1190,7 @@ def get_args():
     parser.add_argument('--equation_bounds', action='store_true')
     parser.add_argument('--job_array', action='store_true')
     parser.add_argument('--max_t', type=float, default=1e9, help='Maximum integration time for ground truth')
-    parser.add_argument('--special', type=str, default=None, choices=['4way', '2way', '4way_pysr', 'f1_features', 'exprs', 'rmse_official'])
+    parser.add_argument('--special', type=str, default=None, choices=['4way', 'pure_sr', '4way_pysr', 'f1_features', 'exprs', 'rmse_official'])
     parser.add_argument('--minimal_plot', action='store_true')
     parser.add_argument('--rmse_diff', action='store_true')
 
@@ -1271,8 +1273,8 @@ if __name__ == '__main__':
     if args.special:
         if args.special == '4way':
             plot_4way_comparison(args)
-        elif args.special == '2way':
-            plot_2way_comparison(args)
+        elif args.special == 'pure_sr':
+            plot_pure_sr_comparison(args)
         elif args.special == '4way_pysr':
             plot_4way_pysr_comparison(args)
         elif args.special == 'f1_features':
