@@ -59,7 +59,7 @@ def get_args():
     print(utils2.get_script_execution_command())
     parser = argparse.ArgumentParser()
     parser.add_argument('--N', type=int, default=50)
-    parser.add_argument('--samples', type=int, default=1) # don't need samples since our model is basically deterministic
+    parser.add_argument('--samples', type=int, default=100) # don't need samples since our model is basically deterministic
     parser.add_argument('--version', '-v', type=int, default=24880)
 
     parser.add_argument('--paper-ready', '-p', action='store_true')
@@ -86,6 +86,9 @@ version = args.version
 
 if args.pysr_version is not None:
     args.turbo = True
+
+if args.turbo:
+    args.samples = 1
 
 # try:
 #     cleaned = pd.read_csv('cur_plot_dataset_1604437382.10866.csv')#'cur_plot_dataset_1604339344.2705607.csv')
@@ -301,6 +304,73 @@ if model.cuda:
     Xflat = Xflat.cuda()
 
 
+def fast_truncnorm(
+        loc, scale, left=jnp.inf, right=jnp.inf,
+        d=10000, nsamp=50, seed=0):
+    """Fast truncnorm sampling.
+
+    Assumes scale and loc have the desired shape of output.
+    length is number of elements.
+    Select nsamp based on expecting at minimum one sample of a Gaussian
+        to fit within your (left, right) range.
+    Select d based on memory considerations - need to operate on
+        a (d, nsamp) array.
+    """
+    oldscale = scale
+    oldloc = loc
+
+    scale = scale.reshape(-1)
+    loc = loc.reshape(-1)
+    samples = jnp.zeros_like(scale)
+    start = 0
+    try:
+        rng = PRNGKey(seed)
+    except:
+        rng = 0
+
+    for start in range(0, scale.shape[0], d):
+
+        end = start + d
+        if end > scale.shape[0]:
+            end = scale.shape[0]
+
+        cd = end-start
+        try:
+            rand_out = normal(
+                rng,
+                (nsamp, cd)
+            )
+        except:
+            rand_out = np.random.normal(size=(nsamp, cd))
+        rng += 1
+
+        rand_out = (
+            rand_out * scale[None, start:end]
+            + loc[None, start:end]
+        )
+
+        #rand_out is (nsamp, cd)
+        if right == jnp.inf:
+            mask = (rand_out > left)
+        elif left == jnp.inf:
+            mask = (rand_out < right)
+        else:
+            mask = (rand_out > left) & (rand_out < right)
+
+        first_good_val = rand_out[
+            mask.argmax(0), jnp.arange(cd)
+        ]
+
+        try:
+            samples = jax.ops.index_update(
+                samples, np.s_[start:end], first_good_val
+            )
+        except:
+            samples[start:end] = first_good_val
+
+    return samples.reshape(*oldscale.shape)
+
+
 def get_predictions(model, samples, turbo=False):
 
     if turbo:
@@ -318,77 +388,14 @@ def get_predictions(model, samples, turbo=False):
         # copy back out into (samples, X.shape[0], X.shape[1], 2)
         time = einops.repeat(time, '1 i j k -> samples i j k', samples=samples)
 
-    def fast_truncnorm(
-            loc, scale, left=jnp.inf, right=jnp.inf,
-            d=10000, nsamp=50, seed=0):
-        """Fast truncnorm sampling.
-
-        Assumes scale and loc have the desired shape of output.
-        length is number of elements.
-        Select nsamp based on expecting at minimum one sample of a Gaussian
-            to fit within your (left, right) range.
-        Select d based on memory considerations - need to operate on
-            a (d, nsamp) array.
-        """
-        oldscale = scale
-        oldloc = loc
-
-        scale = scale.reshape(-1)
-        loc = loc.reshape(-1)
-        samples = jnp.zeros_like(scale)
-        start = 0
-        try:
-            rng = PRNGKey(seed)
-        except:
-            rng = 0
-
-        for start in range(0, scale.shape[0], d):
-
-            end = start + d
-            if end > scale.shape[0]:
-                end = scale.shape[0]
-
-            cd = end-start
-            try:
-                rand_out = normal(
-                    rng,
-                    (nsamp, cd)
-                )
-            except:
-                rand_out = np.random.normal(size=(nsamp, cd))
-            rng += 1
-
-            rand_out = (
-                rand_out * scale[None, start:end]
-                + loc[None, start:end]
-            )
-
-            #rand_out is (nsamp, cd)
-            if right == jnp.inf:
-                mask = (rand_out > left)
-            elif left == jnp.inf:
-                mask = (rand_out < right)
-            else:
-                mask = (rand_out > left) & (rand_out < right)
-
-            first_good_val = rand_out[
-                mask.argmax(0), jnp.arange(cd)
-            ]
-
-            try:
-                samples = jax.ops.index_update(
-                    samples, np.s_[start:end], first_good_val
-                )
-            except:
-                samples[start:end] = first_good_val
-
-        return samples.reshape(*oldscale.shape)
-
-    samps_time = np.array(fast_truncnorm(
-            time[..., 0], time[..., 1],
-            left=4, d=10000, nsamp=40,
-            seed=int((ttime()*1e6) % 1e10)
-        ))
+    if samples == 1:
+        samps_time = time[0, :, :, 0]
+    else:
+        samps_time = np.array(fast_truncnorm(
+                time[..., 0], time[..., 1],
+                left=4, d=10000, nsamp=40,
+                seed=int((ttime()*1e6) % 1e10)
+            ))
 
     #Resample with prior:
     if not args.extrapolate:
@@ -408,7 +415,7 @@ def get_predictions(model, samples, turbo=False):
         top = 100.
         bin_edges = np.linspace(9, top, num=bins)
         cum_values = [0] + list(np.cumsum(prior(bin_edges)*(bin_edges[1] - bin_edges[0]))) + [1]
-        bin_edges = [9.] +list(bin_edges)+[top]
+        bin_edges = [9.] + list(bin_edges)+[top]
         inv_cdf = interp1d(cum_values, bin_edges)
         r = np.random.rand(n_samples)
         samples = inv_cdf(r)
