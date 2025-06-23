@@ -279,39 +279,29 @@ def calculate_results(args):
         return
 
     path = get_results_path(args)
-    # if os.path.exists(path):
-    if False:
-        results = load_pickle(path)
-    else:
-        results = {}
-        datasets = ['val', 'test', 'random']
-        for dataset in datasets:
-            args.dataset = dataset
+    results = {}
+    datasets = ['val', 'test', 'random']
+    for dataset in datasets:
+        args.dataset = dataset
 
-            if args.eval_type in ['nn', 'petit']:
-                rmse = calculate_rmse(args)
-                results[dataset] = rmse
+        if args.eval_type in ['nn', 'petit']:
+            rmse = calculate_rmse(args)
+            results[dataset] = rmse
+        else:
+            if args.eval_type == 'pure_sr':
+                sr_results = get_pure_sr_results(args.pysr_version)
             else:
-                if args.eval_type == 'pure_sr':
-                    sr_results = get_pure_sr_results(args.pysr_version)
-                else:
-                    assert args.eval_type == 'pysr'
-                    sr_results = get_pysr_results(args.pysr_version)
+                assert args.eval_type == 'pysr'
+                sr_results = get_pysr_results(args.pysr_version)
 
-                dataset_results = {}
-                for c in sr_results['complexity']:
-                    args.pysr_model_selection = c
-                    rmse = calculate_rmse(args)
-                    dataset_results[c] = rmse
+            dataset_results = {}
+            for c in sr_results['complexity']:
+                args.pysr_model_selection = c
+                rmse = calculate_rmse(args)
+                dataset_results[c] = rmse
 
-                results[dataset] = dataset_results
-        save_pickle(results, path)
-
-    if type(results['val']) == dict:
-        best_complexity = min(results['val'].items(), key=lambda x: x[1])[0]
-        return best_complexity
-    else:
-        return None
+            results[dataset] = dataset_results
+    save_pickle(results, path)
 
 
 def get_results_path(args):
@@ -345,6 +335,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--version', type=int, default=None)
     parser.add_argument('--pysr_version', type=int, default=None)
+    parser.add_argument('--best_complexity', action='store_true')
     parser.add_argument('--dataset', type=str, default='all', choices=['train','val','test', 'random', 'all'])
     parser.add_argument('--eval_type', type=str, default='pysr', choices=['pure_sr', 'pysr', 'nn', 'petit'])
     parser.add_argument('--pysr_model_selection', type=str, default='accuracy', help='"best", "accuracy", "score", or an integer of the pysr equation complexity.')
@@ -366,6 +357,10 @@ def get_args():
 
 if __name__ == '__main__':
     args = get_args()
-    best_complexity = calculate_results(args)
-    if best_complexity is not None:
+    if args.best_complexity:
+        path = get_results_path(args)
+        results = load_pickle(path)
+        best_complexity = min(results['val'].items(), key=lambda x: x[1])[0]
         print(best_complexity)
+    else:
+        calculate_results(args)

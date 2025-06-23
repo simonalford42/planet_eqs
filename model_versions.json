@@ -1,19 +1,19 @@
 {
   "nn_version": 1,
   "pysr_version": 1,
-  "pysr_model_selection": 5,
+  "pysr_model_selection": 11,
   "pure_sr_version": 2,
-  "pure_sr_model_selection": 3,
+  "pure_sr_model_selection": 5,
   "pure_sr2_version": 3,
-  "pure_sr2_model_selection": 23,
+  "pure_sr2_model_selection": 25,
 
   "mse_nn_version": 2,
   "mse_pysr_version": 4,
-  "mse_pysr_model_selection": 5,
+  "mse_pysr_model_selection": 9,
   "mse_pure_sr_version": 5,
-  "mse_pure_sr_model_selection": 3,
+  "mse_pure_sr_model_selection": 5,
   "mse_pure_sr2_version": 6,
-  "mse_pure_sr2_model_selection": 23,
+  "mse_pure_sr2_model_selection": 15,
 
   "k": {
     "2":  { "version": 1,  "pysr_version": 1  },
