@@ -1,17 +1,9 @@
-# to be downloaded over globus:
 data
-*.png
-*.pdf
 __pycache__
-*.sw*
 wandb
 out
-tb_logs
 sr_out
 models
-*.ckpt
-*.pt
-*.npy
 graphics
 
 # ignore everything in results, sr_results, pickles
