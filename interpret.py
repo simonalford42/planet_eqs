@@ -11,6 +11,7 @@ import matplotlib.ticker as ticker
 plt.rcParams["font.family"] = "serif"
 plt.rcParams['mathtext.fontset']='dejavuserif'
 import pandas as pd
+from utils import load_json
 import argparse
 
 def best_result(all_results):
@@ -596,29 +597,15 @@ def make_pareto_plot(results, important_complexities=None, rmse=True, plot_unimp
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--version', type=int, default=24880)
-    parser.add_argument('--pysr_version', type=int, default=11003)
-    parser.add_argument('--mse_nn_version', type=int, default=12318)
-    parser.add_argument('--mse_pysr_version', type=int, default=93102)
-    parser.add_argument('--pure_sr_version', type=int, default=83941)
-    # parser.add_argument('--pure_sr2_version', type=int, default=28114)
+    parser.add_argument('--version_json', type=str, default='official_versions.json')
     args = parser.parse_args()
     return args
 
 
-def official_stuff():
-    args = get_args()
-    feature_nn = get_feature_nn(args.version)
-    results = get_pysr_results(args.pysr_version, version=args.version, include_ssx=False, feature_nn=feature_nn)
-
-    test_results = load_pickle(f'pickles/pysr_results_all_{args.version}_{args.pysr_version}.pkl')
-    complexity, _ = min(test_results['val'].items(), key=lambda e: e[1])
-    test_error = test_results['test'][complexity]
-    random_error = test_results['random'][complexity]
-
-    print('Equation complexity with best error on validation set:', complexity)
-    print(f'Error for best equation on resonant test set: {test_error:.3f}, random: {random_error:.3f}')
-    print()
+def official_stuff(args):
+    v = load_json(args.version_json)
+    feature_nn = get_feature_nn(v['nn_version'])
+    results = get_pysr_results(v['pysr_version'], version=v['nn_version'], include_ssx=False, feature_nn=feature_nn)
 
     print('phi features latex string:\n')
     f1_str = f1_latex_string(feature_nn, include_ssx=True, include_ssx_bias=True, pysr_results=results)
@@ -630,28 +617,23 @@ def official_stuff():
     print(f2_str)
     print()
 
-    nn_results = load_pickle(f'pickles/nn_results_all_{args.mse_nn_version}.pkl')
+    nn_results = load_pickle(f'pickles/nn_results_all_{v["mse_nn_version"]}.pkl')
     petit_results = load_pickle('pickles/petit_results_all.pkl')
-    pure_sr_results = load_pickle(f'pickles/pure_sr_results_all_{args.pure_sr_version}.pkl')
-    # direct_sr_results = load_pickle(f'pickles/pysr_results_all_{28114_9054.pkl')
-    pysr_results = load_pickle(f'pickles/pysr_results_all_{args.version}_{args.mse_pysr_version}.pkl')
+    pure_sr_results = load_pickle(f'pickles/pure_sr_results_all_{v["mse_pure_sr_version"]}.pkl')
+    pure_sr2_results = load_pickle(f'pickles/pysr_results_all_28114_{v["mse_pure_sr2_version"]}.pkl')
+    pysr_results = load_pickle(f'pickles/pysr_results_all_{v["nn_version"]}_{v["mse_pysr_version"]}.pkl')
 
     pysr_c, _ = min(pysr_results['val'].items(), key=lambda e: e[1])
-    pure_c, _ = min(pure_sr_results['val'].items(), key=lambda e: e[1])
-    # direct_c, _ = min(direct_sr_results['val'].items(), key=lambda e: e[1])
-
-    print()
-    print('Best equation complexity for ours:', pysr_c)
-    print('Best equation complexity for pure sr:', pure_c)
-    print()
+    puresr_c, _ = min(pure_sr_results['val'].items(), key=lambda e: e[1])
+    puresr2_c, _ = min(pure_sr2_results['val'].items(), key=lambda e: e[1])
 
     # table for paper
     print('Table of results:\n')
-    print(f'NN: resonant: {nn_results["test"]:.3f}, random {nn_results["random"]:.3f}')
-    print(f'Ours: resonant: {pysr_results["test"][pysr_c]:.3f}, random {pysr_results["random"][pysr_c]:.3f}')
-    print(f'Petit: resonant: {petit_results["test"]:.3f}, random {petit_results["random"]:.3f}')
-    # print(f'Direct SR: resonant: {direct_sr_results["test"][direct_c]:.3f}, random {direct_sr_results["random"][direct_c]:.3f}')
-    print(f'Pure SR: resonant: {pure_sr_results["test"][pure_c]:.3f}, random {pure_sr_results["random"][pure_c]:.3f}')
+    print(f'NN: resonant: {nn_results["test"]:.2f}, random {nn_results["random"]:.2f}')
+    print(f'Ours: resonant: {pysr_results["test"][pysr_c]:.2f}, random {pysr_results["random"][pysr_c]:.2f}')
+    print(f'Petit: resonant: {petit_results["test"]:.2f}, random {petit_results["random"]:.2f}')
+    print(f'Pure SR: resonant: {pure_sr_results["test"][puresr_c]:.2f}, random {pure_sr_results["random"][puresr_c]:.2f}')
+    print(f'Pure SR (no intermediate features): resonant: {pure_sr2_results["test"][puresr2_c]:.2f}, random {pure_sr2_results["random"][puresr2_c]:.2f}')
 
     important_complexities = results['complexity'].tolist()
     important_complexities, _ = paretoize(important_complexities, results['rmse'].tolist(), replace=False)
@@ -662,4 +644,5 @@ def official_stuff():
 
 
 if __name__ == '__main__':
-    official_stuff()
+    args = get_args()
+    official_stuff(args)

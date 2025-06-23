@@ -1,4 +1,5 @@
 import argparse
+import os
 import numpy as np
 import spock_reg_model
 from tqdm.notebook import tqdm
@@ -277,31 +278,40 @@ def calculate_results(args):
         print(f'RMSE for {args.dataset} dataset: {rmse}')
         return
 
-    results = {}
-    datasets = ['val', 'test', 'random']
-    for dataset in datasets:
-        args.dataset = dataset
+    path = get_results_path(args)
+    # if os.path.exists(path):
+    if False:
+        results = load_pickle(path)
+    else:
+        results = {}
+        datasets = ['val', 'test', 'random']
+        for dataset in datasets:
+            args.dataset = dataset
 
-        if args.eval_type in ['nn', 'petit']:
-            rmse = calculate_rmse(args)
-            results[dataset] = rmse
-        else:
-            if args.eval_type == 'pure_sr':
-                sr_results = get_pure_sr_results(args.pysr_version)
-            else:
-                assert args.eval_type == 'pysr'
-                sr_results = get_pysr_results(args.pysr_version)
-
-            dataset_results = {}
-            for c in sr_results['complexity']:
-                args.pysr_model_selection = c
+            if args.eval_type in ['nn', 'petit']:
                 rmse = calculate_rmse(args)
-                dataset_results[c] = rmse
+                results[dataset] = rmse
+            else:
+                if args.eval_type == 'pure_sr':
+                    sr_results = get_pure_sr_results(args.pysr_version)
+                else:
+                    assert args.eval_type == 'pysr'
+                    sr_results = get_pysr_results(args.pysr_version)
 
-            results[dataset] = dataset_results
+                dataset_results = {}
+                for c in sr_results['complexity']:
+                    args.pysr_model_selection = c
+                    rmse = calculate_rmse(args)
+                    dataset_results[c] = rmse
 
-    results_path = get_results_path(args)
-    save_pickle(results, results_path)
+                results[dataset] = dataset_results
+        save_pickle(results, path)
+
+    if type(results['val']) == dict:
+        best_complexity = min(results['val'].items(), key=lambda x: x[1])[0]
+        return best_complexity
+    else:
+        return None
 
 
 def get_results_path(args):
@@ -335,29 +345,27 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--version', type=int, default=None)
     parser.add_argument('--pysr_version', type=int, default=None)
-    parser.add_argument('--dataset', type=str, default='val', choices=['train','val','test', 'random', 'all'])
+    parser.add_argument('--dataset', type=str, default='all', choices=['train','val','test', 'random', 'all'])
     parser.add_argument('--eval_type', type=str, default='pysr', choices=['pure_sr', 'pysr', 'nn', 'petit'])
     parser.add_argument('--pysr_model_selection', type=str, default='accuracy', help='"best", "accuracy", "score", or an integer of the pysr equation complexity.')
-    parser.add_argument('--best_complexity', action='store_true')
 
     args = parser.parse_args()
-    if args.pysr_version is None and args.version is not None:
-        args.eval_type = 'nn'
+    if args.pysr_version is None:
+        if args.version is not None:
+            args.eval_type = 'nn'
+        else:
+            args.eval_type = 'petit'
+    else:
+        if args.version is None:
+            args.eval_type = 'pure_sr'
+        else:
+            args.eval_type = 'pysr'
+
     return args
 
 
 if __name__ == '__main__':
     args = get_args()
-    if args.best_complexity:
-        results = load_pickle(get_results_path(args))
-        # find complexity that gives lowest val rmse
-        best_complexity, val_loss = min(results['val'].items(), key=lambda x: x[1])
+    best_complexity = calculate_results(args)
+    if best_complexity is not None:
         print(best_complexity)
-    else:
-        calculate_results(args)
-    # args.eval_type = 'nn'
-    # args.dataset = 'all'
-    # for version in [91541, 22676, 44530, 38137, 42062]:
-    #     args.version = version
-    #     args.dataset = 'all'
-    #     calculate_results(args)

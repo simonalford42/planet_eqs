@@ -604,7 +604,7 @@ def get_data(
         print(f'Plotting with {mask.sum()} total elements, when plot_random={plot_random}')
         test_dataset = torch.utils.data.TensorDataset(X[train_len:][r[train_len:]][:, :, idxes], y[train_len:][r[train_len:]])
 
-    test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=3000, shuffle=False, pin_memory=True, num_workers=8)
+    test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=3000, shuffle=False, pin_memory=True, num_workers=0)
 
     kwargs['model'].ssX = copy(ssX)
 
@@ -753,9 +753,9 @@ class VarModel(pl.LightningModule):
     def path(self):
         version = self.hparams['version']
         if 'eval' in self.hparams and self.hparams['eval']:
-            if 'load_f1' in self.hparams and self.hparams['load_f1']:
+            if 'load_f1' in self.hparams and self.hparams['load_f1'] is not None:
                 version =  self.hparams['load_f1']
-            if 'load_f1_f2' in self.hparams and self.hparams['load_f1_f2']:
+            if 'load_f1_f2' in self.hparams and self.hparams['load_f1_f2'] is not None:
                 version =  self.hparams['load_f1_f2']
 
         path = f'{version}_{self.hparams["seed"]}'
@@ -781,9 +781,9 @@ class VarModel(pl.LightningModule):
             hparams['f2_variant'] = 'mlp'
 
         load_version = None
-        if 'load_f2' in hparams and hparams['load_f2']:
+        if 'load_f2' in hparams and hparams['load_f2'] is not None:
             load_version = hparams['load_f2']
-        elif 'load_f1_f2' in hparams and hparams['load_f1_f2']:
+        elif 'load_f1_f2' in hparams and hparams['load_f1_f2'] is not None:
             load_version = hparams['load_f1_f2']
         if load_version is not None:
             model = load(load_version)
@@ -821,7 +821,7 @@ class VarModel(pl.LightningModule):
             if len(regress_nn.module_list) == 1:
                 # pysr only predicts mean. predict std using NN loaded for f1, or a new network
                 print('PySR only predicts mean. Adding a new network to predict std.')
-                if 'load_f1' in hparams and hparams['load_f1']:
+                if 'load_f1' in hparams and hparams['load_f1'] is not None:
                     print('Using --load_f1 network regress_nn to predict std')
                     assert 0, 'plz debug this before using it, something seems off'
                     base_f2 = load(hparams['load_f1']).regress_nn
@@ -877,7 +877,7 @@ class VarModel(pl.LightningModule):
                 if len(residual_net.module_list) == 1:
                     # pysr only predicts mean. predict std using NN loaded for f1, or a new network
                     print('PySR only predicts mean. Adding a new network to predict std.')
-                    if 'load_f1' in hparams and hparams['load_f1']:
+                    if 'load_f1' in hparams and hparams['load_f1'] is not None:
                         print('Using --load_f1 network regress_nn to predict std')
                         base_f2 = load(hparams['load_f1']).regress_nn
                     else:
@@ -902,15 +902,15 @@ class VarModel(pl.LightningModule):
         feature_nn = None
         out_dim = hparams['latent'] # certain f1 variants might change this
 
-        if 'load_f1_feature_nn' in hparams and hparams['load_f1_feature_nn']:
+        if 'load_f1_feature_nn' in hparams and hparams['load_f1_feature_nn'] is not None:
             feature_nn = torch.load(hparams['load_f1_feature_nn'], seed=0)
             out_dim = feature_nn.linear.weight.shape[0]
-        elif any(p in hparams and hparams[p] for p in ['load_f1', 'load_f1_f2']):
+        elif any(p in hparams and hparams[p] is not None for p in ['load_f1', 'load_f1_f2']):
             load_version = None
-            if 'load_f1' in hparams and hparams['load_f1']:
+            if 'load_f1' in hparams and hparams['load_f1'] is not None:
                 load_version = hparams['load_f1']
             else:
-                assert 'load_f1_f2' in hparams and hparams['load_f1_f2']
+                assert 'load_f1_f2' in hparams and (hparams['load_f1_f2'] is not None)
                 load_version = hparams['load_f1_f2']
             model = load(load_version)
             feature_nn = model.feature_nn

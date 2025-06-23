@@ -19,9 +19,9 @@ except ImportError:
     import figures.spock as spock
 import pickle
 try:
-    from utils2 import assert_equal, load_pickle, get_script_execution_command
+    from utils2 import assert_equal, load_pickle, get_script_execution_command, load_json
 except ImportError:
-    from utils import assert_equal, load_pickle, get_script_execution_command
+    from utils import assert_equal, load_pickle, get_script_execution_command, load_json
 import multiprocessing as mp
 import argparse
 import time
@@ -578,10 +578,9 @@ def plot_results(args, metric=None):
 
     plt.tight_layout()
 
-    path = get_results_path(args.Ngrid, args.version, use_petit=args.petit, use_megno=args.megno, ground_truth=args.ground_truth, rmse_diff=args.rmse_diff, minimal_plot=args.minimal_plot, pure_sr=args.pure_sr, pysr_version=args.pysr_version)
+    path = get_results_path(args.Ngrid, args.version, use_petit=args.petit, use_megno=args.megno, ground_truth=args.ground_truth, rmse_diff=args.rmse_diff, minimal_plot=args.minimal_plot, pure_sr=args.pure_sr, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection)
     # get rid of .pkl
     path = path[:-4]
-    path += '_plot'
 
     if metric == 'std':
         path += '_std'
@@ -590,8 +589,8 @@ def plot_results(args, metric=None):
     if metric == 'mean2':
         path += '_mean2'
 
-    if args.pysr_version is not None:
-        path += f'_pysr_f2_v={args.pysr_version}/{args.pysr_model_selection}'
+    # if args.pysr_version is not None:
+    #     path += f'_pysr_f2_v={args.pysr_version}/{args.pysr_model_selection}'
 
     path += '.png' if not args.pdf else '.pdf'
 
@@ -728,10 +727,13 @@ def plot_results_pysr_f2(args):
         args.pysr_model_selection = model_selection
         args.title = f'Equation complexity = {model_selection}'
         plot_results(args)
+
     args.pysr_model_selection = original_model_selection
 
 
 def plot_4way_comparison(args):
+    v = load_json(args.version_json)
+
     # Create the figure and axes
     # fig, axs = plt.subplots(2, 2, figsize=(12, 10))
     fig, axs = plt.subplots(
@@ -757,17 +759,10 @@ def plot_4way_comparison(args):
             ax.set_yticklabels([])
 
 
-    # nn_results = load_pickle(get_results_path(args.Ngrid, args.version))
-    # eq_results = load_pickle(get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection))
-    # petit_results = load_pickle(get_results_path(args.Ngrid, use_petit=True))
-    # # megno_results = load_pickle(get_results_path(args.Ngrid, use_megno=True))
-    # ground_truth_results = load_pickle(get_results_path(args.Ngrid, ground_truth=True))
-    nn_results = load_pickle(get_results_path(300, version=24880))
-    eq_results = load_pickle(get_results_path(300, version=24880, pysr_version=11003, pysr_model_selection=26))
-    petit_results = load_pickle(get_results_path(300, use_petit=True))
-    # megno_results = load_pickle(get_results_path(args.Ngrid, use_megno=True))
-    ground_truth_results = load_pickle(get_results_path(300, ground_truth=True))
-
+    nn_results = load_pickle(get_results_path(args.Ngrid, v['nn_version']))
+    eq_results = load_pickle(get_results_path(args.Ngrid, v['nn_version'], pysr_version=v['pysr_version'], pysr_model_selection=v['pysr_model_selection']))
+    petit_results = load_pickle(get_results_path(args.Ngrid, use_petit=True))
+    ground_truth_results = load_pickle(get_results_path(args.Ngrid, ground_truth=True))
 
     # model_results = [nn_results, eq_results, petit_results, megno_results]
     # names = ['nn', 'eq', 'petit', 'megno']
@@ -782,7 +777,7 @@ def plot_4way_comparison(args):
         show_x = show_xs[i]
         show_y = show_ys[i]
 
-        P12s, P23s = get_period_ratios(300)
+        P12s, P23s = get_period_ratios(args.Ngrid)
 
         # get the results for the specific metric
         if name == 'petit':
@@ -830,6 +825,8 @@ def plot_4way_comparison(args):
 
 
 def plot_pure_sr_comparison(args):
+    v = load_json(args.version_json)
+
     # Create the figure and axes
     # fig, axs = plt.subplots(2, 2, figsize=(12, 10))
     fig, axs = plt.subplots(
@@ -854,10 +851,10 @@ def plot_pure_sr_comparison(args):
         if not show_y:
             ax.set_yticklabels([])
 
-    ground_truth_results = load_pickle(get_results_path(300, ground_truth=True))
-    eq_results = load_pickle(get_results_path(300, version=24880, pysr_version=11003, pysr_model_selection=26))
-    pure_sr_results = load_pickle(get_results_path(300, pysr_version=83941, pysr_model_selection=40, pure_sr=True))
-    pure_sr2_results = load_pickle(get_results_path(300, version=28114, pysr_version=41564, pysr_model_selection=35))
+    ground_truth_results = load_pickle(get_results_path(args.Ngrid, ground_truth=True))
+    eq_results = load_pickle(get_results_path(args.Ngrid, version=v['nn_version'], pysr_version=v['pysr_version'], pysr_model_selection=v['pysr_model_selection']))
+    pure_sr_results = load_pickle(get_results_path(args.Ngrid, pysr_version=v['pure_sr_version'], pysr_model_selection=v['pure_sr_model_selection'], pure_sr=True))
+    pure_sr2_results = load_pickle(get_results_path(args.Ngrid, version=28114, pysr_version=v['pure_sr2_version'], pysr_model_selection=v['pure_sr2_model_selection']))
 
     model_results = [ground_truth_results, eq_results, pure_sr_results, pure_sr2_results]
     titles = ['Ground truth', 'Distilled equations', 'Pure SR', 'Pure SR (no intermediate features)']
@@ -868,8 +865,7 @@ def plot_pure_sr_comparison(args):
         show_y = show_ys[i]
         title = titles[i]
 
-        # P12s, P23s = get_period_ratios(args.Ngrid)
-        P12s, P23s = get_period_ratios(300)
+        P12s, P23s = get_period_ratios(args.Ngrid)
 
         if title == 'Ground truth':
             results = [np.log10(d['ground_truth']) if d is not None else np.nan for d in results]
@@ -898,7 +894,7 @@ def plot_pure_sr_comparison(args):
     cb = fig.colorbar(im, ax=axs.ravel().tolist(), shrink=0.6)
     cb.set_label(INSTABILITY_TIME_LABEL)
 
-    path = 'period_results/pure_sr'
+    path = 'period_results/period_ratio_pure_sr'
     os.makedirs(os.path.dirname(path), exist_ok=True)
     img_path = path + ('.pdf' if args.pdf else '.png')
     plt.savefig(img_path, dpi=800, bbox_inches='tight')
@@ -1140,16 +1136,18 @@ def calculate_rmse(Ngrid, version=None, pysr_version=None, pysr_model_selection=
     return rmse
 
 
-def calculate_rmse_official():
-    nn_rmse = calculate_rmse(300, version=24880)
-    our_rmse = calculate_rmse(300, version=24880, pysr_version=11003, pysr_model_selection=26)
-    petit_rmse = calculate_rmse(300, petit=True)
-    pure_sr = calculate_rmse(300, pure_sr=True, pysr_version=83941, pysr_model_selection=40)
-    # pure2_sr = calculate_rmse(300, pure_sr=True, pysr_version=11003, pysr_model_selection=26)
-    print(f'NN RMSE: {nn_rmse:.3f}')
-    print(f'Distilled EQs RMSE: {our_rmse:.3f}')
-    print(f'Petit+2020 RMSE: {petit_rmse:.3f}')
-    print(f'Pure SR RMSE: {pure_sr:.3f}')
+def calculate_rmses(args):
+    versions = load_json(args.version_json)
+    nn_rmse = calculate_rmse(args.Ngrid, version=versions['nn_version'])
+    our_rmse = calculate_rmse(args.Ngrid, version=versions['nn_version'], pysr_version=versions['pysr_version'], pysr_model_selection=versions['pysr_model_selection'])
+    petit_rmse = calculate_rmse(args.Ngrid, petit=True)
+    pure_sr = calculate_rmse(args.Ngrid, pure_sr=True, pysr_version=versions['pure_sr_version'], pysr_model_selection=versions['pure_sr_model_selection'])
+    pure_sr2 = calculate_rmse(args.Ngrid, version=28114, pysr_version=versions['pure_sr2_version'], pysr_model_selection=versions['pure_sr2_model_selection'])
+    print(f'NN RMSE: {nn_rmse:.2f}')
+    print(f'Distilled EQs RMSE: {our_rmse:.2f}')
+    print(f'Petit+2020 RMSE: {petit_rmse:.2f}')
+    print(f'Pure SR RMSE: {pure_sr:.2f}')
+    print(f'Pure SR (no intermediate features) RMSE: {pure_sr2:.2f}')
 
 
 def get_citation():
@@ -1194,9 +1192,10 @@ def get_args():
     parser.add_argument('--equation_bounds', action='store_true')
     parser.add_argument('--job_array', action='store_true')
     parser.add_argument('--max_t', type=float, default=1e9, help='Maximum integration time for ground truth')
-    parser.add_argument('--special', type=str, default=None, choices=['4way', 'pure_sr', '4way_pysr', 'f1_features', 'exprs', 'rmse_official'])
+    parser.add_argument('--special', type=str, default=None, choices=['4way', 'pure_sr', '4way_pysr', 'f1_features', 'exprs', 'rmse'])
     parser.add_argument('--minimal_plot', action='store_true')
     parser.add_argument('--rmse_diff', action='store_true')
+    parser.add_argument('--version_json', type=str, default='../official_versions.json', help='Path to the JSON file containing model versions')
 
     args = parser.parse_args()
 
@@ -1233,11 +1232,6 @@ def get_args():
         global GROUND_TRUTH_MAX_T
         GROUND_TRUTH_MAX_T = args.max_t
 
-    if args.special == '4way':
-        if args.pysr_version is None:
-            args.pysr_version = 11003
-            args.pysr_model_selection = 26
-
     return args
 
 
@@ -1265,10 +1259,8 @@ if __name__ == '__main__':
     if args.plot:
         if args.pysr_path and not args.pure_sr:
             plot_results_pysr_f2(args)
-            # pysr_error_analysis(args)
         else:
             plot_results(args)
-            # plot_summary_stats(args)
 
     if args.rmse:
         rmse = calculate_rmse(args.Ngrid, args.version, args.pysr_version, args.pysr_model_selection, args.petit, args.pure_sr, clip=True)
@@ -1285,8 +1277,8 @@ if __name__ == '__main__':
             plot_f1_features(args)
         elif args.special == 'exprs':
             plot_exprs(args)
-        elif args.special == 'rmse_official':
-            calculate_rmse_official()
+        elif args.special == 'rmse':
+            calculate_rmses(args)
 
     end = time.time()
     formatted_time = time.strftime('%H:%M:%S', time.gmtime(end - start))

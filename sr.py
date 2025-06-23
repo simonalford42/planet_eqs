@@ -4,9 +4,7 @@ import pysr
 import random
 
 from matplotlib import pyplot as plt
-import seaborn as sns
 import os
-sns.set_style('darkgrid')
 import spock_reg_model
 import numpy as np
 import argparse
@@ -108,7 +106,7 @@ INPUT_VARIABLE_NAMES = [LABELS[ix] for ix in INCLUDED_IXS]
 
 
 def load_inputs_and_targets(config):
-    model = spock_reg_model.load(version=config['version'])
+    model = spock_reg_model.load(version=config['nn_version'])
     model.make_dataloaders()
     model.eval()
 
@@ -152,7 +150,7 @@ def load_inputs_and_targets(config):
         y = out_dict['prediction']  # [B, 2]
         y = y[:, 0:1]  # stop predicting std too haha
 
-        if config['elementwise_loss'] == LL_LOSS:
+        if 'elementwise_loss' in config and config['elementwise_loss'] == LL_LOSS:
             # clip targets to be <= 9 so classification loss works properly
             y = torch.clamp(y, max=9)
 
@@ -308,11 +306,14 @@ def load_inputs_and_targets(config):
 
 
 def get_config(args):
-    id = random.randint(0, 100000)
-    while os.path.exists(f'sr_results/{id}.pkl'):
-        id = random.randint(0, 100000)
+    if args.version is None:
+        version = random.randint(0, 100000)
+        while os.path.exists(f'sr_results/{version}.pkl'):
+            version = random.randint(0, 100000)
+    else:
+        version = args.version
 
-    path = f'sr_results/{id}.csv'
+    path = f'sr_results/{version}.csv'
     # create the directory if it doesn't exist
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
@@ -355,7 +356,7 @@ def get_config(args):
     config.update(pysr_config)
     config['pysr_config'] = pysr_config
     config.update({
-        'id': id,
+        'version': version,
         'slurm_id': os.environ.get('SLURM_JOB_ID', None),
         'slurm_name': os.environ.get('SLURM_JOB_NAME', None),
     })
@@ -388,14 +389,15 @@ def run_pysr(config):
                    'losses': losses,
                    })
 
-    try:
-        # delete julia files: julia-1911988-17110333239-0016.out
-        subprocess.run(f'rm julia*.out', shell=True, check=True)
-    except subprocess.CalledProcessError as e:
-        print(f"An error occurred while trying to delete the backup files: {e}")
+    if os.path.exists('julia*.out'):
+        try:
+            # delete julia files: julia-1911988-17110333239-0016.out
+            subprocess.run(f'rm julia*.out', shell=True, check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"An error occurred while trying to delete the backup files: {e}")
 
     print(f"Saved to path: {config['equation_file']}")
-    print(f'Finished running pysr with pysr_version {config["id"]}')
+    print(f'Finished running pysr with pysr_version {config["version"]}')
 
 
 def parse_args():
@@ -403,8 +405,8 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Optional app description')
     # when importing from jupyter nb, it passes an arg to --f which we should just ignore
     parser.add_argument('--no_log', action='store_true', default=False, help='disable wandb logging')
-    parser.add_argument('--version', type=int, help='')
-
+    parser.add_argument('--nn_version', type=int, help='')
+    parser.add_argument('--version', type=int, default=None)
     parser.add_argument('--time_in_hours', type=float, default=8)
     parser.add_argument('--niterations', type=float, default=500000) # by default, use time in hours as limit
     parser.add_argument('--max_size', type=int, default=30)

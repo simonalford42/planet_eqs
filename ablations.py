@@ -6,7 +6,7 @@ import argparse
 SPLIT = 'test'
 
 
-def get_k_results(k_version_dict):
+def get_k_results(k_version_dict, overall=True):
     k_results = {}
     for k, v in k_version_dict.items():
         k = int(k)
@@ -19,8 +19,11 @@ def get_k_results(k_version_dict):
         results = {}
         for comp in all_rmses.keys():
             eq = pysr_results[pysr_results['complexity'] == comp].iloc[0]
-            overall_comp = overall_complexity(eq, k)
-            results[overall_comp] = all_rmses[comp]
+            if overall:
+                overall_comp = overall_complexity(eq, k)
+                results[overall_comp] = all_rmses[comp]
+            else:
+                results[comp] = all_rmses[comp]
 
         k_results[k] = results
     return k_results
@@ -49,6 +52,7 @@ def plot_combined_pareto(
     k_results,
     f2_linear_results,
     pure_sr_results,
+    pure_sr2_results,
     path,
 ):
     """
@@ -62,6 +66,8 @@ def plot_combined_pareto(
         Mapping {complexity: rmse} for the “Linear ψ” baseline.
     pure_sr_results
         Mapping {complexity: rmse} for the “Pure SR” baseline.
+    pure_sr2_results
+        Mapping {complexity: rmse} for the “Pure SR (no intermediate features)” baseline.
     path
         Destination path.
     """
@@ -106,17 +112,22 @@ def plot_combined_pareto(
     x, y = paretoize(x, y, replace=False)
     ax.plot(x, y, marker = "o", label = "Linear $\\psi$")
 
+    # pure SR 2 baseline
+    x, y = zip(*pure_sr2_results.items())
+    x, y = paretoize(x, y, replace=False)
+    ax.plot(x, y, marker = "o", label = "Pure SR (no intermediate features)")
+
     # pure SR baseline
     x, y = zip(*pure_sr_results.items())
     x, y = paretoize(x, y, replace=False)
     ax.plot(x, y, marker = "o", label = "Pure SR")
 
+
     first_line = ax.lines[0]     # or keep a handle returned by ax.plot
     first_line.set_zorder(10)    # any value larger than the others
 
-    ax.set_xlabel("Overall complexity", fontsize = 12, labelpad = 6)
-    ax.set_ylabel("RMSE (Resonant)", fontsize = 12, labelpad = 6)
-    # ax.set_title("Baselines vs. ours", fontsize = 14, pad = 8)
+    ax.set_xlabel("Overall complexity", fontsize=12, labelpad=6)
+    ax.set_ylabel("RMSE (Resonant)", fontsize=12, labelpad=6)
     ax.legend()
 
     # --- Save & return ------------------------------------------------------
@@ -129,7 +140,7 @@ def plot_combined_pareto(
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--path', type=str, default='graphics/pareto_comparison.pdf', help='Path to save the combined figure')
-    parser.add_argument('--version_json', type=str, default='ablation_versions.json', help='Path to the JSON file containing k versions')
+    parser.add_argument('--version_json', type=str, default='official_model_versions.json', help='Path to the JSON file containing model versions')
     return parser.parse_args()
 
 
@@ -138,10 +149,11 @@ def main():
     version_dict = load_json(args.version_json)
     k_results = get_k_results(version_dict['k'])
     f2_linear_results = get_f2_linear_results(version_dict['f2_linear'])
-    pure_sr_results = load_pickle(f'pickles/pure_sr_results_all_{version_dict["pure_sr_version"]}.pkl')[SPLIT]
+    pure_sr_results = load_pickle(f'pickles/pure_sr_results_all_{version_dict["mse_pure_sr_version"]}.pkl')[SPLIT]
     # get rid of entries with rmse over 2.0, because they were probably invalid equations
     pure_sr_results = {k: v for k, v in pure_sr_results.items() if v < 2.0}
-    plot_combined_pareto(k_results, f2_linear_results, pure_sr_results, args.path)
+    pure_sr2_results = load_pickle(f'pickles/pysr_results_all_28114_{version_dict["mse_pure_sr2_version"]}.pkl')[SPLIT]
+    plot_combined_pareto(k_results, f2_linear_results, pure_sr_results, pure_sr2_results, args.path)
 
 
 if __name__ == "__main__":

@@ -58,7 +58,7 @@ spockoutfile = '../data/spockprobstesttrio.npz'
 def get_args():
     print(utils2.get_script_execution_command())
     parser = argparse.ArgumentParser()
-    parser.add_argument('--N', type=int, default=50)
+    parser.add_argument('--N', type=int, default=5000)
     parser.add_argument('--samples', type=int, default=100) # don't need samples since our model is basically deterministic
     parser.add_argument('--version', '-v', type=int, default=24880)
 
@@ -87,8 +87,8 @@ version = args.version
 if args.pysr_version is not None:
     args.turbo = True
 
-if args.turbo:
-    args.samples = 1
+# if args.turbo:
+#     args.samples = 1
 
 # try:
 #     cleaned = pd.read_csv('cur_plot_dataset_1604437382.10866.csv')#'cur_plot_dataset_1604339344.2705607.csv')
