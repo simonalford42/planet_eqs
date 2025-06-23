@@ -1,16 +1,23 @@
+# data and figures/period_results will be downloaded from globus
 data
+figures/period_results
 __pycache__
 wandb
 out
 sr_out
 models
-graphics
 
-# ignore everything in results, sr_results, pickles
+# ignore everything in these folders
 pickles/**
 sr_results/**
 results/**
-# but include a few models we want to upload, results, etc
+figures/five_planet_figures/**
+graphics/**
+
+# but include a few models we want to upload, results, plots, etc
+!graphics/pareto_comparison.pdf
+!graphics/pareto_fig1.svg
+
 !results/24880_0/
 !results/28114_0/
 !results/12318_0/
@@ -60,3 +67,8 @@ results/**
 !pickles/pysr_results_all_42503.pkl
 
 
+!five_planet_figures/five_planet_main.pdf
+!five_planet_figures/five_planet_all.pdf
+!five_planet_figures/v24880_pysr11003_ms=29_N=5000_turbo_extrapolate.csv
+!five_planet_figures/v24880_pysr72420_ms=50_N=5000_turbo_extrapolate.csv
+!five_planet_figures/v28114_pysr41564_ms=35_N=5000_turbo_extrapolate.csv
