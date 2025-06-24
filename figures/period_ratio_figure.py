@@ -41,8 +41,7 @@ GROUND_TRUTH_MAX_T = 1e9 # Assigned in get_args function
 # COLOR_MAP = COLOR_MAP
 COLOR_MAP = plt.cm.plasma
 
-USE_SUBFOLDERS = False
-
+USE_SUBFOLDERS = True
 
 '''
 Example commands:
@@ -517,7 +516,7 @@ def plot_results(args, metric=None):
         cmap = plt.cm.bwr.copy()
         cmap.set_bad(color='white')
         norm = plt.Normalize(vmin=-8, vmax=8)
-        im = ax.pcolormesh(X, Y, Z, cmap=cmap, norm=norm)
+        im = ax.pcolormesh(X, Y, Z, cmap=cmap, norm=norm, rasterized=True)
     elif args.petit:
         cmap = COLOR_MAP.copy().reversed()
         cmap.set_bad(color='white')
@@ -528,25 +527,25 @@ def plot_results(args, metric=None):
         Zfilt[Zfilt <= 2] = 2.01
         cmap = COLOR_MAP.copy()
         cmap.set_bad(color='white')
-        im = ax.pcolormesh(X, Y, np.log10(Zfilt-2), vmin=-4, vmax=4, cmap=cmap)
+        im = ax.pcolormesh(X, Y, np.log10(Zfilt-2), vmin=-4, vmax=4, cmap=cmap, rasterized=True)
         label = MEGNO_LABEL
     elif args.ground_truth:
         Z = np.log10(Z)
         Z[Z <= 4] = 4
         cmap = COLOR_MAP.copy().reversed()
         cmap.set_bad(color='white')
-        im = ax.pcolormesh(X, Y, Z, cmap=cmap)
+        im = ax.pcolormesh(X, Y, Z, cmap=cmap, rasterized=True)
         label = INSTABILITY_TIME_LABEL
     elif metric == 'std':
         cmap = COLOR_MAP.copy().reversed()
         cmap.set_bad(color='white')
         m = Z[~np.isnan(Z)].max()
-        im = ax.pcolormesh(X, Y, Z, vmin=0, vmax=m, cmap=cmap)
+        im = ax.pcolormesh(X, Y, Z, vmin=0, vmax=m, cmap=cmap, rasterized=True)
         label = "std(" + INSTABILITY_TIME_LABEL + ")"
     elif args.equation_bounds:
         cmap = COLOR_MAP.copy().reversed()
         cmap.set_bad(color='white')
-        im = ax.pcolormesh(X, Y, Z, vmin=0, vmax=1, cmap=cmap)
+        im = ax.pcolormesh(X, Y, Z, vmin=0, vmax=1, cmap=cmap, rasterized=True)
         label = 'Equation bounds'
     elif metric == 'mean' or metric == 'mean2':
         cmap = COLOR_MAP.copy().reversed()
