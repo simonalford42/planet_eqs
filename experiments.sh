@@ -113,9 +113,10 @@ python period_ratio_figure.py --version 1 --compute
 python period_ratio_figure.py --version 1 --pysr_version 1 --compute --plot
 python period_ratio_figure.py --pure_sr --pysr_version 2 --pysr_model_selection $puresr_c --compute
 python period_ratio_figure.py --version 28114 --pysr_version 3 --pysr_model_selection $puresr2_c --compute
-python period_ratio_figure.py --special 4way --version_json ../model_versions.json --pdf
-python period_ratio_figure.py --special pure_sr --version_json ../model_versions.json --pdf
+python period_ratio_figure.py --special 4way --version_json ../model_versions.json
+python period_ratio_figure.py --special pure_sr --version_json ../model_versions.json
 python period_ratio_figure.py --special rmse --version_json ../model_versions.json
+python period_ratio_figure.py --plot --version 1 --pysr_version 1 --pysr_model_selection $sr_c --rmse_diff
 
 cd ..
 # table 3c, print equations, etc.

@@ -401,13 +401,6 @@ def number_of_variables_in_expression(equation: str):
     return count
 
 
-def overall_complexity(entry: pd.Series, k: int):
-    complexity = entry['complexity'].item()
-    # return complexity
-    num_variables = number_of_variables_in_expression(entry.equation)
-    return complexity + (2*k - 1) * num_variables
-
-
 def f1_latex_string2(feature_nn, include_ssx=False, include_ssx_bias=True, pysr_results=None, important_complexities=None):
     if pysr_results is not None:
         if important_complexities == None:

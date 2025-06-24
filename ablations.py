@@ -1,5 +1,6 @@
 from matplotlib import pyplot as plt
-from interpret import paretoize, overall_complexity
+import pandas as pd
+from interpret import paretoize, number_of_variables_in_expression
 from utils import load_pickle, load_json
 import argparse
 
@@ -19,11 +20,8 @@ def get_k_results(k_version_dict, overall=True):
         results = {}
         for comp in all_rmses.keys():
             eq = pysr_results[pysr_results['complexity'] == comp].iloc[0]
-            if overall:
-                overall_comp = overall_complexity(eq, k)
-                results[overall_comp] = all_rmses[comp]
-            else:
-                results[comp] = all_rmses[comp]
+            overall_comp = get_complexity(eq, k, overall=overall)
+            results[overall_comp] = all_rmses[comp]
 
         k_results[k] = results
     return k_results
@@ -33,19 +31,45 @@ def nn_test_rmse(version):
     return load_pickle(f'pickles/nn_results_all_{version}.pkl')[SPLIT]
 
 
-def overall_complexity_f2_linear(n_features):
+def f2_linear_complexity(n_features, overall=True):
     '''
-    - each feature is mean/std of a k=2 input feature, which has complexity 2.
-    - we do a linear combination of the features, so that is complexity 3 * n_features (2 for each feature, 1 for the product)
-    - also we have a bias term, which adds 1
+
+    - each feature has complexity 2, because it's a k=2 input feature.
+    - each feature used in the linear combination has complexity 3: 2 for the complexity of the feature itself, and 1 for the linear combination value.
+    - the bias term adds 1 to the overall complexity.
+    - so overall commplexity 3 * n_features + 1
+
+    Example: x1 = a1 i1 + a2 i2 has complexity 2 (each
+        y = b1 x1 + b2 x2 + c has complexity 3 ignoring the features themselves, plus 4 (complexity 2 for each feature x_i)
     '''
-    return 3 * n_features + 1
+
+    if overall:
+        return 3 * n_features + 1
+    else:
+        # learned features have complexity 1 instead.
+        # so overall complexity is just 2 * n_features + 1
+        return 2 * n_features + 1
 
 
-def get_f2_linear_results(f2_linear_models):
+def get_f2_linear_results(f2_linear_models, overall=True):
     return {
-        overall_complexity_f2_linear(int(k)): nn_test_rmse(v) for k, v in f2_linear_models.items()
+        f2_linear_complexity(int(k), overall=overall): nn_test_rmse(v)
+        for k, v in f2_linear_models.items()
     }
+
+
+def get_complexity(entry: pd.Series, k: int, overall=True):
+    '''
+    - each feature has complexity k, because it's a k input features (k free parameters).
+    - overall complexity is Pysr equattion complexity + complexity of the features
+    - but the features are already counted in the pysr complexity as complexity 1, so subtract 1
+    '''
+    if overall:
+        complexity = entry['complexity'].item()
+        num_variables = number_of_variables_in_expression(entry.equation)
+        return complexity + (k - 1) * num_variables
+    else:
+        return entry['complexity'].item()
 
 
 def plot_combined_pareto(
@@ -55,36 +79,21 @@ def plot_combined_pareto(
     pure_sr2_results,
     path,
 ):
-    """
-    Combine the `plot_k` and `plot_all` panels into one stacked figure and save it.
-
-    Parameters
-    ----------
-    k_results
-        Mapping k -> {complexity: rmse}.
-    f2_linear_results
-        Mapping {complexity: rmse} for the “Linear ψ” baseline.
-    pure_sr_results
-        Mapping {complexity: rmse} for the “Pure SR” baseline.
-    pure_sr2_results
-        Mapping {complexity: rmse} for the “Pure SR (no intermediate features)” baseline.
-    path
-        Destination path.
-    """
     plt.rcParams["font.family"] = "serif"
 
     # --- Layout ------------------------------------------------------------
     fig, axs = plt.subplots(
-        nrows = 2,
-        ncols = 1,
-        figsize = (6, 8),
-        sharex = False,
+        nrows=2,
+        ncols=1,
+        figsize=(6, 8),
+        sharex=False,
         # constrained_layout = True,
         gridspec_kw={"hspace": 0.25}
     )
 
     # ---------- Top panel: all k -------------------------------------------
     ax = axs[0]
+
     for k, result in k_results.items():
         x, y = zip(*result.items())
         x, y = paretoize(x, y, replace=False)
@@ -96,10 +105,9 @@ def plot_combined_pareto(
 
     ax.set_xlabel("Overall complexity", fontsize = 12, labelpad = 6)
     ax.set_ylabel("RMSE (Resonant)", fontsize = 12, labelpad = 6)
-    # ax.set_title("Top‑k Pareto fronts", fontsize = 14, pad = 8)
     ax.legend()
 
-    # ---------- Bottom panel: comparison -----------------------------------
+    # ---------- Middle panel: comparison -----------------------------------
     ax = axs[1]
 
     # k = 2 (ours)
@@ -122,12 +130,11 @@ def plot_combined_pareto(
     x, y = paretoize(x, y, replace=False)
     ax.plot(x, y, marker = "o", label = "Pure SR")
 
-
     first_line = ax.lines[0]     # or keep a handle returned by ax.plot
     first_line.set_zorder(10)    # any value larger than the others
 
-    ax.set_xlabel("Overall complexity", fontsize=12, labelpad=6)
-    ax.set_ylabel("RMSE (Resonant)", fontsize=12, labelpad=6)
+    ax.set_xlabel("Overall complexity", fontsize = 12, labelpad = 6)
+    ax.set_ylabel("RMSE (Resonant)", fontsize = 12, labelpad = 6)
     ax.legend()
 
     # --- Save & return ------------------------------------------------------
@@ -140,19 +147,24 @@ def plot_combined_pareto(
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--path', type=str, default='graphics/pareto_comparison.pdf', help='Path to save the combined figure')
-    parser.add_argument('--version_json', type=str, default='official_model_versions.json', help='Path to the JSON file containing model versions')
+    parser.add_argument('--version_json', type=str, default='official_versions.json', help='Path to the JSON file containing model versions')
     return parser.parse_args()
 
 
-def main():
-    args = get_args()
-    version_dict = load_json(args.version_json)
-    k_results = get_k_results(version_dict['k'])
-    f2_linear_results = get_f2_linear_results(version_dict['f2_linear'])
+def get_results(version_dict):
+    k_results = get_k_results(version_dict['k'], overall=True)
+    f2_linear_results = get_f2_linear_results(version_dict['f2_linear'], overall=True)
     pure_sr_results = load_pickle(f'pickles/pure_sr_results_all_{version_dict["mse_pure_sr_version"]}.pkl')[SPLIT]
     # get rid of entries with rmse over 2.0, because they were probably invalid equations
     pure_sr_results = {k: v for k, v in pure_sr_results.items() if v < 2.0}
     pure_sr2_results = load_pickle(f'pickles/pysr_results_all_28114_{version_dict["mse_pure_sr2_version"]}.pkl')[SPLIT]
+
+    return k_results, f2_linear_results, pure_sr_results, pure_sr2_results
+
+def main():
+    args = get_args()
+    version_dict = load_json(args.version_json)
+    k_results, f2_linear_results, pure_sr_results, pure_sr2_results = get_results(version_dict)
     plot_combined_pareto(k_results, f2_linear_results, pure_sr_results, pure_sr2_results, args.path)
 
 

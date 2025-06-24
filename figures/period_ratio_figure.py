@@ -41,7 +41,7 @@ GROUND_TRUTH_MAX_T = 1e9 # Assigned in get_args function
 # COLOR_MAP = COLOR_MAP
 COLOR_MAP = plt.cm.plasma
 
-USE_SUBFOLDERS = True
+USE_SUBFOLDERS = False
 
 '''
 Example commands:
@@ -460,12 +460,18 @@ def plot_results(args, metric=None):
     results = load_pickle(get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection, use_petit=args.petit, use_megno=args.megno, ground_truth=args.ground_truth, pure_sr=args.pure_sr))
     P12s, P23s = get_period_ratios(args.Ngrid)
 
-    fig, ax = plt.subplots(figsize=(5,4.5))
+    scale=0.75
+    if args.minimal_plot:
+        scale = 0.675
+    fig, ax = plt.subplots(figsize=(5*scale,4.5*scale))
     ax.set_aspect('equal', adjustable='box')
 
-    ticks = [0.55, 0.60, 0.65, 0.70, 0.75]
-    ax.set_xticks(ticks)
-    ax.set_yticks(ticks)
+    major_ticks = [0.55, 0.75]
+    minor_ticks = [0.60, 0.65, 0.70]
+    ax.set_xticks(major_ticks)
+    ax.set_xticks(minor_ticks, minor=True)
+    ax.set_yticks(major_ticks)
+    ax.set_yticks(minor_ticks, minor=True)
 
     # get the results for the specific metric
     if args.petit:
@@ -520,7 +526,7 @@ def plot_results(args, metric=None):
     elif args.petit:
         cmap = COLOR_MAP.copy().reversed()
         cmap.set_bad(color='white')
-        im = ax.pcolormesh(X, Y, Z, cmap=cmap)
+        im = ax.pcolormesh(X, Y, Z, cmap=cmap, rasterized=True)
         label = INSTABILITY_TIME_LABEL
     elif args.megno:
         Zfilt = Z
@@ -551,15 +557,10 @@ def plot_results(args, metric=None):
         cmap = COLOR_MAP.copy().reversed()
         cmap.set_bad(color='white')
 
-        if args.rmse_diff:
-            zmax = Z[~np.isnan(Z)].max()
-            zmin = Z[~np.isnan(Z)].min()
-        else:
-            # zmax = 12
-            zmax = 9
-            zmin = 4
+        zmax = 9
+        zmin = 4
 
-        im = ax.pcolormesh(X, Y, Z, vmin=zmin, vmax=zmax, cmap=cmap)
+        im = ax.pcolormesh(X, Y, Z, vmin=zmin, vmax=zmax, cmap=cmap, rasterized=True)
         label = INSTABILITY_TIME_LABEL
 
 
@@ -569,11 +570,16 @@ def plot_results(args, metric=None):
         ax.tick_params(labelbottom=False, labelleft=False)
         ax.set_xlabel("")
         ax.set_ylabel("")
+        ax.set_title(f"Complexity {args.pysr_model_selection}")
     else:
         cb = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
         cb.set_label(label)
         ax.set_xlabel("P1/P2")
         ax.set_ylabel("P2/P3")
+
+        if args.rmse_diff:
+            cb.ax.set_yticks([-8, -4, 0, 4, 8])
+            cb.ax.set_yticks(np.arange(-8, 9, 2), minor=True)
 
     plt.tight_layout()
 
@@ -591,7 +597,7 @@ def plot_results(args, metric=None):
     # if args.pysr_version is not None:
     #     path += f'_pysr_f2_v={args.pysr_version}/{args.pysr_model_selection}'
 
-    path += '.png' if not args.pdf else '.pdf'
+    path += '.png' if args.png else '.pdf'
 
     os.makedirs(os.path.dirname(path), exist_ok=True)
     plt.savefig(path, dpi=800)
@@ -735,9 +741,10 @@ def plot_4way_comparison(args):
 
     # Create the figure and axes
     # fig, axs = plt.subplots(2, 2, figsize=(12, 10))
+    scale = 0.75
     fig, axs = plt.subplots(
         2, 2,
-        figsize=(12, 10),
+        figsize=(12*scale, 10*scale),
         gridspec_kw={'wspace': 0.1, 'hspace': 0.1},
     )
     axs = axs.flatten()
@@ -748,15 +755,21 @@ def plot_4way_comparison(args):
     for ax in axs:
         ax.set_aspect('equal', adjustable='box')
 
-    ticks = [0.55, 0.60, 0.65, 0.70, 0.75]
+    # ticks = [0.55, 0.60, 0.65, 0.70, 0.75]
+    major_ticks=[0.55, 0.75]
+    minor_ticks=[0.60, 0.65, 0.70]
     for ax, show_x, show_y in zip(axs, show_xs, show_ys):
-        ax.set_xticks(ticks)
+        ax.set_xticks(major_ticks, major=True)
+        ax.set_xticks(minor_ticks, minor=True)
+
         if not show_x:
             ax.set_xticklabels([])
-        ax.set_yticks(ticks)
+
+        ax.set_yticks(major_ticks, major=True)
+        ax.set_yticks(minor_ticks, minor=True)
+
         if not show_y:
             ax.set_yticklabels([])
-
 
     nn_results = load_pickle(get_results_path(args.Ngrid, v['nn_version']))
     eq_results = load_pickle(get_results_path(args.Ngrid, v['nn_version'], pysr_version=v['pysr_version'], pysr_model_selection=v['pysr_model_selection']))
@@ -786,11 +799,11 @@ def plot_4way_comparison(args):
         elif name == 'ground_truth':
             results = [np.log10(d['ground_truth']) if d is not None else np.nan for d in results]
             # we want to color times < 4 white
-            # results = [r if r >= 4 else np.nan for r in results]
+            results = [r if r >= 4 else np.nan for r in results]
         else:
             results = [d['mean'] if d is not None else np.nan for d in results]
 
-        results = [4. if np.isnan(r) else r for r in results]
+        # results = [4. if np.isnan(r) else r for r in results]
         results = np.array(results)
         X,Y,Z = get_centered_grid(P12s, P23s, results)
 
@@ -817,7 +830,7 @@ def plot_4way_comparison(args):
 
     path = 'period_results/4way'
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    img_path = path + ('.pdf' if args.pdf else '.png')
+    img_path = path + ('.png' if args.png else '.pdf')
     plt.savefig(img_path, dpi=800, bbox_inches='tight')
     print('Saved figure to', img_path)
     plt.close(fig)
@@ -868,9 +881,10 @@ def plot_pure_sr_comparison(args):
 
         if title == 'Ground truth':
             results = [np.log10(d['ground_truth']) if d is not None else np.nan for d in results]
+            results = [np.nan if r <= 4. else r for r in results]
         else:
             results = [d['mean'] if d is not None else np.nan for d in results]
-        results = [4. if np.isnan(r) else r for r in results]
+        # results = [4. if np.isnan(r) else r for r in results]
         results = np.array(results)
         X,Y,Z = get_centered_grid(P12s, P23s, results)
 
@@ -895,7 +909,7 @@ def plot_pure_sr_comparison(args):
 
     path = 'period_results/period_ratio_pure_sr'
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    img_path = path + ('.pdf' if args.pdf else '.png')
+    img_path = path + ('.png' if args.png else '.pdf')
     plt.savefig(img_path, dpi=800, bbox_inches='tight')
     print('Saved figure to', img_path)
     plt.close(fig)
@@ -981,7 +995,7 @@ def plot_exprs(args):
                 path += f'_plot_exprs/{i}_contrast'
             else:
                 path += f'_plot_exprs/{i}'
-            path += '.pdf' if args.pdf else '.png'
+            path += '.png' if args.png else '.pdf'
 
             os.makedirs(os.path.dirname(path), exist_ok=True)
             plt.savefig(path, dpi=800)
@@ -1025,7 +1039,7 @@ def plot_f1_features(args):
             path = path[:-4]
             path += f'_plot_features/{feature}'
             path += '_std' if plot_std else '_mean'
-            path += '.pdf' if args.pdf else '.png'
+            path += '.png' if args.png else '.pdf'
 
             os.makedirs(os.path.dirname(path), exist_ok=True)
             plt.savefig(path, dpi=800)
@@ -1090,7 +1104,7 @@ def plot_4way_pysr_comparison(args):
 
     path = get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection='comparison')[:-4]
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    img_path = path + ('.pdf' if args.pdf else '.png')
+    img_path = path + ('.png' if args.png else '.pdf')
     plt.savefig(img_path, dpi=800)
     print('Saved figure to', path + '.png')
     plt.close(fig)
@@ -1175,7 +1189,7 @@ def get_args():
     parser.add_argument('--ground_truth', action='store_true')
     parser.add_argument('--pure_sr', action='store_true')
     parser.add_argument('--create_input_cache', action='store_true')
-    parser.add_argument('--pdf', action='store_true')
+    parser.add_argument('--png', action='store_true')
     parser.add_argument('--seed', type=int, default=0, help='seed for loading NN model')
 
     parser.add_argument('--pysr_version', type=str, default=None) # sr_results/11003.pkl

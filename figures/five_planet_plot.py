@@ -4,8 +4,8 @@ import pandas as pd
 import time
 import argparse
 from utils2 import load_json
-plt.style.use('seaborn-darkgrid')
-# plt.style.use('seaborn-ticks')
+# plt.style.use('seaborn-darkgrid')
+plt.style.use('seaborn-ticks')
 
 def make_main_plot(cleaned, path=None):
 
