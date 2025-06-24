@@ -1,6 +1,7 @@
 # data and figures/period_results will be downloaded from globus
 data
 figures/period_results
+figures/cur_plot_datasets
 __pycache__
 wandb
 out
