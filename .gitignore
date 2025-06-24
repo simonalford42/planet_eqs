@@ -20,6 +20,7 @@ graphics/**
 !graphics/pareto_comparison.pdf
 !graphics/pareto_fig1.svg
 
+!results/
 !results/24880_0/*
 !results/28114_0/*
 !results/12318_0/*
@@ -32,6 +33,18 @@ graphics/**
 !results/13523_0/*
 !results/22697_0/*
 !results/8880_0/*
+!results/24880_0/
+!results/28114_0/
+!results/12318_0/
+!results/12318_0/
+!results/74649_0/
+!results/11566_0/
+!results/72646_0/
+!results/4014_0/
+!results/22649_0/
+!results/13523_0/
+!results/22697_0/
+!results/8880_0/
 
 !sr_results/11003.pkl
 !sr_results/11003.pkl
