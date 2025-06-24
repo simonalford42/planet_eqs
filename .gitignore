@@ -69,8 +69,8 @@ graphics/**
 !pickles/pysr_results_all_42503.pkl
 
 
-!five_planet_figures/five_planet_main.pdf
-!five_planet_figures/five_planet_all.pdf
-!five_planet_figures/v24880_pysr11003_ms=29_N=5000_turbo_extrapolate.csv
-!five_planet_figures/v24880_pysr72420_ms=50_N=5000_turbo_extrapolate.csv
-!five_planet_figures/v28114_pysr41564_ms=35_N=5000_turbo_extrapolate.csv
+!figures/five_planet_figures/five_planet_main.pdf
+!figures/five_planet_figures/five_planet_all.pdf
+!figures/five_planet_figures/v24880_pysr11003_ms=29_N=5000_turbo_extrapolate.csv
+!figures/five_planet_figures/v24880_pysr72420_ms=50_N=5000_turbo_extrapolate.csv
+!figures/five_planet_figures/v28114_pysr41564_ms=35_N=5000_turbo_extrapolate.csv
