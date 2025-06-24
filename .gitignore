@@ -59,7 +59,6 @@ graphics/**
 !results/21130_0/*
 !results/21130_0/
 
-
 !sr_results/11003.pkl
 !sr_results/11003.pkl
 !sr_results/72420.pkl
@@ -94,7 +93,7 @@ graphics/**
 !pickles/pysr_results_all_49636.pkl
 !pickles/pysr_results_all_94842.pkl
 !pickles/pysr_results_all_42503.pkl
-
+!pickles/petit_results_all.pkl
 
 !figures/five_planet_figures/five_planet_main.pdf
 !figures/five_planet_figures/five_planet_all.pdf
