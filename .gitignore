@@ -2,6 +2,7 @@
 data
 figures/period_results
 figures/cur_plot_datasets
+plots
 __pycache__
 wandb
 out
