@@ -13,6 +13,8 @@ plt.rcParams['mathtext.fontset']='dejavuserif'
 import pandas as pd
 from utils import load_json
 import argparse
+from brokenaxes import brokenaxes
+from matplotlib.ticker import MultipleLocator
 
 def best_result(all_results):
     # find complexity that gives best val error
@@ -559,7 +561,8 @@ def plot_period_ratio_rmse():
 
 def make_pareto_plot(results, important_complexities=None, rmse=True, plot_unimportant=False):
     plt.rcParams["font.family"] = "serif"
-    plt.figure(figsize=(8, 4.8))  # Width = 10 inches, Height = 6 inches
+    scale = 0.8
+    plt.figure(figsize=(8*scale, 4.8*scale))  # Width = 10 inches, Height = 6 inches
     ax = plt.gca()
 
     if plot_unimportant:
@@ -632,8 +635,102 @@ def official_stuff(args):
     important_complexities, _ = paretoize(important_complexities, results['rmse'].tolist(), replace=False)
 
     plot = make_pareto_plot(results, important_complexities=important_complexities, rmse=True, plot_unimportant=False)
-    plot.savefig('graphics/pareto_fig1.svg')
-    print('Saved pareto plot to graphics/pareto_fig1.svg')
+    # plot.savefig('graphics/pareto_fig1.svg', bbox_inches='tight')
+    # print('Saved pareto plot to graphics/pareto_fig1.svg')
+
+    rmse_dict = {
+        'Neural network':       [nn_results['test'], nn_results['random'], 1.427],
+        'Distilled equations':  [pysr_results['test'][pysr_c], pysr_results['random'][pysr_c], 1.072],
+        'Pure SR':              [pure_sr_results['test'][puresr_c], pure_sr_results['random'][puresr_c], 1.724],
+        'Petit+2020':           [petit_results['test'], petit_results['random'], 1.253],
+    }
+    rmse_plot(rmse_dict)
+
+
+def rmse_plot(rmse_dict=None):
+    plt.style.use('seaborn-darkgrid')
+    plt.rcParams['font.family'] = 'serif'
+
+    # ── data ──────────────────────────────────────────────────────────────────
+    methods  = ['Neural network', 'Distilled equations', 'Pure SR', 'Petit+2020']
+    datasets = ['Resonant*', 'Random*', 'Grid']
+    rmse_dict = {
+        'Neural network':       [0.96, 1.06, 1.427],
+        'Distilled equations':  [1.15, 1.23, 1.072],
+        'Pure SR':              [1.36, 1.40, 1.724],
+        'Petit+2020':           [3.13, 3.00, 1.253],
+    }
+
+    cmap = plt.get_cmap('tab10')
+    # rearrange colors so nn is orange and eqs are blue
+    method_colors = dict(zip(methods, [cmap(i) for i in [1, 0, 2, 3]]))
+
+    # ── broken-axes container ────────────────────────────────────────────────
+    scale = 0.8
+    fig = plt.figure(figsize=(scale*7, scale*3.5))
+    bax = brokenaxes(
+        ylims=((0.5, 1.8), (2.9, 3.4)),
+        hspace=0.1,
+        despine=False,
+        subplot_spec=fig.add_gridspec(1, 1)[0]
+    )
+
+    x = np.arange(len(datasets)) * 1.1
+    bw = 0.23
+
+    for i, m in enumerate(methods):
+        offset = (i - 1.5) * bw
+        vals   = rmse_dict[m]
+        bax.bar(x + offset, vals, width=bw, color=method_colors[m], label=m)
+        # annotate on the LOWER pane only
+        lower_ax = bax.axs[-1]
+        upper_ax = bax.axs[0]
+        for j, v in enumerate(vals):
+            ax = lower_ax if v <= 1.8 else upper_ax
+            ax.annotate(f'{v:.2f}',
+                              xy=(x[j] + offset, v),
+                              xytext=(0, 3),
+                              textcoords='offset points',
+                              ha='center', va='bottom', fontsize=8)
+
+    # ── tidy up axes / grids ─────────────────────────────────────────────────
+    for ax in bax.axs:                                  # flat list of two axes
+        ax.grid(True, axis='y', linewidth=0.6)
+        ax.grid(False, axis='x')
+
+    upper_ax, lower_ax = bax.axs                        # ← unpack once
+
+    upper_ax.tick_params(axis='y', labelleft=True)
+    upper_ax.tick_params(axis='x', labelbottom=False)
+    lower_ax.set_ylabel('RMSE')
+    lower_ax.set_xticks(x)
+    lower_ax.set_xticklabels(datasets, fontsize=10)
+    lower_ax.yaxis.set_major_locator(MultipleLocator(0.5))
+    upper_ax.yaxis.set_major_locator(MultipleLocator(0.5))
+    lower_ax.tick_params(axis='x', pad=6)
+
+    # legend once
+    # fig.legend(fontsize=8, loc='outside right upper')
+
+    # single footnote under the whole figure
+    fig.text(0.10, -0.04, '* Models retrained with MSE loss', ha='left', fontsize=8)
+
+    # slanted lines
+    d = .5  # proportion of vertical to horizontal extent of the slanted line
+    kwargs = dict(marker=[(-1, -d), (1, d)], markersize=10,
+                  linestyle="none", color='grey', mec='grey', mew=1, clip_on=False)
+    upper_ax.plot([0, 1], [0, 0], transform=upper_ax.transAxes, **kwargs)
+    lower_ax.plot([0, 1], [1, 1], transform=lower_ax.transAxes, **kwargs)
+
+    fig.subplots_adjust(right=0.9)      # play with 0.78 ↔ 0.80 to taste
+    bax.legend(loc='upper left',         # anchor = legend’s upper-left corner
+               bbox_to_anchor=(0.815, 0.935), # (x,y) in *figure* coords
+               bbox_transform=fig.transFigure,
+               frameon=True, fontsize=8)
+
+    plt.tight_layout()
+    plt.savefig('graphics/rmse_plot.svg', bbox_inches='tight')
+    print('Saved rmse plot to graphics/rmse_plot.svg')
 
 
 if __name__ == '__main__':

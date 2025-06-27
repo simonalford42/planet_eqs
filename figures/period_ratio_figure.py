@@ -18,18 +18,16 @@ try:
 except ImportError:
     import figures.spock as spock
 import pickle
-try:
-    from utils2 import assert_equal, load_pickle, get_script_execution_command, load_json
-except ImportError:
-    from utils import assert_equal, load_pickle, get_script_execution_command, load_json
+from utils2 import assert_equal, load_pickle, get_script_execution_command, load_json, truncate_cmap
 import multiprocessing as mp
 import argparse
 import time
 import spock_reg_model
 from petit20_survival_time import Tsurv
-# from pure_sr_evaluation import pure_sr_predict_fn
-
+import cmasher as cmr
 import warnings
+from matplotlib.gridspec import GridSpec
+
 warnings.filterwarnings("ignore", category=ResourceWarning)
 warnings.filterwarnings("default", category=UserWarning)
 
@@ -38,8 +36,10 @@ MEGNO_LABEL = r"$\log_{10}(\rm MEGNO-2)$"
 
 GROUND_TRUTH_MAX_T = 1e9 # Assigned in get_args function
 
-# COLOR_MAP = COLOR_MAP
 COLOR_MAP = plt.cm.plasma
+DIVERGING_CMAP = cmr.viola.reversed()
+RMSE_CMAP = truncate_cmap(cmr.sunburst.reversed(), 0.0, 0.65)
+
 
 USE_SUBFOLDERS = False
 
@@ -325,7 +325,7 @@ def compute_results(args):
     return results
 
 
-def get_results_path(Ngrid, version=None, parallel_ix=None, parallel_total=None, pysr_version=None, pysr_model_selection=None, use_petit=False, use_megno=False, input_cache=False, ground_truth=False, rmse_diff=False, minimal_plot=False, pure_sr=False):
+def get_results_path(Ngrid, version=None, parallel_ix=None, parallel_total=None, pysr_version=None, pysr_model_selection=None, use_petit=False, use_megno=False, input_cache=False, ground_truth=False, special=False, minimal_plot=False, pure_sr=False):
     if use_petit:
         if USE_SUBFOLDERS:
             path = f'period_results/petit/petit_ngrid={Ngrid}'
@@ -369,8 +369,8 @@ def get_results_path(Ngrid, version=None, parallel_ix=None, parallel_total=None,
 
             path += f'_pysr_f2_v={pysr_version}/{pysr_model_selection}'
 
-    if rmse_diff:
-        path += '_rmse_diff'
+    if special:
+        path += '_' + special
 
     if parallel_ix is not None:
         path += f'/{parallel_ix}-{parallel_total}'
@@ -449,6 +449,249 @@ def collate_parallel_results(args):
     print('Saved results to', path)
 
 
+# ----------------------------------------------------------------------
+# 6-panel composite (preferred GridSpec layout with centred half-height bar)
+# ----------------------------------------------------------------------
+def plot_6way(args):
+    """
+    Layout:
+        col 0          col 1          cbar       col 2
+    ┌─────────┬─────────┬─────────┬─────────┐
+    │  GT     │ Eqns    │         │ RMSEeq  │
+    │ (axs[0])│ (axs[1])│  bar    │ (axs[2])│
+    ├─────────┼─────────┼─────────┼─────────┤
+    │  NN     │ Petit   │         │ ΔRMSE   │
+    │ (axs[3])│ (axs[4])│         │ (axs[5])│
+    └─────────┴─────────┴─────────┴─────────┘
+    """
+    # --------------------------------------------------------------
+    # prep & figure scaffold
+    # --------------------------------------------------------------
+    v     = load_json(args.version_json)
+    scale = 0.7
+
+    fig = plt.figure(figsize=(17.5 * scale, 10 * scale), constrained_layout=False)
+    gs  = GridSpec(
+            2, 4,                       # rows × cols
+            width_ratios=[0.92, 0.95, 0.05, 1.25],  # bar gets narrow dedicated col
+            wspace=0,
+            hspace=0.19,
+          )
+
+    # map the six data panels
+    axes_map = {
+        0: fig.add_subplot(gs[0, 0]),   # GT
+        1: fig.add_subplot(gs[0, 1]),   # Eqns
+        2: fig.add_subplot(gs[0, 3]),   # distilled-RMSE
+        3: fig.add_subplot(gs[1, 0]),   # NN
+        4: fig.add_subplot(gs[1, 1]),   # Petit
+        5: fig.add_subplot(gs[1, 3])    # ΔRMSE
+    }
+    axs = [axes_map[i] for i in range(6)]
+
+    # --------------------------------------------------------------
+    # (A) 4-way instability-time panels (indices 0,1,3,4)
+    # --------------------------------------------------------------
+    nn_res    = load_pickle(get_results_path(args.Ngrid, v['nn_version']))
+    eq_res    = load_pickle(get_results_path(
+                    args.Ngrid, v['nn_version'],
+                    pysr_version=v['pysr_version'],
+                    pysr_model_selection=v['pysr_model_selection']))
+    petit_res = load_pickle(get_results_path(args.Ngrid, use_petit=True))
+    gt_res    = load_pickle(get_results_path(args.Ngrid, ground_truth=True))
+
+    models  = [gt_res, eq_res, nn_res, petit_res]
+    names   = ['ground_truth', 'eq', 'nn', 'petit']
+    titles  = ['Ground truth', 'Distilled equations',
+               'Neural network', 'Petit+ 2020']
+    # ticks   = [0.55, 0.60, 0.65, 0.70, 0.75]
+    major_ticks = [0.55, 0.75]
+    minor_ticks = [0.55, 0.60, 0.65, 0.70, 0.75]
+    panel_indices = [0, 1, 3, 4]
+
+    im4way = None
+    for idx_panel, (ax_i, name, title) in zip(panel_indices, zip(models, names, titles)):
+        ax = axs[idx_panel]
+
+        show_x = idx_panel in (3, 4)          # bottom row
+        show_y = idx_panel in (0, 3)          # left column
+
+        ax.set_aspect('equal')
+        ax.set_xticks(major_ticks, major=True)
+        ax.set_xticks(minor_ticks, minor=True)
+        ax.set_yticks(major_ticks, major=True)
+        ax.set_yticks(minor_ticks, minor=True)
+        if not show_x:
+            ax.set_xticklabels([])
+        if not show_y:
+            ax.set_yticklabels([])
+
+        # map dicts → scalar grid
+        data = ax_i
+        if name == 'petit':
+            data = [d['mean'] if d else np.nan for d in data]
+        elif name == 'ground_truth':
+            data = [np.log10(d['ground_truth']) if d else np.nan for d in data]
+            data = [val if val >= 4 else np.nan for val in data]
+        else:
+            data = [d['mean'] if d else np.nan for d in data]
+
+        P12s, P23s = get_period_ratios(args.Ngrid)
+        X, Y, Z    = get_centered_grid(P12s, P23s, np.asarray(data))
+
+        cmap = COLOR_MAP.copy().reversed()
+        cmap.set_bad(color='white')
+        im4way = ax.pcolormesh(X, Y, Z, vmin=4, vmax=9,
+                               cmap=cmap, rasterized=True)
+
+        if show_x:
+            ax.set_xlabel("P1/P2")
+        if show_y:
+            ax.set_ylabel("P2/P3")
+        ax.set_title(title)
+
+    # --------------------------------------------------------------
+    # Shared colour-bar (½-height, centred vertically)
+    # --------------------------------------------------------------
+    cax = fig.add_subplot(gs[:, 2])          # spans both rows
+    cb  = fig.colorbar(im4way, cax=cax)
+    cb.set_label(INSTABILITY_TIME_LABEL)
+
+    # shrink to half height & recenter
+    bb   = cax.get_position(fig)
+    half = 0.5 * bb.height
+    new_bottom = bb.y0 + 0.25 * bb.height    # centre vertically
+    cax.set_position([bb.x0, new_bottom, bb.width, half])
+
+    # --------------------------------------------------------------
+    # (B) distilled-RMSE  (top-right)  &  (C) ΔRMSE (bottom-right)
+    # --------------------------------------------------------------
+    _draw_diff_panel(axs[2], v, special='gt_diff',  hide_xlabel=True)
+    _draw_diff_panel(axs[5], v, special='rmse_diff', hide_xlabel=False)
+
+    # --------------------------------------------------------------
+    # Save out
+    # --------------------------------------------------------------
+    out_path = "period_results/6way" + (".png" if args.png else ".pdf")
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    plt.savefig(out_path, dpi=800, bbox_inches='tight')
+    print("Saved figure to", out_path)
+    plt.close(fig)
+
+# ----------------------------------------------------------------------
+# Helper: draw either the distilled-RMSE (“gt_diff”) or ΔRMSE (“rmse_diff”)
+# panel inside a supplied Axes object.
+# ----------------------------------------------------------------------
+def _draw_diff_panel(ax, v, special, hide_xlabel=False):
+    """
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        Target axes to draw into.
+    Ngrid : int
+        Grid resolution used by `get_period_ratios`.
+    v : dict
+        Parsed JSON holding version metadata (keys: 'nn_version',
+        'pysr_version', 'pysr_model_selection', …).
+    special : {'gt_diff', 'rmse_diff'}
+        • 'gt_diff'    →  RMSE of distilled equations vs. ground truth
+        • 'rmse_diff'  →  RMSE_NN − RMSE_Eqns
+    hide_xlabel : bool, optional
+        If True, x-tick labels are suppressed to align with upper row.
+    """
+
+    # ------------- shared prep ------------------------------------------------
+    P12s, P23s = get_period_ratios(300)
+    ticks = [0.55, 0.60, 0.65, 0.70, 0.75]
+    major_ticks = [0.55, 0.75]
+    minor_ticks = [0.55, 0.60, 0.65, 0.70, 0.75]
+    ax.set_aspect('equal')
+    ax.set_xticks(major_ticks, major=True)
+    ax.set_xticks(minor_ticks, minor=True)
+    ax.set_yticks(major_ticks, major=True)
+    ax.set_yticks(minor_ticks, minor=True)
+
+    nn_version = v['nn_version']
+    pysr_v     = v['pysr_version']
+    model_sel  = v['pysr_model_selection']
+
+    # Base “equations” map (mean instability time)
+    eq_data = load_pickle(
+        get_results_path(
+            300,
+            nn_version,
+            pysr_version=pysr_v,
+            pysr_model_selection=model_sel
+        )
+    )
+    eq_vals = np.array([d['mean'] if d is not None else np.nan
+                        for d in eq_data])
+
+    # Ground-truth map
+    gt_data = load_pickle(
+        get_results_path(300, nn_version, ground_truth=True)
+    )
+    gt_vals = np.array([d['ground_truth'] if d is not None else np.nan
+                        for d in gt_data])
+    gt_vals = np.log10(gt_vals)
+
+    # ------------- panel-specific logic ---------------------------------------
+    if special == 'gt_diff':
+        # RMSE of distilled equations relative to GT
+        eq_clip = np.clip(eq_vals, 4, 9)
+        Z = np.sqrt((eq_clip - gt_vals) ** 2)
+
+        cmap = RMSE_CMAP.copy()
+        cmap.set_bad(color='white')
+        norm = plt.Normalize(vmin=0, vmax=5)
+        title = "Distilled equations RMSE"
+        label = "RMSE"
+
+    elif special == 'rmse_diff':
+        # Difference of RMSEs: NN – Eqns
+        # NN map
+        nn_data = load_pickle(get_results_path(300, nn_version))
+        nn_vals = np.array([d['mean'] if d is not None else np.nan
+                            for d in nn_data])
+
+        eq_clip = np.clip(eq_vals, 4, 9)
+        nn_clip = np.clip(nn_vals, 4, 9)
+
+        rmse_eq = np.sqrt((eq_clip - gt_vals) ** 2)
+        rmse_nn = np.sqrt((nn_clip - gt_vals) ** 2)
+        Z = rmse_nn - rmse_eq
+
+        cmap = DIVERGING_CMAP.copy()
+        cmap.set_bad(color='white')
+        norm = plt.Normalize(vmin=-5, vmax=5)
+        title = "Difference in RMSE (NN – Equations)"
+        label = r"${\rm RMSE}_{\rm NN}\;-\;{\rm RMSE}_{\rm Eqns}$"
+
+    else:
+        raise ValueError("special must be 'gt_diff' or 'rmse_diff'")
+
+    # ------------- draw -------------------------------------------------------
+    X, Y, ZZ = get_centered_grid(P12s, P23s, Z)
+    im = ax.pcolormesh(X, Y, ZZ, cmap=cmap, norm=norm, rasterized=True)
+
+    # axis labels
+    if hide_xlabel:
+        ax.set_xticklabels([])
+    else:
+        ax.set_xlabel("P1/P2")
+    if ax.is_first_col():
+        ax.set_ylabel("P2/P3")
+    else:
+        ax.set_ylabel("")
+
+    # colour-bar
+    cb = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    cb.set_label(label)
+
+    ax.set_title(title)
+    return im
+
+
 def plot_results(args, metric=None):
     if (not (args.petit or args.megno or args.ground_truth or args.equation_bounds)) and metric is None:
         # for metric in ['mean', 'std']:
@@ -460,13 +703,15 @@ def plot_results(args, metric=None):
     results = load_pickle(get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection, use_petit=args.petit, use_megno=args.megno, ground_truth=args.ground_truth, pure_sr=args.pure_sr))
     P12s, P23s = get_period_ratios(args.Ngrid)
 
-    scale=0.75
+    # scale=0.75
+    scale=0.7
     if args.minimal_plot:
-        scale = 0.675
+        scale = 0.775 * scale
     fig, ax = plt.subplots(figsize=(5*scale,4.5*scale))
     ax.set_aspect('equal', adjustable='box')
 
     major_ticks = [0.55, 0.75]
+    # major_ticks = [0.55, 0.60, 0.65, 0.70, 0.75]
     minor_ticks = [0.60, 0.65, 0.70]
     ax.set_xticks(major_ticks)
     ax.set_xticks(minor_ticks, minor=True)
@@ -495,7 +740,7 @@ def plot_results(args, metric=None):
 
     results = np.array(results)
 
-    if args.rmse_diff:
+    if args.special == 'rmse_diff':
         ground_truth_results = load_pickle(get_results_path(args.Ngrid, args.version, ground_truth=True))
         ground_truth_results = [d['ground_truth'] if d is not None else np.nan for d in ground_truth_results]
         ground_truth_results = np.array(ground_truth_results)
@@ -514,15 +759,34 @@ def plot_results(args, metric=None):
 
         results = nn_rmse - eq_rmse
 
+    elif args.special == 'gt_diff':
+        ground_truth_results = load_pickle(get_results_path(args.Ngrid, args.version, ground_truth=True))
+        ground_truth_results = [d['ground_truth'] if d is not None else np.nan for d in ground_truth_results]
+        ground_truth_results = np.array(ground_truth_results)
+        ground_truth_results = np.log10(ground_truth_results)
+
+        results[results < 4] = 4
+        results[results > 9] = 9
+        gt_rmse = np.sqrt((results - ground_truth_results)**2)
+
+        results = gt_rmse
 
     X,Y,Z = get_centered_grid(P12s, P23s, results)
 
-    if args.rmse_diff:
-        label = 'NN RMSE - Equation RMSE'
-        cmap = plt.cm.bwr.copy()
+    if args.special == 'rmse_diff':
+        label = r"${\rm RMSE}_{\rm NN}\;-\;{\rm RMSE}_{\rm Eqns}$"
+        cmap = DIVERGING_CMAP.copy()
         cmap.set_bad(color='white')
-        norm = plt.Normalize(vmin=-8, vmax=8)
+        norm = plt.Normalize(vmin=-5, vmax=5)
         im = ax.pcolormesh(X, Y, Z, cmap=cmap, norm=norm, rasterized=True)
+        ax.set_title("Difference in RMSE (NN – Equations)")
+    elif args.special == 'gt_diff':
+        label = "RMSE"
+        cmap = RMSE_CMAP.copy()
+        cmap.set_bad(color='white')
+        norm = plt.Normalize(vmin=0, vmax=5)
+        im = ax.pcolormesh(X, Y, Z, cmap=cmap, norm=norm, rasterized=True)
+        ax.set_title("Distilled equations RMSE")
     elif args.petit:
         cmap = COLOR_MAP.copy().reversed()
         cmap.set_bad(color='white')
@@ -577,13 +841,14 @@ def plot_results(args, metric=None):
         ax.set_xlabel("P1/P2")
         ax.set_ylabel("P2/P3")
 
-        if args.rmse_diff:
-            cb.ax.set_yticks([-8, -4, 0, 4, 8])
-            cb.ax.set_yticks(np.arange(-8, 9, 2), minor=True)
+        # if args.special == 'rmse_diff':
+            # cb.ax.set_yticks([-8, -4, 0, 4, 8])
+            # cb.ax.set_yticks(np.arange(-8, 9, 2), minor=True)
+
 
     plt.tight_layout()
 
-    path = get_results_path(args.Ngrid, args.version, use_petit=args.petit, use_megno=args.megno, ground_truth=args.ground_truth, rmse_diff=args.rmse_diff, minimal_plot=args.minimal_plot, pure_sr=args.pure_sr, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection)
+    path = get_results_path(args.Ngrid, args.version, use_petit=args.petit, use_megno=args.megno, ground_truth=args.ground_truth, special=args.special, minimal_plot=args.minimal_plot, pure_sr=args.pure_sr, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection)
     # get rid of .pkl
     path = path[:-4]
 
@@ -741,7 +1006,7 @@ def plot_4way_comparison(args):
 
     # Create the figure and axes
     # fig, axs = plt.subplots(2, 2, figsize=(12, 10))
-    scale = 0.75
+    scale = 0.85
     fig, axs = plt.subplots(
         2, 2,
         figsize=(12*scale, 10*scale),
@@ -755,18 +1020,20 @@ def plot_4way_comparison(args):
     for ax in axs:
         ax.set_aspect('equal', adjustable='box')
 
-    # ticks = [0.55, 0.60, 0.65, 0.70, 0.75]
-    major_ticks=[0.55, 0.75]
-    minor_ticks=[0.60, 0.65, 0.70]
+    ticks = [0.55, 0.60, 0.65, 0.70, 0.75]
+    # major_ticks=[0.55, 0.75]
+    # minor_ticks=[0.60, 0.65, 0.70]
     for ax, show_x, show_y in zip(axs, show_xs, show_ys):
-        ax.set_xticks(major_ticks, major=True)
-        ax.set_xticks(minor_ticks, minor=True)
+        # ax.set_xticks(major_ticks, major=True)
+        ax.set_xticks(ticks, major=True)
+        # ax.set_xticks(minor_ticks, minor=True)
 
         if not show_x:
             ax.set_xticklabels([])
 
-        ax.set_yticks(major_ticks, major=True)
-        ax.set_yticks(minor_ticks, minor=True)
+        # ax.set_yticks(major_ticks, major=True)
+        ax.set_yticks(ticks, major=True)
+        # ax.set_yticks(minor_ticks, minor=True)
 
         if not show_y:
             ax.set_yticklabels([])
@@ -825,7 +1092,7 @@ def plot_4way_comparison(args):
         axs[i].set_title(titles[i])
 
     # Create a single colorbar
-    cb = fig.colorbar(im, ax=axs.ravel().tolist(), shrink=0.6)
+    cb = fig.colorbar(im, ax=axs.ravel().tolist(), shrink=0.5)
     cb.set_label(INSTABILITY_TIME_LABEL)
 
     path = 'period_results/4way'
@@ -1156,11 +1423,11 @@ def calculate_rmses(args):
     petit_rmse = calculate_rmse(args.Ngrid, petit=True)
     pure_sr = calculate_rmse(args.Ngrid, pure_sr=True, pysr_version=versions['pure_sr_version'], pysr_model_selection=versions['pure_sr_model_selection'])
     pure_sr2 = calculate_rmse(args.Ngrid, version=28114, pysr_version=versions['pure_sr2_version'], pysr_model_selection=versions['pure_sr2_model_selection'])
-    print(f'NN RMSE: {nn_rmse:.2f}')
-    print(f'Distilled EQs RMSE: {our_rmse:.2f}')
-    print(f'Petit+2020 RMSE: {petit_rmse:.2f}')
-    print(f'Pure SR RMSE: {pure_sr:.2f}')
-    print(f'Pure SR (no intermediate features) RMSE: {pure_sr2:.2f}')
+    print(f'NN RMSE: {nn_rmse:.3f}')
+    print(f'Distilled EQs RMSE: {our_rmse:.3f}')
+    print(f'Petit+2020 RMSE: {petit_rmse:.3f}')
+    print(f'Pure SR RMSE: {pure_sr:.3f}')
+    print(f'Pure SR (no intermediate features) RMSE: {pure_sr2:.3f}')
 
 
 def get_citation():
@@ -1205,9 +1472,8 @@ def get_args():
     parser.add_argument('--equation_bounds', action='store_true')
     parser.add_argument('--job_array', action='store_true')
     parser.add_argument('--max_t', type=float, default=1e9, help='Maximum integration time for ground truth')
-    parser.add_argument('--special', type=str, default=None, choices=['4way', 'pure_sr', '4way_pysr', 'f1_features', 'exprs', 'rmse'])
+    parser.add_argument('--special', type=str, default=None, choices=['4way', '6way', 'pure_sr', '4way_pysr', 'f1_features', 'exprs', 'rmse', 'rmse_diff', 'gt_diff'])
     parser.add_argument('--minimal_plot', action='store_true')
-    parser.add_argument('--rmse_diff', action='store_true')
     parser.add_argument('--version_json', type=str, default='../official_versions.json', help='Path to the JSON file containing model versions')
 
     args = parser.parse_args()
@@ -1282,6 +1548,8 @@ if __name__ == '__main__':
     if args.special:
         if args.special == '4way':
             plot_4way_comparison(args)
+        if args.special == '6way':
+            plot_6way(args)
         elif args.special == 'pure_sr':
             plot_pure_sr_comparison(args)
         elif args.special == '4way_pysr':

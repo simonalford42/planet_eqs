@@ -3,6 +3,9 @@ import pandas as pd
 from interpret import paretoize, number_of_variables_in_expression
 from utils import load_pickle, load_json
 import argparse
+import numpy as np
+from matplotlib.ticker import MultipleLocator
+plt.style.use('seaborn-darkgrid')
 
 SPLIT = 'test'
 
@@ -103,9 +106,10 @@ def plot_combined_pareto(
     first_line = ax.lines[0]     # or keep a handle returned by ax.plot
     first_line.set_zorder(10)    # any value larger than the others
 
+    ax.yaxis.set_major_locator(MultipleLocator(0.1))
     ax.set_xlabel("Overall complexity", fontsize = 12, labelpad = 6)
     ax.set_ylabel("RMSE (Resonant)", fontsize = 12, labelpad = 6)
-    ax.legend()
+    ax.legend(framealpha=1)
 
     # ---------- Middle panel: comparison -----------------------------------
     ax = axs[1]
@@ -133,9 +137,10 @@ def plot_combined_pareto(
     first_line = ax.lines[0]     # or keep a handle returned by ax.plot
     first_line.set_zorder(10)    # any value larger than the others
 
+    ax.yaxis.set_major_locator(MultipleLocator(0.1))
     ax.set_xlabel("Overall complexity", fontsize = 12, labelpad = 6)
     ax.set_ylabel("RMSE (Resonant)", fontsize = 12, labelpad = 6)
-    ax.legend()
+    ax.legend(framealpha=1)
 
     # --- Save & return ------------------------------------------------------
     fig.savefig(path, bbox_inches = "tight", dpi = 400)

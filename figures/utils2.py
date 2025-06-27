@@ -14,6 +14,37 @@ DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 WARNINGS = set()
 
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
+
+def whiten_mid(cmap_name, width=0.02, n=256):
+    """
+    Return a copy of *cmap_name* whose centre fades to pure white.
+
+    width  – fractional width of the white notch (0 → hard edge).
+    n      – colour resolution.
+    """
+    cmap        = plt.get_cmap(cmap_name, n)
+    colours     = cmap(np.linspace(0, 1, n))
+    centre      = n // 2
+    half_span   = int(width * n / 2)
+
+    for i in range(-half_span, half_span + 1):
+        f                = abs(i) / (half_span + 1)      # 1 → edge, 0 → middle
+        colours[centre+i, :3] = 1 - f * (1 - colours[centre+i, :3])  # linear fade to white
+
+    new_name = f'{cmap_name}_white'
+    return ListedColormap(colours, name=new_name)
+
+def truncate_cmap(cmap, vmin=0.0, vmax=1.0, n=256, name=None):
+    """
+    Return a copy of *cmap* ranging only from vmin→vmax (fractional).
+    """
+    new   = cmap(np.linspace(vmin, vmax, n))
+    name  = name or f'{cmap.name}_{vmin:.2f}_{vmax:.2f}'
+    return ListedColormap(new, name=name)
+
 
 def save_pickle(data, filename):
     with open(filename, 'wb') as f:

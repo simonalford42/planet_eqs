@@ -4,8 +4,8 @@ import pandas as pd
 import time
 import argparse
 from utils2 import load_json
-# plt.style.use('seaborn-darkgrid')
-plt.style.use('seaborn-ticks')
+plt.style.use('seaborn-darkgrid')
+# plt.style.use('seaborn-ticks')
 
 def make_main_plot(cleaned, path=None):
 
@@ -59,8 +59,8 @@ def make_separate_comparison_plot(cleaned, path):
     fig, axarr = plt.subplots(5, 1, figsize=(7*scale, 10.5 * scale), dpi=300, sharex=True)
     plt.subplots_adjust(hspace=0.2)
     tmp = cleaned
-    # tmp2 = tmp.query('true > 4 & delta > 5')
-    tmp2 = tmp
+    tmp2 = tmp.query('true > 4 & delta > 5')
+    # tmp2 = tmp
     # decrease buffer around plot in image
     # plt.subplots_adjust(left=0.08, right=0.95, top=0.95, bottom=0.05)
 
