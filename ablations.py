@@ -47,11 +47,11 @@ def f2_linear_complexity(n_features, overall=True):
     '''
 
     if overall:
-        return 3 * n_features + 1
+        return 2 * n_features + 1
     else:
         # learned features have complexity 1 instead.
         # so overall complexity is just 2 * n_features + 1
-        return 2 * n_features + 1
+        return n_features + 1
 
 
 def get_f2_linear_results(f2_linear_models, overall=True):
