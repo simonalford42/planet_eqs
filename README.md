@@ -14,7 +14,7 @@
 
 ## Reproducing experiments
 Commands for rerunning the experiments and generating figures for the paper are in `experiments.sh`.
-Commands that generate the figures from already run experiments are in `official.sh`.
+Commands that generate the figures from already run experiments are in `official_plots.sh`.
 
 ## Miscellaneous
 This repository originated as a fork of https://github.com/MilesCranmer/bnn_chaos_model.
