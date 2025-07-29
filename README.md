@@ -1,7 +1,7 @@
 # Distilling neural networks into equations that predict instability of planetary systems
 
 ## Installation
-1. Clone repo
+1. Clone repo and `cd` into it
 2. Create python environment:
     ```bash
     conda create python=3.7.12 -n planet_eqs
