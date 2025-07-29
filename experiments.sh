@@ -2,7 +2,7 @@
 ### This script has all the commands to rerun the experiments in the paper.
 ### Actually running the experiments with this script will take a long time.
 ### Instead you should run them in parallel using a job scheduler like slurm.
-### To generate plots using existing data from the paper, use official.sh
+### To generate plots using existing data from the paper, use official_plots.sh
 ################################################################################
 
 # exit on error
