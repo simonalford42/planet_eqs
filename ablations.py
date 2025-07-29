@@ -108,7 +108,7 @@ def plot_combined_pareto(
 
     ax.yaxis.set_major_locator(MultipleLocator(0.1))
     ax.set_xlabel("Overall complexity", fontsize = 12, labelpad = 6)
-    ax.set_ylabel("RMSE (Resonant)", fontsize = 12, labelpad = 6)
+    ax.set_ylabel("Resonant RMSE (dex)", fontsize = 12, labelpad = 6)
     ax.legend(framealpha=1)
 
     # ---------- Middle panel: comparison -----------------------------------
@@ -139,7 +139,7 @@ def plot_combined_pareto(
 
     ax.yaxis.set_major_locator(MultipleLocator(0.1))
     ax.set_xlabel("Overall complexity", fontsize = 12, labelpad = 6)
-    ax.set_ylabel("RMSE (Resonant)", fontsize = 12, labelpad = 6)
+    ax.set_ylabel("Resonant RMSE (dex)", fontsize = 12, labelpad = 6)
     ax.legend(framealpha=1)
 
     # --- Save & return ------------------------------------------------------

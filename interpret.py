@@ -499,7 +499,7 @@ def f2_latex_str(results, important_complexities=None, mapping_dict=None, add_rm
     if add_rmse and 'rmse' in results.columns:
         # add column of rmse scores
         s = s.replace('cc@', 'ccc@')
-        s = s.replace('Complexity \\\\', 'Complexity & RMSE \\\\')
+        s = s.replace('Complexity \\\\', 'Complexity & RMSE (dex) \\\\')
 
         for i in range(len(results)):
             complexity = results.iloc[i]['complexity']
@@ -657,7 +657,8 @@ def rmse_plot(rmse_dict=None):
     rmse_dict = {
         'Neural network':       [0.96, 1.06, 1.427],
         'Distilled equations':  [1.15, 1.23, 1.072],
-        'Pure SR':              [1.36, 1.40, 1.724],
+        # 'Pure SR':              [1.36, 1.40, 1.724],
+        'Pure SR':              [1.21, 1.29, 0.90],
         'Petit+2020':           [3.13, 3.00, 1.253],
     }
 
@@ -702,7 +703,7 @@ def rmse_plot(rmse_dict=None):
 
     upper_ax.tick_params(axis='y', labelleft=True)
     upper_ax.tick_params(axis='x', labelbottom=False)
-    lower_ax.set_ylabel('RMSE')
+    lower_ax.set_ylabel('RMSE (dex)')
     lower_ax.set_xticks(x)
     lower_ax.set_xticklabels(datasets, fontsize=10)
     lower_ax.yaxis.set_major_locator(MultipleLocator(0.5))

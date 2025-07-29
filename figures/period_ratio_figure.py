@@ -18,6 +18,7 @@ try:
 except ImportError:
     import figures.spock as spock
 import pickle
+import math
 from utils2 import assert_equal, load_pickle, get_script_execution_command, load_json, truncate_cmap
 import multiprocessing as mp
 import argparse
@@ -449,72 +450,73 @@ def collate_parallel_results(args):
     print('Saved results to', path)
 
 
-# ----------------------------------------------------------------------
-# 6-panel composite (preferred GridSpec layout with centred half-height bar)
-# ----------------------------------------------------------------------
-def plot_6way(args):
-    """
-    Layout:
-        col 0          col 1          cbar       col 2
-    ┌─────────┬─────────┬─────────┬─────────┐
-    │  GT     │ Eqns    │         │ RMSEeq  │
-    │ (axs[0])│ (axs[1])│  bar    │ (axs[2])│
-    ├─────────┼─────────┼─────────┼─────────┤
-    │  NN     │ Petit   │         │ ΔRMSE   │
-    │ (axs[3])│ (axs[4])│         │ (axs[5])│
-    └─────────┴─────────┴─────────┴─────────┘
-    """
-    # --------------------------------------------------------------
-    # prep & figure scaffold
-    # --------------------------------------------------------------
-    v     = load_json(args.version_json)
+def plot_main_figure(args):
+    v = load_json(args.version_json)
     scale = 0.7
+    fig = plt.figure(figsize=(17.5 * scale, 15.5 * scale), constrained_layout=False)
 
-    fig = plt.figure(figsize=(17.5 * scale, 10 * scale), constrained_layout=False)
-    gs  = GridSpec(
-            2, 4,                       # rows × cols
-            width_ratios=[0.92, 0.95, 0.05, 1.25],  # bar gets narrow dedicated col
-            wspace=0,
-            hspace=0.19,
-          )
+    # Outer grid: two blocks vertically.
+    #   Top block holds the original 2×4 layout (with narrow colour-bar col).
+    #   Bottom block is a new 1×4 equally spaced row.
+    gs_outer = GridSpec(
+        2, 1,
+        height_ratios=[2.4, 1],  # tweak as you like
+        hspace=0.20,
+        figure=fig
+    )
 
-    # map the six data panels
+    # Original layout inside the top block
+    gs_top = gs_outer[0].subgridspec(
+        2, 4,
+        width_ratios=[0.92, 0.95, 0.15, 1.25],
+        wspace=0,
+        hspace=0.19
+    )
+
+    # New bottom row: four equal columns spanning full width
+    gs_bottom = gs_outer[1].subgridspec(
+        1, 4,
+        width_ratios=[1, 1, 1, 1],
+        wspace=0.15,
+    )
+
+    # ---------------- existing six axes ----------------
     axes_map = {
-        0: fig.add_subplot(gs[0, 0]),   # GT
-        1: fig.add_subplot(gs[0, 1]),   # Eqns
-        2: fig.add_subplot(gs[0, 3]),   # distilled-RMSE
-        3: fig.add_subplot(gs[1, 0]),   # NN
-        4: fig.add_subplot(gs[1, 1]),   # Petit
-        5: fig.add_subplot(gs[1, 3])    # ΔRMSE
+        0: fig.add_subplot(gs_top[0, 0]),  # GT
+        1: fig.add_subplot(gs_top[0, 1]),  # Eqns
+        2: fig.add_subplot(gs_top[0, 3]),  # distilled-RMSE
+        3: fig.add_subplot(gs_top[1, 0]),  # NN
+        4: fig.add_subplot(gs_top[1, 1]),  # Petit
+        5: fig.add_subplot(gs_top[1, 3])   # ΔRMSE
     }
     axs = [axes_map[i] for i in range(6)]
 
-    # --------------------------------------------------------------
-    # (A) 4-way instability-time panels (indices 0,1,3,4)
-    # --------------------------------------------------------------
-    nn_res    = load_pickle(get_results_path(args.Ngrid, v['nn_version']))
-    eq_res    = load_pickle(get_results_path(
-                    args.Ngrid, v['nn_version'],
-                    pysr_version=v['pysr_version'],
-                    pysr_model_selection=v['pysr_model_selection']))
-    petit_res = load_pickle(get_results_path(args.Ngrid, use_petit=True))
-    gt_res    = load_pickle(get_results_path(args.Ngrid, ground_truth=True))
+    P12s, P23s = get_period_ratios(args.Ngrid)
 
-    models  = [gt_res, eq_res, nn_res, petit_res]
-    names   = ['ground_truth', 'eq', 'nn', 'petit']
-    titles  = ['Ground truth', 'Distilled equations',
-               'Neural network', 'Petit+ 2020']
-    # ticks   = [0.55, 0.60, 0.65, 0.70, 0.75]
-    major_ticks = [0.55, 0.75]
+    # ---------------- new bottom axes ------------------
+    bottom_axes = [fig.add_subplot(gs_bottom[0, i]) for i in range(4)]
+
+    # (A) original 4‑way panels
+    nn_res = load_pickle(get_results_path(args.Ngrid, v['nn_version']))
+    eq_res = load_pickle(get_results_path(
+        args.Ngrid, v['nn_version'],
+        pysr_version=v['pysr_version'],
+        pysr_model_selection=v['pysr_model_selection']))
+    petit_res = load_pickle(get_results_path(args.Ngrid, use_petit=True))
+    gt_res = load_pickle(get_results_path(args.Ngrid, ground_truth=True))
+
+    models = [gt_res, eq_res, nn_res, petit_res]
+    names = ['ground_truth', 'eq', 'nn', 'petit']
+    titles = ['Ground truth', 'Distilled equations', 'Neural network', 'Petit+ 2020']
+    major_ticks = [0.55, 0.65, 0.75]
     minor_ticks = [0.55, 0.60, 0.65, 0.70, 0.75]
     panel_indices = [0, 1, 3, 4]
 
     im4way = None
-    for idx_panel, (ax_i, name, title) in zip(panel_indices, zip(models, names, titles)):
+    for idx_panel, (model_data, name, title) in zip(panel_indices, zip(models, names, titles)):
         ax = axs[idx_panel]
-
-        show_x = idx_panel in (3, 4)          # bottom row
-        show_y = idx_panel in (0, 3)          # left column
+        show_x = idx_panel in (3, 4)
+        show_y = idx_panel in (0, 3)
 
         ax.set_aspect('equal')
         ax.set_xticks(major_ticks, major=True)
@@ -526,8 +528,7 @@ def plot_6way(args):
         if not show_y:
             ax.set_yticklabels([])
 
-        # map dicts → scalar grid
-        data = ax_i
+        data = model_data
         if name == 'petit':
             data = [d['mean'] if d else np.nan for d in data]
         elif name == 'ground_truth':
@@ -536,47 +537,62 @@ def plot_6way(args):
         else:
             data = [d['mean'] if d else np.nan for d in data]
 
-        P12s, P23s = get_period_ratios(args.Ngrid)
-        X, Y, Z    = get_centered_grid(P12s, P23s, np.asarray(data))
+        X, Y, Z = get_centered_grid(P12s, P23s, np.asarray(data))
 
         cmap = COLOR_MAP.copy().reversed()
         cmap.set_bad(color='white')
-        im4way = ax.pcolormesh(X, Y, Z, vmin=4, vmax=9,
-                               cmap=cmap, rasterized=True)
+        im4way = ax.pcolormesh(X, Y, Z, vmin=4, vmax=9, cmap=cmap, rasterized=True)
 
         if show_x:
-            ax.set_xlabel("P1/P2")
+            ax.set_xlabel(r"$P_1/P_2$")
         if show_y:
-            ax.set_ylabel("P2/P3")
+            ax.set_ylabel(r"$P_2/P_3$")
         ax.set_title(title)
 
-    # --------------------------------------------------------------
-    # Shared colour-bar (½-height, centred vertically)
-    # --------------------------------------------------------------
-    cax = fig.add_subplot(gs[:, 2])          # spans both rows
-    cb  = fig.colorbar(im4way, cax=cax)
+    # Shared colour bar (top grid only)
+    cax = fig.add_subplot(gs_top[:, 2])
+    cb = fig.colorbar(im4way, cax=cax)
     cb.set_label(INSTABILITY_TIME_LABEL)
-
-    # shrink to half height & recenter
-    bb   = cax.get_position(fig)
+    bb = cax.get_position(fig)
     half = 0.5 * bb.height
-    new_bottom = bb.y0 + 0.25 * bb.height    # centre vertically
-    cax.set_position([bb.x0, new_bottom, bb.width, half])
+    new_bottom = bb.y0 + 0.25 * bb.height
+    width = 0.01
+    cax.set_position([bb.x0, new_bottom, width, half])
 
-    # --------------------------------------------------------------
-    # (B) distilled-RMSE  (top-right)  &  (C) ΔRMSE (bottom-right)
-    # --------------------------------------------------------------
-    _draw_diff_panel(axs[2], v, special='gt_diff',  hide_xlabel=True)
+    # RMSE panels
+    _draw_diff_panel(axs[2], v, special='gt_diff', hide_xlabel=True)
     _draw_diff_panel(axs[5], v, special='rmse_diff', hide_xlabel=False)
 
-    # --------------------------------------------------------------
-    # Save out
-    # --------------------------------------------------------------
-    out_path = "period_results/6way" + (".png" if args.png else ".pdf")
+    # -------- bottom row ----
+    complexities = [3, 7, 14, 26]
+    data = [
+        load_pickle(get_results_path(
+            args.Ngrid, v['nn_version'],
+            pysr_version=v['pysr_version'],
+            pysr_model_selection=comp))
+        for comp in complexities
+    ]
+    data = [np.array([d['mean'] if d else np.nan for d in datum]) for datum in data]
+    for i, ax in enumerate(bottom_axes):
+        X, Y, Z = get_centered_grid(P12s, P23s, data[i])
+        ax.set_aspect('equal')
+        ax.set_xticks(major_ticks, major=True)
+        ax.set_xticks(minor_ticks, minor=True)
+        ax.set_yticks(major_ticks, major=True)
+        ax.set_yticks(minor_ticks, minor=True)
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
+        cmap = COLOR_MAP.copy().reversed()
+        cmap.set_bad(color='white')
+        ax.pcolormesh(X, Y, Z, vmin=4, vmax=9, cmap=cmap, rasterized=True)
+        ax.set_title(f"Complexity {complexities[i]}")
+
+    out_path = "period_results/period_ratio_main" + (".png" if args.png else ".pdf")
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     plt.savefig(out_path, dpi=800, bbox_inches='tight')
     print("Saved figure to", out_path)
     plt.close(fig)
+
 
 # ----------------------------------------------------------------------
 # Helper: draw either the distilled-RMSE (“gt_diff”) or ΔRMSE (“rmse_diff”)
@@ -603,7 +619,7 @@ def _draw_diff_panel(ax, v, special, hide_xlabel=False):
     # ------------- shared prep ------------------------------------------------
     P12s, P23s = get_period_ratios(300)
     ticks = [0.55, 0.60, 0.65, 0.70, 0.75]
-    major_ticks = [0.55, 0.75]
+    major_ticks = [0.55, 0.65, 0.75]
     minor_ticks = [0.55, 0.60, 0.65, 0.70, 0.75]
     ax.set_aspect('equal')
     ax.set_xticks(major_ticks, major=True)
@@ -645,7 +661,7 @@ def _draw_diff_panel(ax, v, special, hide_xlabel=False):
         cmap.set_bad(color='white')
         norm = plt.Normalize(vmin=0, vmax=5)
         title = "Distilled equations RMSE"
-        label = "RMSE"
+        label = "RMSE (dex)"
 
     elif special == 'rmse_diff':
         # Difference of RMSEs: NN – Eqns
@@ -665,7 +681,7 @@ def _draw_diff_panel(ax, v, special, hide_xlabel=False):
         cmap.set_bad(color='white')
         norm = plt.Normalize(vmin=-5, vmax=5)
         title = "Difference in RMSE (NN – Equations)"
-        label = r"${\rm RMSE}_{\rm NN}\;-\;{\rm RMSE}_{\rm Eqns}$"
+        label = r"${\rm RMSE}_{\rm NN}\;-\;{\rm RMSE}_{\rm Eqns} \ ({\rm dex})$"
 
     else:
         raise ValueError("special must be 'gt_diff' or 'rmse_diff'")
@@ -678,9 +694,9 @@ def _draw_diff_panel(ax, v, special, hide_xlabel=False):
     if hide_xlabel:
         ax.set_xticklabels([])
     else:
-        ax.set_xlabel("P1/P2")
+        ax.set_xlabel(r"$P_1/P_2$")
     if ax.is_first_col():
-        ax.set_ylabel("P2/P3")
+        ax.set_ylabel(r"$P_2/P_3$")
     else:
         ax.set_ylabel("")
 
@@ -705,14 +721,14 @@ def plot_results(args, metric=None):
 
     # scale=0.75
     scale=0.7
-    if args.minimal_plot:
-        scale = 0.775 * scale
+    # if args.minimal_plot:
+        # scale = 0.775 * scale
     fig, ax = plt.subplots(figsize=(5*scale,4.5*scale))
     ax.set_aspect('equal', adjustable='box')
 
-    major_ticks = [0.55, 0.75]
+    major_ticks = [0.55, 0.65, 0.75]
     # major_ticks = [0.55, 0.60, 0.65, 0.70, 0.75]
-    minor_ticks = [0.60, 0.65, 0.70]
+    minor_ticks = [0.60, 0.70]
     ax.set_xticks(major_ticks)
     ax.set_xticks(minor_ticks, minor=True)
     ax.set_yticks(major_ticks)
@@ -838,8 +854,8 @@ def plot_results(args, metric=None):
     else:
         cb = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
         cb.set_label(label)
-        ax.set_xlabel("P1/P2")
-        ax.set_ylabel("P2/P3")
+        ax.set_xlabel(r"$P_1/P_2$")
+        ax.set_ylabel(r"$P_2/P_3$")
 
         # if args.special == 'rmse_diff':
             # cb.ax.set_yticks([-8, -4, 0, 4, 8])
@@ -1081,11 +1097,11 @@ def plot_4way_comparison(args):
         im = axs[i].pcolormesh(X, Y, Z, vmin=4, vmax=9, cmap=cmap, rasterized=True)
 
         if show_x:
-            axs[i].set_xlabel("P1/P2")
+            axs[i].set_xlabel(r"$P_1/P_2$")
         else:
             axs[i].set_xlabel("")
         if show_y:
-            axs[i].set_ylabel("P2/P3")
+            axs[i].set_ylabel(r"$P_2/P_3$")
         else:
             axs[i].set_ylabel("")
 
@@ -1160,11 +1176,11 @@ def plot_pure_sr_comparison(args):
         im = axs[i].pcolormesh(X, Y, Z, vmin=4, vmax=9, cmap=cmap, rasterized=True)
 
         if show_x:
-            axs[i].set_xlabel("P1/P2")
+            axs[i].set_xlabel(r"$P_1/P_2$")
         else:
             axs[i].set_xlabel("")
         if show_y:
-            axs[i].set_ylabel("P2/P3")
+            axs[i].set_ylabel(r"$P_2/P_3$")
         else:
             axs[i].set_ylabel("")
 
@@ -1246,13 +1262,13 @@ def plot_exprs(args):
             else:
                 im = ax.pcolormesh(X, Y, Z, cmap=cmap)
             ax.set_title(s)
-            ax.set_xlabel("P1/P2")
-            ax.set_ylabel("P2/P3")
+            ax.set_xlabel(r"$P_1/P_2$")
+            ax.set_ylabel(r"$P_2/P_3$")
 
             cb = plt.colorbar(im, ax=ax)
             cb.set_label(s)
-            ax.set_xlabel("P1/P2")
-            ax.set_ylabel("P2/P3")
+            ax.set_xlabel(r"$P_1/P_2$")
+            ax.set_ylabel(r"$P_2/P_3$")
             plt.tight_layout()
 
             path = get_results_path(args.Ngrid, args.version)
@@ -1270,48 +1286,202 @@ def plot_exprs(args):
             plt.close(fig)
 
 
+def plot_f1_features2(args):
+    """
+    Display the first six μ/σ features on one page (3 × 2 grid),
+    and the remaining four on a second page (2 × 2 grid).  All
+    formatting, colour scaling, and file-naming conventions follow
+    the original implementation.
+    """
+
+    v = load_json(args.version_json)
+    Ngrid = 300
+    nn_version = v['nn_version']
+    pysr_version = v['pysr_version']
+
+    # -------------------- load data / discover indices -------------------- #
+    results = load_pickle(get_results_path(Ngrid, nn_version))
+    n_features = results[0]['f1'].shape[0] // 2
+    P12s, P23s = get_period_ratios(Ngrid)
+
+    from interpret import get_variables_in_str, feature_string, get_feature_nn
+    feature_nn = get_feature_nn(nn_version)
+
+    pysr_results = pickle.load(
+        open(f'../sr_results/{pysr_version}.pkl', 'rb')
+    ).equations_
+    if isinstance(results, list):
+        pysr_results = pysr_results[0]      # only the mean equations
+
+    # work out which f1-indices appear in an important symbolic expression
+    all_vars = [
+        v
+        for sub in pysr_results['equation']
+        for v in get_variables_in_str(sub)
+    ]
+    all_vars = list(dict.fromkeys(all_vars))          # dedupe, keep order
+    mu_vars  = sorted(int(v[1]) for v in all_vars if v[0] == 'm')
+    std_vars = sorted(int(v[1]) for v in all_vars if v[0] == 's')
+
+    feat_indices = mu_vars + std_vars                 # 10 total
+    is_std_flags = [False] * len(mu_vars) + [True] * len(std_vars)
+
+    # ---------------------- helper to draw one figure --------------------- #
+    def _draw_subset(sub_idx, sub_is_std, part_tag):
+        n_plots = len(sub_idx)
+        n_cols  = 2
+        n_rows  = math.ceil(n_plots / n_cols)
+        scale   = 0.85
+
+        fig, axs = plt.subplots(
+            n_rows, n_cols,
+            figsize=(12 * scale, 10 * scale * n_rows / 2),
+            gridspec_kw={'wspace': 0.15, 'hspace': 0.15}
+        )
+        axs = axs.flatten()
+
+        # remove any unused axes (happens only for the second figure)
+        for ax in axs[n_plots:]:
+            ax.remove()
+        axs = axs[:n_plots]
+
+        major_ticks = [0.55, 0.65, 0.75]
+        minor_ticks = [0.55, 0.60, 0.65, 0.70, 0.75]
+
+        for ax_id, (ax, feat_i, is_std) in enumerate(zip(axs, sub_idx, sub_is_std)):
+            # --------- populate each subplot (identical to old single-plot) ---- #
+            ax.set_aspect('equal', adjustable='box')
+            ax.set_xticks(major_ticks, minor=False)
+            ax.set_xticks(minor_ticks, minor=True)
+            ax.set_yticks(major_ticks, minor=False)
+            ax.set_yticks(minor_ticks, minor=True)
+
+            row, col = divmod(ax_id, n_cols)
+            if row < n_rows - 1:
+                ax.set_xticklabels([])
+            else:
+                ax.set_xlabel(r"$P_1/P_2$")
+            if col == 1:
+                ax.set_yticklabels([])
+            else:
+                ax.set_ylabel(r"$P_2/P_3$")
+
+            vals = np.array([
+                d['f1'][feat_i + n_features if is_std else feat_i]
+                if d is not None else np.nan
+                for d in results
+            ])
+            valid = vals[~np.isnan(vals)]
+            lower, upper = np.percentile(valid, [20, 80])   # middle 50 %
+            X, Y, Z = get_centered_grid(P12s, P23s, vals)
+
+            cmap = COLOR_MAP.copy().reversed()
+            cmap.set_bad(color='white')
+
+            im = ax.pcolormesh(
+                X, Y, Z,
+                vmin=lower, vmax=upper,
+                cmap=cmap,
+                rasterized=True
+            )
+
+            feat_str = feature_string(
+                feature_nn, feat_i,
+                include_ssx=True,
+                latex=True,
+                include_ssx_bias=not is_std
+            )
+            if is_std:
+                title = r'$\sigma_{' + str(feat_i) + r'} = {\rm Std} \left(' + feat_str + r'\right)$'
+            else:
+                title = r'$\mu_{' + str(feat_i) + r'} = \mathbb{E} \left [' + feat_str + r' \right ]$'
+            ax.set_title(title)
+
+            fig.colorbar(im, ax=ax)
+
+        # ---------------------------- save figure --------------------------- #
+        out_dir = f"period_results/v={nn_version}_ngrid={Ngrid}_plot_features"
+        os.makedirs(out_dir, exist_ok=True)
+        ext = '.pdf'
+        fname = f"{out_dir}/features_grid_{part_tag}{ext}"
+        plt.savefig(fname, dpi=800, bbox_inches='tight')
+        print("Saved combined figure to", fname)
+        plt.close(fig)
+
+    # ------------------------- render both figures ------------------------ #
+    _draw_subset(feat_indices[:6],  is_std_flags[:6],  "part1")   # first  6 panels
+    _draw_subset(feat_indices[6:], is_std_flags[6:], "part2")     # last   4 panels
+
+
 def plot_f1_features(args):
     results = load_pickle(get_results_path(args.Ngrid, args.version))
     n_features = results[0]['f1'].shape[0] // 2
 
     P12s, P23s = get_period_ratios(args.Ngrid)
 
-    for feature in range(n_features):
-        for plot_std in [True, False]:
-            values = [d['f1'][feature + n_features if plot_std else feature] if d is not None else np.nan for d in results]
-            values = np.array(values)
-            values2 = values[~np.isnan(values)]
-            fraction = 0.5
-            lower, upper = np.percentile(values2, [100 * (fraction/2), 100 * (1 - fraction/2)])
+    from interpret import get_variables_in_str, feature_string, get_feature_nn
+    feature_nn = get_feature_nn(args.version)
 
-            X,Y,Z = get_centered_grid(P12s, P23s, values)
+    pysr_results = pickle.load(open(f'../sr_results/{args.pysr_version}.pkl', 'rb'))
+    pysr_results = pysr_results.equations_
+    if type(results) == list:
+        pysr_results = pysr_results[0]  # just the mean equations
 
-            fig, ax = plt.subplots(figsize=(8,6))
+    # only print variables used in an important equation in the pysr results
+    all_vars = [get_variables_in_str(e) for e in pysr_results['equation']]
+    # go from list of lists to just one big list
+    all_vars = [item for sublist in all_vars for item in sublist]
+    all_vars = list(dict.fromkeys(all_vars)) # remove duplicates, but keep order
+    mu_vars = [int(s[1]) for s in all_vars if s[0] == 'm']
+    std_vars = [int(s[1]) for s in all_vars if s[0] == 's']
+    mu_vars = sorted(mu_vars)
+    std_vars = sorted(std_vars)
+    print(mu_vars, std_vars)
 
-            cmap = COLOR_MAP.copy().reversed()
-            cmap.set_bad(color='white')
-            im = ax.pcolormesh(X, Y, Z, cmap=cmap, vmin=lower, vmax=upper)
-            ax.set_title(f'Feature {feature} std' if plot_std else f'Feature {feature} mean')
-            ax.set_xlabel("P1/P2")
-            ax.set_ylabel("P2/P3")
+    mu_is_std = [False for _ in range(len(mu_vars))]
+    std_is_std = [True for _ in range(len(std_vars))]
 
-            cb = plt.colorbar(im, ax=ax)
-            cb.set_label('Feature std' if plot_std else 'Feature mean')
-            ax.set_xlabel("P1/P2")
-            ax.set_ylabel("P2/P3")
-            plt.tight_layout()
+    for i, is_std in zip(mu_vars + std_vars, mu_is_std + std_is_std):
 
-            path = get_results_path(args.Ngrid, args.version)
-            # get rid of .pkl
-            path = path[:-4]
-            path += f'_plot_features/{feature}'
-            path += '_std' if plot_std else '_mean'
-            path += '.png' if args.png else '.pdf'
+        values = [d['f1'][i + n_features if is_std else i] if d is not None else np.nan for d in results]
+        values = np.array(values)
+        values2 = values[~np.isnan(values)]
+        fraction = 0.5
+        lower, upper = np.percentile(values2, [100 * (fraction/2), 100 * (1 - fraction/2)])
 
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            plt.savefig(path, dpi=800)
-            print('Saved figure to', path)
-            plt.close(fig)
+        X,Y,Z = get_centered_grid(P12s, P23s, values)
+        fig, ax = plt.subplots(figsize=(8,6))
+        cmap = COLOR_MAP.copy().reversed()
+        cmap.set_bad(color='white')
+        im = ax.pcolormesh(X, Y, Z, cmap=cmap, vmin=lower, vmax=upper, rasterized=True)
+
+        feature_str = feature_string(feature_nn, i, include_ssx=True, latex=True, include_ssx_bias=not is_std)
+        if is_std:
+            title = r'$\sigma_{' + str(i) + r'} = {\rm Std}\left(' + feature_str + r'\right)$'
+        else:
+            title = r'$\mu_{' + str(i) + '} = { \\rm \mathbb{E}} \\left [' + feature_str + ' \\right ]$'
+        ax.set_title(title)
+
+        ax.set_xlabel(r"$P_1/P_2$")
+        ax.set_ylabel(r"$P_2/P_3$")
+
+        cb = plt.colorbar(im, ax=ax)
+        cb.set_label(f'Feature {i} std' if is_std else f'Feature {i} mean')
+        ax.set_xlabel(r"$P_1/P_2$")
+        ax.set_ylabel(r"$P_2/P_3$")
+        plt.tight_layout()
+
+        path = get_results_path(args.Ngrid, args.version)
+        # get rid of .pkl
+        path = path[:-4]
+        path += f'_plot_features/{i}'
+        path += '_std' if is_std else '_mean'
+        path += '.png' if args.png else '.pdf'
+
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        plt.savefig(path, dpi=800)
+        print('Saved figure to', path)
+        plt.close(fig)
 
 
 def plot_4way_pysr_comparison(args):
@@ -1360,8 +1530,8 @@ def plot_4way_pysr_comparison(args):
         zmin = 4
         im = axs[i].pcolormesh(X, Y, Z, vmin=zmin, vmax=zmax, cmap=cmap)
         axs[i].set_title(f'Complexity {model_selection}')
-        axs[i].set_xlabel("P1/P2")
-        axs[i].set_ylabel("P2/P3")
+        axs[i].set_xlabel(r"$P_1/P_2$")
+        axs[i].set_ylabel(r"$P_2/P_3$")
 
     # Create a single colorbar
     cb = fig.colorbar(im, ax=axs.ravel().tolist(), shrink=0.6)
@@ -1472,7 +1642,7 @@ def get_args():
     parser.add_argument('--equation_bounds', action='store_true')
     parser.add_argument('--job_array', action='store_true')
     parser.add_argument('--max_t', type=float, default=1e9, help='Maximum integration time for ground truth')
-    parser.add_argument('--special', type=str, default=None, choices=['4way', '6way', 'pure_sr', '4way_pysr', 'f1_features', 'exprs', 'rmse', 'rmse_diff', 'gt_diff'])
+    parser.add_argument('--special', type=str, default=None, choices=['4way', 'main', 'pure_sr', '4way_pysr', 'f1_features', 'exprs', 'rmse', 'rmse_diff', 'gt_diff'])
     parser.add_argument('--minimal_plot', action='store_true')
     parser.add_argument('--version_json', type=str, default='../official_versions.json', help='Path to the JSON file containing model versions')
 
@@ -1548,14 +1718,14 @@ if __name__ == '__main__':
     if args.special:
         if args.special == '4way':
             plot_4way_comparison(args)
-        if args.special == '6way':
-            plot_6way(args)
+        if args.special == 'main':
+            plot_main_figure(args)
         elif args.special == 'pure_sr':
             plot_pure_sr_comparison(args)
         elif args.special == '4way_pysr':
             plot_4way_pysr_comparison(args)
         elif args.special == 'f1_features':
-            plot_f1_features(args)
+            plot_f1_features2(args)
         elif args.special == 'exprs':
             plot_exprs(args)
         elif args.special == 'rmse':

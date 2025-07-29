@@ -104,7 +104,7 @@ def make_separate_comparison_plot(cleaned, path):
 
 def official_plots(args):
     v = load_json(args.version_json)
-    ms = v['pysr_model_selection_five_planet'] if 'pysr_model_selection_five_planet' in v else v['pysr_model_selection']
+    ms = v['pysr_model_selection']
     main_path = f"five_planet_figures/v{v['nn_version']}_pysr{v['pysr_version']}_ms={ms}_N={args.N}_turbo_extrapolate.csv"
     cleaned = pd.read_csv(main_path)
     make_main_plot(cleaned, path='five_planet_figures/five_planet_main.pdf')
