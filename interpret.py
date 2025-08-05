@@ -610,6 +610,7 @@ def official_stuff(args):
 
     print('psi table latex string:\n')
     f2_str = f2_latex_str(results, mapping_dict=None)
+    # WARNING: for some reason, generating the f2 tables messes up the equation for complexity 18. You have to manually fix that entry.
     print(f2_str)
     print()
 
@@ -635,8 +636,8 @@ def official_stuff(args):
     important_complexities, _ = paretoize(important_complexities, results['rmse'].tolist(), replace=False)
 
     plot = make_pareto_plot(results, important_complexities=important_complexities, rmse=True, plot_unimportant=False)
-    # plot.savefig('graphics/pareto_fig1.svg', bbox_inches='tight')
-    # print('Saved pareto plot to graphics/pareto_fig1.svg')
+    plot.savefig('graphics/pareto_fig1.svg', bbox_inches='tight')
+    print('Saved pareto plot to graphics/pareto_fig1.svg')
 
     rmse_dict = {
         'Neural network':       [nn_results['test'], nn_results['random'], 1.427],
