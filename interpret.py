@@ -614,6 +614,7 @@ def official_stuff(args):
     print(f2_str)
     print()
 
+    # these results obtained via calc_rmse.py script (see official_plots.sh)
     nn_results = load_pickle(f'pickles/nn_results_all_{v["mse_nn_version"]}.pkl')
     petit_results = load_pickle('pickles/petit_results_all.pkl')
     pure_sr_results = load_pickle(f'pickles/pure_sr_results_all_{v["mse_pure_sr_version"]}.pkl')

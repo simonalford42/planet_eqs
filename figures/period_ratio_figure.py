@@ -560,8 +560,8 @@ def plot_main_figure(args):
     cax.set_position([bb.x0, new_bottom, width, half])
 
     # RMSE panels
-    _draw_diff_panel(axs[2], v, special='gt_diff', hide_xlabel=True)
-    _draw_diff_panel(axs[5], v, special='rmse_diff', hide_xlabel=False)
+    _draw_diff_panel(axs[2], v, special='gt_diff', hide_xlabel=True, exclude_stable=args.exclude_stable)
+    _draw_diff_panel(axs[5], v, special='rmse_diff', hide_xlabel=False, exclude_stable=args.exclude_stable)
 
     # -------- bottom row ----
     complexities = [3, 7, 14, 26]
@@ -598,7 +598,7 @@ def plot_main_figure(args):
 # Helper: draw either the distilled-RMSE (“gt_diff”) or ΔRMSE (“rmse_diff”)
 # panel inside a supplied Axes object.
 # ----------------------------------------------------------------------
-def _draw_diff_panel(ax, v, special, hide_xlabel=False):
+def _draw_diff_panel(ax, v, special, hide_xlabel=False, exclude_stable=False):
     """
     Parameters
     ----------
@@ -676,6 +676,9 @@ def _draw_diff_panel(ax, v, special, hide_xlabel=False):
         rmse_eq = np.sqrt((eq_clip - gt_vals) ** 2)
         rmse_nn = np.sqrt((nn_clip - gt_vals) ** 2)
         Z = rmse_nn - rmse_eq
+        if args.exclude_stable:
+            stable_mask = gt_vals >= 9
+            Z[stable_mask] = np.nan
 
         cmap = DIVERGING_CMAP.copy()
         cmap.set_bad(color='white')
@@ -1119,6 +1122,104 @@ def plot_4way_comparison(args):
     plt.close(fig)
 
 
+def plot_4way_rmse(args):
+    """
+    Four-panel plot showing per-cell RMSE vs. ground truth for:
+      NN, distilled equations, pure SR, and Petit+2020.
+
+    If args.exclude_stable, cells where ground truth == 9 (stable) are
+    set to RMSE = 0 rather than NaN so they appear as "no error" in the
+    colormap instead of blank.
+    """
+    v = load_json(args.version_json)
+    Ngrid = args.Ngrid
+    P12s, P23s = get_period_ratios(Ngrid)
+
+    # --- ground truth ---
+    gt_data = load_pickle(get_results_path(Ngrid, ground_truth=True))
+    gt_vals = np.array([
+        np.log10(d['ground_truth']) if d is not None else np.nan
+        for d in gt_data
+    ])
+    stable_mask = gt_vals >= 9
+
+    # --- per-model predictions ---
+    def _mean(data):
+        return np.array([d['mean'] if d is not None else np.nan for d in data])
+
+    nn_preds   = _mean(load_pickle(get_results_path(Ngrid, v['nn_version'])))
+    eq_preds   = _mean(load_pickle(get_results_path(Ngrid, v['nn_version'],
+                       pysr_version=v['pysr_version'],
+                       pysr_model_selection=v['pysr_model_selection'])))
+    psr_preds  = _mean(load_pickle(get_results_path(Ngrid,
+                       pysr_version=v['pure_sr_version'],
+                       pysr_model_selection=v['pure_sr_model_selection'],
+                       pure_sr=True)))
+    pet_preds  = _mean(load_pickle(get_results_path(Ngrid, use_petit=True)))
+
+    all_preds  = [nn_preds, eq_preds, psr_preds, pet_preds]
+    titles     = ['Neural network', 'Distilled equations', 'Pure SR', 'Petit+ 2020']
+
+    # --- per-cell RMSE (= abs error; one simulation per cell) ---
+    all_Z = []
+    for preds in all_preds:
+        preds_clip = np.clip(preds, 4, 9)
+        Z = np.abs(preds_clip - gt_vals)
+        if args.exclude_stable:
+            Z[stable_mask] = 0.0
+        all_Z.append(Z)
+
+    # --- figure ---
+    scale = 0.85
+    fig, axs = plt.subplots(
+        2, 2,
+        figsize=(12 * scale, 10 * scale),
+        gridspec_kw={'wspace': 0.15, 'hspace': 0.15},
+    )
+    axs = axs.flatten()
+
+    show_xs    = [False, False, True,  True]
+    show_ys    = [True,  False, True,  False]
+    major_ticks = [0.55, 0.65, 0.75]
+    minor_ticks = [0.55, 0.60, 0.65, 0.70, 0.75]
+
+    cmap = RMSE_CMAP.copy()
+    cmap.set_bad(color='white')
+    norm = plt.Normalize(vmin=0, vmax=5)
+
+    im = None
+    for i, (Z, title, show_x, show_y) in enumerate(
+            zip(all_Z, titles, show_xs, show_ys)):
+        ax = axs[i]
+        ax.set_aspect('equal')
+        ax.set_xticks(major_ticks, major=True)
+        ax.set_xticks(minor_ticks, minor=True)
+        ax.set_yticks(major_ticks, major=True)
+        ax.set_yticks(minor_ticks, minor=True)
+
+        X, Y, ZZ = get_centered_grid(P12s, P23s, Z)
+        im = ax.pcolormesh(X, Y, ZZ, cmap=cmap, norm=norm, rasterized=True)
+        ax.set_title(title)
+
+        if show_x:
+            ax.set_xlabel(r"$P_1/P_2$")
+        else:
+            ax.set_xticklabels([])
+        if show_y:
+            ax.set_ylabel(r"$P_2/P_3$")
+        else:
+            ax.set_yticklabels([])
+
+    cb = fig.colorbar(im, ax=axs.ravel().tolist(), shrink=0.5)
+    cb.set_label("RMSE (dex)")
+
+    out_path = 'period_results/four_way_rmse.pdf'
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    plt.savefig(out_path, dpi=800, bbox_inches='tight')
+    print('Saved figure to', out_path)
+    plt.close(fig)
+
+
 def plot_pure_sr_comparison(args):
     v = load_json(args.version_json)
 
@@ -1547,7 +1648,7 @@ def plot_4way_pysr_comparison(args):
     plt.close(fig)
 
 
-def get_truths_and_preds(Ngrid, version=None, pysr_version=None, pysr_model_selection=None, petit=False, pure_sr=False, clip=True):
+def get_truths_and_preds(Ngrid, version=None, pysr_version=None, pysr_model_selection=None, petit=False, pure_sr=False, clip=True, exclude_stable=True):
     results_path = get_results_path(Ngrid, version, pysr_version=pysr_version, pysr_model_selection=pysr_model_selection, use_petit=petit, pure_sr=pure_sr)
     truth_path = get_results_path(Ngrid, ground_truth=True)
     if not os.path.exists(results_path):
@@ -1573,6 +1674,12 @@ def get_truths_and_preds(Ngrid, version=None, pysr_version=None, pysr_model_sele
     preds = preds[~bad_ixs]
     assert not np.isnan(preds).any()
 
+    if exclude_stable:
+        # ignore stable systems (i.e., where ground_truth is 10^9)
+        stable_ixs = truths == 9
+        truths = truths[~stable_ixs]
+        preds = preds[~stable_ixs]
+
     if clip:
         preds = np.clip(preds, 4, 9)
         truths = np.clip(truths, 4, 9)
@@ -1580,24 +1687,35 @@ def get_truths_and_preds(Ngrid, version=None, pysr_version=None, pysr_model_sele
     return truths, preds
 
 
-def calculate_rmse(Ngrid, version=None, pysr_version=None, pysr_model_selection=None, petit=False, pure_sr=False, clip=True):
-    truths, preds = get_truths_and_preds(Ngrid, version, pysr_version, pysr_model_selection, petit, pure_sr, clip=clip)
+def calculate_rmse(Ngrid, version=None, pysr_version=None, pysr_model_selection=None, petit=False, pure_sr=False, clip=True, exclude_stable=True):
+    truths, preds = get_truths_and_preds(Ngrid, version, pysr_version, pysr_model_selection, petit, pure_sr, clip=clip, exclude_stable=exclude_stable)
     rmse = np.average(np.square(truths - preds))**0.5
-    return rmse
+    acc = np.mean((truths >= 9) == (preds >= 9))
+    return rmse, acc
 
 
 def calculate_rmses(args):
     versions = load_json(args.version_json)
-    nn_rmse = calculate_rmse(args.Ngrid, version=versions['nn_version'])
-    our_rmse = calculate_rmse(args.Ngrid, version=versions['nn_version'], pysr_version=versions['pysr_version'], pysr_model_selection=versions['pysr_model_selection'])
-    petit_rmse = calculate_rmse(args.Ngrid, petit=True)
-    pure_sr = calculate_rmse(args.Ngrid, pure_sr=True, pysr_version=versions['pure_sr_version'], pysr_model_selection=versions['pure_sr_model_selection'])
-    pure_sr2 = calculate_rmse(args.Ngrid, version=28114, pysr_version=versions['pure_sr2_version'], pysr_model_selection=versions['pure_sr2_model_selection'])
-    print(f'NN RMSE: {nn_rmse:.3f}')
-    print(f'Distilled EQs RMSE: {our_rmse:.3f}')
-    print(f'Petit+2020 RMSE: {petit_rmse:.3f}')
-    print(f'Pure SR RMSE: {pure_sr:.3f}')
-    print(f'Pure SR (no intermediate features) RMSE: {pure_sr2:.3f}')
+    nn_rmse = calculate_rmse(args.Ngrid, version=versions['nn_version'], exclude_stable=args.exclude_stable)
+    our_rmse = calculate_rmse(args.Ngrid, version=versions['nn_version'], pysr_version=versions['pysr_version'], pysr_model_selection=versions['pysr_model_selection'], exclude_stable=args.exclude_stable)
+    petit_rmse = calculate_rmse(args.Ngrid, petit=True, exclude_stable=args.exclude_stable)
+    pure_sr = calculate_rmse(args.Ngrid, pure_sr=True, pysr_version=versions['pure_sr_version'], pysr_model_selection=versions['pure_sr_model_selection'], exclude_stable=args.exclude_stable)
+    pure_sr2 = calculate_rmse(args.Ngrid, version=28114, pysr_version=versions['pure_sr2_version'], pysr_model_selection=versions['pure_sr2_model_selection'], exclude_stable=args.exclude_stable)
+    # print(f'NN RMSE: {nn_rmse:.3f}')
+    # print(f'Distilled EQs RMSE: {our_rmse:.3f}')
+    # print(f'Petit+2020 RMSE: {petit_rmse:.3f}')
+    # print(f'Pure SR RMSE: {pure_sr:.3f}')
+    # print(f'Pure SR (no intermediate features) RMSE: {pure_sr2:.3f}')
+    print(f'NN RMSE: {nn_rmse[0]:.3f}')
+    print(f'Distilled EQs RMSE: {our_rmse[0]:.3f}')
+    print(f'Petit+2020 RMSE: {petit_rmse[0]:.3f}')
+    print(f'Pure SR RMSE: {pure_sr[0]:.3f}')
+    print(f'Pure SR (no intermediate features) RMSE: {pure_sr2[0]:.3f}')
+    print(f'NN Accuracy: {nn_rmse[1]:.3f}')
+    print(f'Distilled EQs accuracy: {our_rmse[1]:.3f}')
+    print(f'Petit+2020 accuracy: {petit_rmse[1]:.3f}')
+    print(f'Pure SR accuracy: {pure_sr[1]:.3f}')
+    print(f'Pure SR (no intermediate features) accuracy: {pure_sr2[1]:.3f}')
 
 
 def get_citation():
@@ -1642,9 +1760,10 @@ def get_args():
     parser.add_argument('--equation_bounds', action='store_true')
     parser.add_argument('--job_array', action='store_true')
     parser.add_argument('--max_t', type=float, default=1e9, help='Maximum integration time for ground truth')
-    parser.add_argument('--special', type=str, default=None, choices=['4way', 'main', 'pure_sr', '4way_pysr', 'f1_features', 'exprs', 'rmse', 'rmse_diff', 'gt_diff'])
+    parser.add_argument('--special', type=str, default=None, choices=['4way', 'main', 'pure_sr', '4way_pysr', 'f1_features', 'exprs', 'rmse', 'rmse_diff', 'gt_diff', 'four_way_rmse'])
     parser.add_argument('--minimal_plot', action='store_true')
     parser.add_argument('--version_json', type=str, default='../official_versions.json', help='Path to the JSON file containing model versions')
+    parser.add_argument('--exclude_stable', action='store_true', help='exclude stable systems from RMSE calculation')
 
     args = parser.parse_args()
 
@@ -1730,6 +1849,8 @@ if __name__ == '__main__':
             plot_exprs(args)
         elif args.special == 'rmse':
             calculate_rmses(args)
+        elif args.special == 'four_way_rmse':
+            plot_4way_rmse(args)
 
     end = time.time()
     formatted_time = time.strftime('%H:%M:%S', time.gmtime(end - start))

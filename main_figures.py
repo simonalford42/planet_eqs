@@ -4,10 +4,13 @@ import glob
 import seaborn as sns
 from matplotlib import pyplot as plt
 import pandas as pd
-plt.style.use('science')
+# plt.style.use('science')
+import sys
 import spock_reg_model
 import numpy as np
 from tqdm.notebook import tqdm
+import utils
+import argparse
 
 
 # +
@@ -18,12 +21,23 @@ from tqdm.notebook import tqdm
 # sys.argv.extend(manual_argv)
 # -
 
-from parse_swag_args import parse
-args, checkpoint_filename = parse(glob=True)
+# from parse_swag_args import parse
+# args, checkpoint_filename = parse(glob=True)
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--version', type=int, default=0)
+    parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--plot_random', action='store_true')
+    parser.add_argument('--train_all', action='store_true')
+    return parser.parse_args()
+
+args = parse_args()
+checkpoint_filename = utils.ckpt_path(args.version, args.seed)
 
 swag_ensemble = [
-    spock_reg_model.load_swag(fname).cuda()
-    for fname in glob.glob('*' + checkpoint_filename + '*output.pkl') #
+    # spock_reg_model.load_swag(fname).cuda()
+    # for fname in glob.glob('*' + checkpoint_filename + '*output.pkl') #
+    spock_reg_model.load(version=args.version, seed=args.seed)
 ]
 
 if args.plot_random:

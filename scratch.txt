@@ -1,0 +1,36 @@
+(planet_eqs) sca63@ellis-compute-01:~/planet_eqs$ p calc_rmse.py --pysr_version 72420 --pysr_model_selection 41 --classification --dataset random --eval_type pure_sr
+RMSE: 1.7542, Accuracy: 0.4348, AUC: 0.7367, Bias: -0.9506
+
+(planet_eqs) sca63@ellis-compute-01:~/planet_eqs$ p calc_rmse.py --version 24880 --classification --dataset random --eval_type nn
+RMSE: 1.6545, Accuracy: 0.8362, AUC: 0.9316, Bias: 0.6808
+
+(planet_eqs) sca63@ellis-compute-01:~/planet_eqs$ p calc_rmse.py --version 24880 --classification --dataset test --eval_type nn
+RMSE: 1.4126, Accuracy: 0.8731, AUC: 0.9258, Bias: 0.2564
+
+(planet_eqs) sca63@ellis-compute-01:~/planet_eqs$ p calc_rmse.py --version 24880 --pysr_version 11003 --pysr_model_selection 26 --classification --dataset test
+RMSE: 1.4695, Accuracy: 0.8110, AUC: 0.8673, Bias: 0.1711
+
+(planet_eqs) sca63@ellis-compute-01:~/planet_eqs$ p calc_rmse.py --pysr_version 72420 --pysr_model_selection 41 --classification --dataset test --eval_type pure_sr
+RMSE: 1.5839, Accuracy: 0.7403, AUC: 0.7434, Bias: -0.0719
+
+(planet_eqs) sca63@ellis-compute-01:~/planet_eqs$ p calc_rmse.py --version 24880 --classification --dataset test --eval_type nn
+RMSE: 1.4126, Accuracy: 0.8731, AUC: 0.9258, Bias: 0.2564
+
+(planet_eqs) sca63@ellis-compute-01:~/planet_eqs$ p calc_rmse.py --version 24880 --classification --dataset random --eval_type nn
+RMSE: 1.6545, Accuracy: 0.8362, AUC: 0.9316, Bias: 0.6808
+
+(planet_eqs) sca63@ellis-compute-01:~/planet_eqs$ p calc_rmse.py --version 24880 --pysr_version 11003 --pysr_model_selection 26 --classification --dataset random
+RMSE: 1.5800, Accuracy: 0.7184, AUC: 0.8983, Bias: 0.2197
+
+
+# NN TEST           RMSE: 1.4126, Accuracy: 0.8731, AUC: 0.9258, Bias: 0.2564
+# NN RANDOM         RMSE: 1.6545, Accuracy: 0.8362, AUC: 0.9316, Bias: 0.6808
+
+# PYSR TEST         RMSE: 1.4695, Accuracy: 0.8110, AUC: 0.8673, Bias: 0.1711
+# PYSR RANDOM       RMSE: 1.5800, Accuracy: 0.7184, AUC: 0.8983, Bias: 0.2197
+
+# PURE SR TEST      RMSE: 1.5839, Accuracy: 0.7403, AUC: 0.7434, Bias: -0.0719
+# PURE SR RANDOM    RMSE: 1.7542, Accuracy: 0.4348, AUC: 0.7367, Bias: -0.9506
+
+# PETIT TEST        RMSE: 5.2746, Accuracy: 0.3118, AUC: 0.5346, Bias: 4.8918
+# PETIT RANDOM      RMSE: 4.4214, Accuracy: 0.5831, AUC: 0.5214, Bias: 4.0902

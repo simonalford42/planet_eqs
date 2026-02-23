@@ -10,6 +10,7 @@ from utils import assert_equal, load_pickle, save_pickle
 from sklearn.preprocessing import StandardScaler
 import seaborn as sns
 from matplotlib import pyplot as plt
+from sklearn.metrics import roc_auc_score, roc_curve
 # to fix the fonts?
 plt.rcParams.update(plt.rcParamsDefault)
 
@@ -232,7 +233,7 @@ def get_model_name(args):
         return f'pysr_{args.version}_{args.pysr_version}_{args.pysr_model_selection}'
 
 
-def get_truths_and_preds(args, clip=True, within_range=True):
+def get_truths_and_preds(args, clip=True, exclude_stable=True):
     petit = args.eval_type == 'petit'
     dataloader = get_dataloader(args.dataset, petit=petit)
     predict_fn = get_prediction_fn(args)
@@ -256,16 +257,97 @@ def get_truths_and_preds(args, clip=True, within_range=True):
 
     truths = np.average(truths, 1)  # avg the two ground truths for each sim
 
-    if within_range:
-        preds = preds[truths < 9]
-        truths = truths[truths < 9]
+    if exclude_stable:
+        stable_ixs = truths == 9
+        preds = preds[~stable_ixs]
+        truths = truths[~stable_ixs]
 
     return truths, preds
 
-def calculate_rmse(args, clip=True, within_range=True):
-    truths, preds = get_truths_and_preds(args, clip=clip, within_range=within_range)
+def calculate_rmse(args, clip=True):
+    if args.classification:
+        return classification_metrics(args)
+
+    truths, preds = get_truths_and_preds(args, clip=clip, exclude_stable=not args.include_stable)
     rmse = np.average(np.square(truths - preds))**0.5
     return rmse
+
+
+def roc_curve_from_scratch(args):
+    """
+    Educational implementation of ROC curve + AUC.
+
+    The key idea: instead of one fixed threshold (pred >= 9 → "stable"),
+    we sweep the threshold across all possible values. At each threshold t:
+      - predict stable if pred >= t
+      - compute TPR = fraction of true stables we correctly caught
+      - compute FPR = fraction of true unstables we wrongly called stable
+    Plotting TPR vs FPR traces the ROC curve.
+    AUC is just the area under that curve (higher = better; 0.5 = random).
+    """
+    truths, preds = get_truths_and_preds(args, clip=False, exclude_stable=False)
+    stable_truths = truths >= 9
+
+    thresholds = np.sort(np.unique(preds))[::-1]  # sweep high -> low
+
+    tprs = []
+    fprs = []
+    for t in thresholds:
+        predicted_stable = preds >= t
+        tpr = np.sum(stable_truths & predicted_stable) / (np.sum(stable_truths) + 1e-8)
+        fpr = np.sum(~stable_truths & predicted_stable) / (np.sum(~stable_truths) + 1e-8)
+        tprs.append(tpr)
+        fprs.append(fpr)
+
+    tprs = np.array(tprs)
+    fprs = np.array(fprs)
+    auc = np.trapz(tprs, fprs)  # area under curve via trapezoidal rule
+
+    plt.switch_backend('agg')
+    fig, ax = plt.subplots()
+    ax.plot(fprs, tprs, label=f'AUC = {auc:.4f}')
+    ax.plot([0, 1], [0, 1], 'k--', label='Random')
+    ax.set_xlabel('False Positive Rate')
+    ax.set_ylabel('True Positive Rate')
+    ax.set_title(f'ROC Curve (from scratch) — {get_model_name(args)} ({args.dataset})')
+    ax.legend()
+
+    path = f'plots/roc_scratch_{get_model_name(args)}_{args.dataset}.png'
+    fig.savefig(path, dpi=300, bbox_inches='tight')
+    plt.close(fig)
+    print(f'AUC = {auc:.4f}')
+    print(f'Saved ROC curve to {path}')
+    return auc
+
+
+def plot_roc_curve(args, stable_truths, preds, auc):
+    fpr, tpr, _ = roc_curve(stable_truths, preds)
+
+    plt.switch_backend('agg')
+    fig, ax = plt.subplots()
+    ax.plot(fpr, tpr, label=f'AUC = {auc:.4f}')
+    ax.plot([0, 1], [0, 1], 'k--')
+    ax.set_xlabel('False Positive Rate')
+    ax.set_ylabel('True Positive Rate')
+    ax.set_title(f'ROC Curve — {get_model_name(args)} ({args.dataset})')
+    ax.legend()
+
+    path = f'plots/roc_{get_model_name(args)}_{args.dataset}.png'
+    fig.savefig(path, dpi=300, bbox_inches='tight')
+    plt.close(fig)
+    print(f'Saved ROC curve to {path}')
+
+
+def classification_metrics(args):
+    truths, preds = get_truths_and_preds(args, clip=False, exclude_stable=False)
+    rmse = np.average(np.square(truths - preds))**0.5
+    acc = np.mean((preds >= 9) == (truths >= 9))
+    stable_truths = truths >= 9
+    auc = roc_auc_score(stable_truths, preds)
+    bias = np.mean(preds - truths)
+    print(f'RMSE: {rmse:.4f}, Accuracy: {acc:.4f}, AUC: {auc:.4f}, Bias: {bias:.4f}')
+    plot_roc_curve(args, stable_truths, preds, auc)
+    return rmse, acc, auc, bias
 
 
 def const_predict_fn(const):
@@ -275,7 +357,8 @@ def const_predict_fn(const):
 def calculate_results(args):
     if args.dataset != 'all':
         rmse = calculate_rmse(args)
-        print(f'RMSE for {args.dataset} dataset: {rmse}')
+        if not args.classification:
+            print(f'RMSE for {args.dataset} dataset: {rmse}')
         return
 
     path = get_results_path(args)
@@ -310,6 +393,10 @@ def get_results_path(args):
         results_tag += f'_{args.version}'
     if args.pysr_version is not None:
         results_tag += f'_{args.pysr_version}'
+    if args.classification:
+        results_tag += '_classification'
+    elif args.include_stable:
+        results_tag += '_include_stable'
 
     filename = f'pickles/{args.eval_type}_results_all{results_tag}.pkl'
     return filename
@@ -339,6 +426,8 @@ def get_args():
     parser.add_argument('--dataset', type=str, default='all', choices=['train','val','test', 'random', 'all'])
     parser.add_argument('--eval_type', type=str, default='pysr', choices=['pure_sr', 'pysr', 'nn', 'petit'])
     parser.add_argument('--pysr_model_selection', type=str, default='accuracy', help='"best", "accuracy", "score", or an integer of the pysr equation complexity.')
+    parser.add_argument('--include_stable', action='store_true', help='Include stable systems in RMSE calculation (i.e., where ground_truth is 10^9).')
+    parser.add_argument('--classification', action='store_true', help='Calculate classification metrics with RMSE.')
 
     args = parser.parse_args()
     if args.pysr_version is None:
@@ -351,6 +440,9 @@ def get_args():
             args.eval_type = 'pure_sr'
         else:
             args.eval_type = 'pysr'
+
+    if args.classification:
+        args.include_stable = True
 
     return args
 

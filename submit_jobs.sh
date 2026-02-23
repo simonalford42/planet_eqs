@@ -1,8 +1,28 @@
 #!/usr/bin/env bash
 
+# February 18 2026
+# calculate RMSE scores including stable systems
+# sbatch -J nn --partition gpu run.sh calc_rmse.py --eval_type nn --dataset all --version 24880 --classification
+# sbatch -J pysr --partition gpu run.sh calc_rmse.py --eval_type pysr --dataset all --version 24880 --pysr_version 11003 --classification
+# sbatch -J petit --partition gpu -t 28:00:00 run.sh calc_rmse.py --eval_type petit --dataset all --classification
+# sbatch -J pure_sr --partition gpu run.sh calc_rmse.py --eval_type pure_sr --dataset all --pysr_version 72420 --classification
+# sbatch -J pure_sr2 --partition gpu run.sh calc_rmse.py --eval_type pysr --dataset all --version 28114 --pysr_version 41564 --classification
+
+p calc_rmse.py --pysr_version 72420 --pysr_model_selection 41 --classification --dataset random --eval_type pure_sr
+p calc_rmse.py --version 24880 --classification --dataset random --eval_type nn
+p calc_rmse.py --version 24880 --classification --dataset test --eval_type nn
+p calc_rmse.py --version 24880 --pysr_version 11003 --pysr_model_selection 26 --classification --dataset test
+p calc_rmse.py --pysr_version 72420 --pysr_model_selection 41 --classification --dataset test --eval_type pure_sr
+p calc_rmse.py --version 24880 --classification --dataset test --eval_type nn
+p calc_rmse.py --version 24880 --classification --dataset random --eval_type nn
+p calc_rmse.py --version 24880 --pysr_version 11003 --pysr_model_selection 26 --classification --dataset random
+p calc_rmse.py --eval_type petit --dataset test --classification
+p calc_rmse.py --eval_type petit --dataset random --classification
+
+
 # June 17 2025
-sbatch -J f1 --partition ellis sr.sh pure_sr.py --loss_fn ll
-sbatch -J f1_mse --partition ellis sr.sh pure_sr.py --loss_fn mse
+# sbatch -J f1 --partition ellis sr.sh pure_sr.py --loss_fn ll
+# sbatch -J f1_mse --partition ellis sr.sh pure_sr.py --loss_fn mse
 
 # June 16 2025
 # sbatch -J f2_0 --partition gpu f2_prune_train.sh --prune_f2_topk 0
