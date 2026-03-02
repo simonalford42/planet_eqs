@@ -6,6 +6,7 @@ import argparse
 from utils2 import load_json
 plt.style.use('seaborn-darkgrid')
 # plt.style.use('seaborn-ticks')
+from sklearn.metrics import roc_auc_score
 
 def make_main_plot(cleaned, path=None):
 
@@ -102,6 +103,38 @@ def make_separate_comparison_plot(cleaned, path):
     print('Saved to', path)
 
 
+def calculate_metrics(args):
+    v = load_json(args.version_json)
+    ms = v['pysr_model_selection']
+    main_path = f"five_planet_figures/v{v['nn_version']}_pysr{v['pysr_version']}_ms={ms}_N={args.N}_turbo_extrapolate.csv"
+    cleaned = pd.read_csv(main_path)
+    # make_main_plot(cleaned, path='five_planet_figures/five_planet_main_eq29.pdf')
+
+    pure_sr_path = f"five_planet_figures/v24880_pysr{v['pure_sr_version']}_ms={v['pure_sr_model_selection']}_N={args.N}_turbo_extrapolate.csv"
+    pure_sr = pd.read_csv(pure_sr_path)
+    cleaned['pure_sr'] = pure_sr['median']
+
+    pure_sr2_path = f"five_planet_figures/v28114_pysr{v['pure_sr2_version']}_ms={v['pure_sr2_model_selection']}_N={args.N}_turbo_extrapolate.csv"
+    pure_sr2 = pd.read_csv(pure_sr2_path)
+    cleaned['pure_sr2'] = pure_sr2['median']
+
+    # calculate rmse for predictions where ground truth is between 4 and 9
+    # also calculate accuracy for predicting stable (ground truth > 9) as well as accuracy predicting very stable (ground truth > 10)
+    # also calculate AUC and bis
+    cleaned[cleaned > 10] = 10
+    cleaned[cleaned < 4] = 4
+
+    for col in ['bnn_median', 'median', 'pperiodetitf', 'pure_sr', 'pure_sr2']:
+        rmse = np.sqrt(np.mean((cleaned['true'] - cleaned[col])**2))
+        acc = np.mean((cleaned['true'] >= 9) == (cleaned[col] >= 9))
+        acc10 = np.mean((cleaned['true'] >= 10) == (cleaned[col] >= 10))
+        auc = roc_auc_score(cleaned['true'] >= 9, cleaned[col])
+        bias = np.mean(cleaned[col] - cleaned['true'])
+        t = "\t\t" if col == "median" else "\t"
+        print(f'{col} {t}RMSE: {rmse:.3f}, Accuracy: {acc:.3f}, Accuracy (> 10): {acc10:.3f}, AUC: {auc:.3f}, Bias: {bias:.3f}')
+
+
+
 def official_plots(args):
     v = load_json(args.version_json)
     ms = v['pysr_model_selection']
@@ -125,8 +158,12 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--version_json', type=str, default='../official_versions.json')
     parser.add_argument('--N', type=int, default=5000)
+    parser.add_argument('--metrics', action='store_true')
     return parser.parse_args()
 
 if __name__ == '__main__':
     args = get_args()
-    official_plots(args)
+    if args.metrics:
+        calculate_metrics(args)
+    else:
+        official_plots(args)

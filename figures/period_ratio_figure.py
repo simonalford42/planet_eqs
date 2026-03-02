@@ -28,6 +28,7 @@ from petit20_survival_time import Tsurv
 import cmasher as cmr
 import warnings
 from matplotlib.gridspec import GridSpec
+from sklearn.metrics import roc_auc_score
 
 warnings.filterwarnings("ignore", category=ResourceWarning)
 warnings.filterwarnings("default", category=UserWarning)
@@ -1691,7 +1692,9 @@ def calculate_rmse(Ngrid, version=None, pysr_version=None, pysr_model_selection=
     truths, preds = get_truths_and_preds(Ngrid, version, pysr_version, pysr_model_selection, petit, pure_sr, clip=clip, exclude_stable=exclude_stable)
     rmse = np.average(np.square(truths - preds))**0.5
     acc = np.mean((truths >= 9) == (preds >= 9))
-    return rmse, acc
+    auc = roc_auc_score(truths >= 9, preds)
+    bias = np.mean(preds - truths)
+    return rmse, acc, auc, bias
 
 
 def calculate_rmses(args):
@@ -1706,16 +1709,11 @@ def calculate_rmses(args):
     # print(f'Petit+2020 RMSE: {petit_rmse:.3f}')
     # print(f'Pure SR RMSE: {pure_sr:.3f}')
     # print(f'Pure SR (no intermediate features) RMSE: {pure_sr2:.3f}')
-    print(f'NN RMSE: {nn_rmse[0]:.3f}')
-    print(f'Distilled EQs RMSE: {our_rmse[0]:.3f}')
-    print(f'Petit+2020 RMSE: {petit_rmse[0]:.3f}')
-    print(f'Pure SR RMSE: {pure_sr[0]:.3f}')
-    print(f'Pure SR (no intermediate features) RMSE: {pure_sr2[0]:.3f}')
-    print(f'NN Accuracy: {nn_rmse[1]:.3f}')
-    print(f'Distilled EQs accuracy: {our_rmse[1]:.3f}')
-    print(f'Petit+2020 accuracy: {petit_rmse[1]:.3f}')
-    print(f'Pure SR accuracy: {pure_sr[1]:.3f}')
-    print(f'Pure SR (no intermediate features) accuracy: {pure_sr2[1]:.3f}')
+    for name, vals in zip(
+        ['NN     ', 'Ours    ', 'Petit  ', 'Pure SR', 'Pure SR 2'],
+        [nn_rmse, our_rmse, petit_rmse, pure_sr, pure_sr2]
+    ):
+        print(f'{name} \tRMSE: {vals[0]:.3f}, Accuracy: {vals[1]:.3f}, AUC: {vals[2]:.3f}, Bias: {vals[3]:.3f}')
 
 
 def get_citation():

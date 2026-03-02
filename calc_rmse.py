@@ -233,7 +233,7 @@ def get_model_name(args):
         return f'pysr_{args.version}_{args.pysr_version}_{args.pysr_model_selection}'
 
 
-def get_truths_and_preds(args, clip=True, exclude_stable=True):
+def get_truths_and_preds(args, clip=True):
     petit = args.eval_type == 'petit'
     dataloader = get_dataloader(args.dataset, petit=petit)
     predict_fn = get_prediction_fn(args)
@@ -257,20 +257,32 @@ def get_truths_and_preds(args, clip=True, exclude_stable=True):
 
     truths = np.average(truths, 1)  # avg the two ground truths for each sim
 
-    if exclude_stable:
-        stable_ixs = truths == 9
-        preds = preds[~stable_ixs]
-        truths = truths[~stable_ixs]
 
     return truths, preds
 
-def calculate_rmse(args, clip=True):
-    if args.classification:
-        return classification_metrics(args)
+def calculate_metrics(args):
+    truths, preds = get_truths_and_preds(args)
 
-    truths, preds = get_truths_and_preds(args, clip=clip, exclude_stable=not args.include_stable)
-    rmse = np.average(np.square(truths - preds))**0.5
-    return rmse
+    # calculate rmse excluding stable systems
+    stable_ixs = truths >= 9
+    exclude_stable_preds = preds[~stable_ixs]
+    exclude_stable_truths = truths[~stable_ixs]
+    rmse = np.average(np.square(exclude_stable_truths - exclude_stable_preds))**0.5
+    print(f'RMSE for {args.dataset} dataset: {rmse}')
+
+    acc = np.mean((preds >= 9) == (truths >= 9))
+    stable_truths = truths >= 9
+    auc = roc_auc_score(stable_truths, preds)
+    bias = np.mean(preds - truths)
+    print(f'Accuracy: {acc:.4f}, AUC: {auc:.4f}, Bias: {bias:.4f}')
+    plot_roc_curve(args, stable_truths, preds, auc)
+
+    return {
+        'rmse': rmse,
+        'acc': acc,
+        'auc': auc,
+        'bias': bias,
+    }
 
 
 def roc_curve_from_scratch(args):
@@ -338,38 +350,22 @@ def plot_roc_curve(args, stable_truths, preds, auc):
     print(f'Saved ROC curve to {path}')
 
 
-def classification_metrics(args):
-    truths, preds = get_truths_and_preds(args, clip=False, exclude_stable=False)
-    rmse = np.average(np.square(truths - preds))**0.5
-    acc = np.mean((preds >= 9) == (truths >= 9))
-    stable_truths = truths >= 9
-    auc = roc_auc_score(stable_truths, preds)
-    bias = np.mean(preds - truths)
-    print(f'RMSE: {rmse:.4f}, Accuracy: {acc:.4f}, AUC: {auc:.4f}, Bias: {bias:.4f}')
-    plot_roc_curve(args, stable_truths, preds, auc)
-    return rmse, acc, auc, bias
 
 
 def const_predict_fn(const):
     return lambda *_: const
 
 
-def calculate_results(args):
-    if args.dataset != 'all':
-        rmse = calculate_rmse(args)
-        if not args.classification:
-            print(f'RMSE for {args.dataset} dataset: {rmse}')
-        return
-
+def calculate_all_and_store(args):
     path = get_results_path(args)
     results = {}
-    datasets = ['val', 'test', 'random']
+    datasets = ['test', 'random']
     for dataset in datasets:
         args.dataset = dataset
 
         if args.eval_type in ['nn', 'petit']:
-            rmse = calculate_rmse(args)
-            results[dataset] = rmse
+            metrics = calculate_metrics(args)
+            results[dataset] = metrics
         else:
             if args.eval_type == 'pure_sr':
                 sr_results = get_pure_sr_results(args.pysr_version)
@@ -378,10 +374,14 @@ def calculate_results(args):
                 sr_results = get_pysr_results(args.pysr_version)
 
             dataset_results = {}
-            for c in sr_results['complexity']:
-                args.pysr_model_selection = c
-                rmse = calculate_rmse(args)
-                dataset_results[c] = rmse
+            if args.pysr_model_selection is None:
+                for c in sr_results['complexity']:
+                    args.pysr_model_selection = c
+                    metrics = calculate_metrics(args)
+                    dataset_results[c] = metrics
+            else:
+                metrics = calculate_metrics(args)
+                dataset_results = metrics
 
             results[dataset] = dataset_results
     save_pickle(results, path)
@@ -393,10 +393,6 @@ def get_results_path(args):
         results_tag += f'_{args.version}'
     if args.pysr_version is not None:
         results_tag += f'_{args.pysr_version}'
-    if args.classification:
-        results_tag += '_classification'
-    elif args.include_stable:
-        results_tag += '_include_stable'
 
     filename = f'pickles/{args.eval_type}_results_all{results_tag}.pkl'
     return filename
@@ -423,11 +419,12 @@ def get_args():
     parser.add_argument('--version', type=int, default=None)
     parser.add_argument('--pysr_version', type=int, default=None)
     parser.add_argument('--best_complexity', action='store_true')
-    parser.add_argument('--dataset', type=str, default='all', choices=['train','val','test', 'random', 'all'])
+    parser.add_argument('--dataset', type=str, default='test', choices=['train','val','test', 'random', 'grid', 'five_planet'])
     parser.add_argument('--eval_type', type=str, default='pysr', choices=['pure_sr', 'pysr', 'nn', 'petit'])
-    parser.add_argument('--pysr_model_selection', type=str, default='accuracy', help='"best", "accuracy", "score", or an integer of the pysr equation complexity.')
+    parser.add_argument('--pysr_model_selection', type=str, default=None, help='"best", "accuracy", "score", or an integer of the pysr equation complexity.')
     parser.add_argument('--include_stable', action='store_true', help='Include stable systems in RMSE calculation (i.e., where ground_truth is 10^9).')
     parser.add_argument('--classification', action='store_true', help='Calculate classification metrics with RMSE.')
+    parser.add_argument('--calculate_all', action='store_true', help='Calculate official classification and RMSE metrics on test and random splits and save to pickles/ folder.')
 
     args = parser.parse_args()
     if args.pysr_version is None:
@@ -441,9 +438,6 @@ def get_args():
         else:
             args.eval_type = 'pysr'
 
-    if args.classification:
-        args.include_stable = True
-
     return args
 
 
@@ -454,5 +448,7 @@ if __name__ == '__main__':
         results = load_pickle(path)
         best_complexity = min(results['val'].items(), key=lambda x: x[1])[0]
         print(best_complexity)
+    elif args.calculate_all:
+        calculate_all_and_store(args)
     else:
-        calculate_results(args)
+        calculate_metrics(args)
