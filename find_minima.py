@@ -28,7 +28,7 @@ def parse():
     parser.add_argument('--latent', type=int, default=10, help='number of features f1 outputs')
     # remember that f2_depth = 1 is one hidden layer of (h, h) shape, plus the input and output dim layers.
     parser.add_argument('--lr', type=float, default=5e-4)
-    parser.add_argument('--eval', action='store_true', help='disables optimizer step so no weights are changed')
+    parser.add_argument('--eval', action='store_true', help='disables optimizer step so no weights are changed, and only does one epoch')
 
     ########## quick experimenting options, many not used anymore ##########
     parser.add_argument('--sr_f1', action='store_true', default=False, help='do misc. stuff with f1 and SR')
@@ -45,7 +45,6 @@ def parse():
     parser.add_argument('--n_predicates', default=10, type=int, help='number predictates for if then f2')
     parser.add_argument('--fix_variance', action='store_true', help='fix the variance prediction to be one')
     parser.add_argument('--K', type=int, default=30, help='run swag K choice')
-    parser.add_argument('--calc_scores', action='store_true')
     parser.add_argument('--petit', action='store_true')
     # example: 24880_feature_nn_simplified.pt
     parser.add_argument('--load_f1_feature_nn', default=None, type=str)

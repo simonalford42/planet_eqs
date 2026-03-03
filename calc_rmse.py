@@ -1,4 +1,5 @@
 import argparse
+import torch
 import os
 import numpy as np
 import spock_reg_model
@@ -11,6 +12,7 @@ from sklearn.preprocessing import StandardScaler
 import seaborn as sns
 from matplotlib import pyplot as plt
 from sklearn.metrics import roc_auc_score, roc_curve
+from einops import rearrange
 # to fix the fonts?
 plt.rcParams.update(plt.rcParamsDefault)
 
@@ -260,8 +262,103 @@ def get_truths_and_preds(args, clip=True):
 
     return truths, preds
 
+def safe_log_erf(x):
+    base_mask = x < -1
+    value_giving_zero = torch.zeros_like(x, device=x.device)
+    x_under = torch.where(base_mask, x, value_giving_zero)
+    x_over = torch.where(~base_mask, x, value_giving_zero)
+
+    f_under = lambda x: (
+         0.485660082730562*x + 0.643278438654541*torch.exp(x) +
+         0.00200084619923262*x**3 - 0.643250926022749 - 0.955350621183745*x**2
+    )
+    f_over = lambda x: torch.log(1.0+torch.erf(x))
+
+    return f_under(x_under) + f_over(x_over)
+
+
+def lossfnc(testy, y):
+    # y: [B, 2] batch of ground truth means. each input system has two
+    #  simulations, one with a small initial perturbation, so the two means
+    #  are samples from the distribution of instability times for that
+    #  initial system
+    # so we just sum over the loss for both of them.
+    mu = testy[:, [0]]
+    std = testy[:, [1]]
+
+    var = std**2
+    t_greater_9 = y >= 9
+
+    regression_loss = -(y - mu)**2/(2*var)
+    regression_loss += -torch.log(std)
+
+    regression_loss += -safe_log_erf(
+                (mu - 4)/(torch.sqrt(2*var))
+            )
+
+    classifier_loss = safe_log_erf(
+                (mu - 9)/(torch.sqrt(2*var))
+        )
+
+    safe_regression_loss = torch.where(
+            ~torch.isfinite(regression_loss),
+            -torch.ones_like(regression_loss)*100,
+            regression_loss)
+    safe_classifier_loss = torch.where(
+            ~torch.isfinite(classifier_loss),
+            -torch.ones_like(classifier_loss)*100,
+            classifier_loss)
+
+    total_loss = (
+        safe_regression_loss * (~t_greater_9) +
+        safe_classifier_loss * ( t_greater_9)
+    )
+    return -total_loss.sum(1)
+
+    # total_regression = safe_regression_loss * (~t_greater_9)
+    # total_classifier = safe_classifier_loss * ( t_greater_9)
+    # total_regression = total_regression.sum(1)
+    # total_classifier = total_classifier.sum(1)
+    # total_loss = total_regression + total_classifier
+    # return -total_loss
+
+
+def calculate_loss(args):
+    petit = args.eval_type == 'petit'
+    dataloader = get_dataloader(args.dataset, petit=petit)
+    model = spock_reg_model.load(version=args.version)
+    model.eval()
+    model.cuda()
+
+    def predict_fn(x):
+        return model(x.cuda(), noisy_val=False, deterministic=True).cpu().detach()
+
+    xs = []
+    truths = []
+    preds = []
+    for x, y in tqdm(dataloader):
+        xs.append(x)
+        truths.append(y)
+        preds.append(predict_fn(x))
+
+    xs = torch.cat(xs, dim=0)
+    truths = torch.cat(truths, dim=0)
+    preds = torch.cat(preds, dim=0)
+    # preds[:, 0] = torch.clip(preds[:, 0], 4, 9)
+    assert_equal(truths.shape, preds.shape)
+    print('xs mean', xs.mean().item())
+    print('truths mean', truths.mean().item())
+    print('preds mean', preds[:, 0].mean().item())
+    # loss = model._lossfnc(preds, truths).sum() / len(truths)
+    loss = lossfnc(truths, preds[:, 0])
+    loss = loss.sum() / len(truths)
+    print(f'Loss for {args.dataset} dataset: {loss.item()}')
+
+
 def calculate_metrics(args):
     truths, preds = get_truths_and_preds(args)
+    print('truths mean', truths.mean().item())
+    print('preds mean', preds.mean().item())
 
     # calculate rmse excluding stable systems
     stable_ixs = truths >= 9
@@ -271,18 +368,33 @@ def calculate_metrics(args):
     print(f'RMSE for {args.dataset} dataset: {rmse}')
 
     acc = np.mean((preds >= 9) == (truths >= 9))
+    stable_only_acc = np.mean((preds[stable_ixs] >= 9) == (truths[stable_ixs] >= 9))
     stable_truths = truths >= 9
     auc = roc_auc_score(stable_truths, preds)
     bias = np.mean(preds - truths)
-    print(f'Accuracy: {acc:.4f}, AUC: {auc:.4f}, Bias: {bias:.4f}')
+    print(f'Accuracy: {acc:.4f}, Stable-only Accuracy: {stable_only_acc:.4f}, AUC: {auc:.4f}, Bias: {bias:.4f}')
     plot_roc_curve(args, stable_truths, preds, auc)
 
     return {
         'rmse': rmse,
         'acc': acc,
+        'stable_only_acc': stable_only_acc,
         'auc': auc,
         'bias': bias,
     }
+
+
+def single_class_acc(truths, preds):
+    thresholds = np.sort(np.unique(preds))[::-1]  # sweep high -> low
+    stable_truths = truths >= 9
+
+    def accuracy_at_threshold(t):
+        predicted_stable = preds >= t
+        acc = np.mean(predicted_stable == stable_truths)
+        return acc
+    scores = [accuracy_at_threshold(t) for t in thresholds]
+    best_threshold = thresholds[np.argmax(scores)]
+    return best_threshold, np.max(scores)
 
 
 def roc_curve_from_scratch(args):
@@ -443,6 +555,12 @@ def get_args():
 
 if __name__ == '__main__':
     args = get_args()
+    # for dataset in ['val', 'test', 'random']:
+    # for dataset in ['val']:
+    #     args.dataset = dataset
+    #     calculate_loss(args)
+    # assert 0
+
     if args.best_complexity:
         path = get_results_path(args)
         results = load_pickle(path)

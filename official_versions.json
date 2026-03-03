@@ -4,6 +4,8 @@
     "pysr_model_selection": 26,
     "pure_sr_version": 72420,
     "pure_sr_model_selection": 50,
+
+    "pure_sr2_nn_version": 28114,
     "pure_sr2_version": 41564,
     "pure_sr2_model_selection": 35,
 
@@ -12,6 +14,8 @@
     "mse_pysr_model_selection": 29,
     "mse_pure_sr_version": 83941,
     "mse_pure_sr_model_selection": 40,
+
+    "mse_pure_sr2_nn_version": 28114,
     "mse_pure_sr2_version": 93890,
     "mse_pure_sr2_model_selection": 43,
 

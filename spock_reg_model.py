@@ -1343,6 +1343,7 @@ class VarModel(pl.LightningModule):
 
     def lossfnc(self, x, y, samples=1, noisy_val=True, include_reg=True):
 
+        print('xmean:', x.mean().item())
         # change the predicted mean to the eq_model's predicted mean
         # this way the nn learns to predict the std of the eq_model's predictions
         if 'predict_eq_uncertainty' in self.hparams and self.hparams['predict_eq_uncertainty']:
@@ -1364,11 +1365,18 @@ class VarModel(pl.LightningModule):
             # needs to be outside the no_grad otherwise pytorch complains
             testy[:, 0] = eq_testy[:, 0]
         else:
-            testy = self(x, noisy_val=noisy_val)
+            print('doing here')
+            # testy = self(x, noisy_val=noisy_val)
+            testy = self(x, noisy_val=False)
 
         if self.mse:
             loss = self.mse_loss(testy, y).sum()
         else:
+            print()
+            print('predy mean:', testy[:, 0].mean().item())
+            print('targett mean:', y.mean().item())
+            print()
+            print(testy.shape, y.shape)
             loss = self._lossfnc(testy, y).sum()
 
         if include_reg:
@@ -1427,7 +1435,9 @@ class VarModel(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         X_sample, y_sample = batch
-        loss = self.lossfnc(X_sample, y_sample, noisy_val=self.hparams['noisy_val'], include_reg=False)/self.test_len
+        print('warning: disabled noisy_val in validation step')
+        loss = self.lossfnc(X_sample, y_sample, noisy_val=False, include_reg=False)/self.test_len
+        # loss = self.lossfnc(X_sample, y_sample, noisy_val=self.hparams['noisy_val'], include_reg=False)/self.test_len
 
         return {'val_loss': loss}
 
@@ -1436,7 +1446,9 @@ class VarModel(pl.LightningModule):
         avg_loss = torch.stack([x['val_loss'] for x in outputs]).sum()
 
         tensorboard_logs = {'val_loss_no_reg': avg_loss}
-
+        print()
+        print('val loss:', avg_loss.item())
+        print()
         return {'val_loss': avg_loss, 'log': tensorboard_logs}
 
     def configure_optimizers(self):
