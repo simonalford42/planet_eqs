@@ -1,0 +1,8 @@
+name: planet_eqs
+channels:
+  - conda-forge
+dependencies:
+  - python=3.7.12
+  - pip
+  - pip:
+      - -r requirements.txt
