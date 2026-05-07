@@ -4,7 +4,7 @@
 1. Clone repo and `cd` into it
 2. Create python environment:
     ```bash
-    conda create python=3.7.12 -n planet_eqs
+    conda create -c conda-forge python=3.7.12 -n planet_eqs
     conda activate planet_eqs
     pip install -r requirements.txt
     ```
