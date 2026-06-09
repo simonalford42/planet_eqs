@@ -10,6 +10,7 @@ sr_out
 models
 data_bundle.tar.gz
 data_bundle.tar.gz.sha256
+figures/feature_cache
 
 # ignore everything in these folders
 pickles/**

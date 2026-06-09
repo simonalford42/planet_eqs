@@ -3,11 +3,11 @@
     "pysr_version": 11003,
     "pysr_model_selection": 26,
     "pure_sr_version": 72420,
-    "pure_sr_model_selection": 50,
+    "pure_sr_model_selection": 41,
 
     "pure_sr2_nn_version": 28114,
     "pure_sr2_version": 41564,
-    "pure_sr2_model_selection": 35,
+    "pure_sr2_model_selection": 45,
 
     "mse_nn_version": 12318,
     "mse_pysr_version": 93102,
@@ -20,7 +20,7 @@
     "mse_pure_sr2_model_selection": 43,
 
     "k": {
-        "2": {"version": 24880, "pysr_version": 93102},
+        "2": {"version": 12318, "pysr_version": 93102},
         "3": {"version": 74649, "pysr_version": 49636},
         "4": {"version": 11566, "pysr_version": 94842},
         "5": {"version": 72646, "pysr_version": 42503}
@@ -29,7 +29,7 @@
         "0": 4014,
         "2": 22649,
         "5": 13523,
-        "10": 22697,
-        "20": 8880
-    }
+        "10": 22697
+    },
+    "eq_std_nn_version": 15687
 }

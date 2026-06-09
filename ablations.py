@@ -98,7 +98,7 @@ def plot_combined_pareto(
     ax = axs[0]
 
     for k, result in k_results.items():
-        x, y = zip(*result.items())
+        x, y = zip(*_extract_metric(result, 'rmse').items())
         x, y = paretoize(x, y, replace=False)
         label = f"$k = {k}$" if k != 2 else "$k = 2$ (Ours)"
         ax.plot(x, y, marker = "^", label = label)
@@ -115,22 +115,22 @@ def plot_combined_pareto(
     ax = axs[1]
 
     # k = 2 (ours)
-    x, y = zip(*k_results[2].items())
+    x, y = zip(*_extract_metric(k_results[2], 'rmse').items())
     x, y = paretoize(x, y, replace=False)
     ax.plot(x, y, marker = "^", label = "Ours")
 
     # linear ψ baseline
-    x, y = zip(*f2_linear_results.items())
+    x, y = zip(*_extract_metric(f2_linear_results, 'rmse').items())
     x, y = paretoize(x, y, replace=False)
     ax.plot(x, y, marker = "o", label = "Linear $\\psi$")
 
     # pure SR 2 baseline
-    x, y = zip(*pure_sr2_results.items())
+    x, y = zip(*_extract_metric(pure_sr2_results, 'rmse').items())
     x, y = paretoize(x, y, replace=False)
     ax.plot(x, y, marker = "o", label = "Pure SR (no intermediate features)")
 
     # pure SR baseline
-    x, y = zip(*pure_sr_results.items())
+    x, y = zip(*_extract_metric(pure_sr_results, 'rmse').items())
     x, y = paretoize(x, y, replace=False)
     ax.plot(x, y, marker = "o", label = "Pure SR")
 
@@ -147,6 +147,126 @@ def plot_combined_pareto(
     print('Saved combined figure to', path)
     plt.close(fig)
     return fig, axs
+
+
+def compute_results(version_json='official_versions.json'):
+    """Compute all results needed for pareto plots on the resonant test split.
+
+    Uses evaluation.calculate_metrics which caches truths/preds automatically.
+    Returns dict with keys 'k', 'f2_linear', 'pure_sr', 'pure_sr2',
+    each mapping complexity -> metrics dict.
+    """
+    from evaluation import calculate_metrics
+    from types import SimpleNamespace
+    from interpret import get_pysr_results as _get_pysr_results
+    from pure_sr_evaluation import get_pure_sr_results as _get_pure_sr_results
+
+    version_dict = load_json(version_json)
+
+    # --- k-variant PySR results ---
+    print("=" * 60)
+    print("Computing k-variant PySR results...")
+    k_results = {}
+    for k_str, v in version_dict['k'].items():
+        k = int(k_str)
+        pysr_version = v['pysr_version']
+        version = v['version']
+        pysr_table = _get_pysr_results(pysr_version)
+        complexities = sorted(pysr_table['complexity'].tolist())
+        print(f"  k={k} (version={version}, pysr={pysr_version}): {len(complexities)} complexities")
+
+        k_result = {}
+        for comp in complexities:
+            args = SimpleNamespace(
+                eval_type='pysr', version=version,
+                pysr_version=pysr_version,
+                pysr_model_selection=str(comp),
+                dataset='test',
+            )
+            metrics = calculate_metrics(args)
+            eq = pysr_table[pysr_table['complexity'] == comp].iloc[0]
+            overall_comp = get_complexity(eq, k, overall=True)
+            k_result[overall_comp] = metrics
+            # print(f"    complexity {comp} (overall {overall_comp}): ll={metrics['ll']:.4f}")
+        k_results[k] = k_result
+
+    # --- f2 linear baselines ---
+    print("=" * 60)
+    print("Computing f2 linear baselines...")
+    f2_linear_results = {}
+    for n_feat_str, version in version_dict['f2_linear'].items():
+        n_feat = int(n_feat_str)
+        comp = f2_linear_complexity(n_feat, overall=True)
+        print(f"  n_features={n_feat} (version={version}): complexity={comp}")
+        args = SimpleNamespace(
+            eval_type='nn', version=version, dataset='test',
+            pysr_version=None, pysr_model_selection=None,
+        )
+        metrics = calculate_metrics(args)
+        f2_linear_results[comp] = metrics
+        # print(f"    ll={metrics['ll']:.4f}")
+
+    # --- Pure SR ---
+    print("=" * 60)
+    print("Computing pure SR results...")
+    pure_sr_version = version_dict['pure_sr_version']
+    pure_sr_table = _get_pure_sr_results(pure_sr_version)
+    pure_sr_complexities = sorted(pure_sr_table['complexity'].tolist())
+    print(f"  version={pure_sr_version}: {len(pure_sr_complexities)} complexities")
+    pure_sr_results = {}
+    for comp in pure_sr_complexities:
+        args = SimpleNamespace(
+            eval_type='pure_sr', pysr_version=pure_sr_version,
+            pysr_model_selection=str(comp), dataset='test',
+            version=None,
+        )
+        metrics = calculate_metrics(args)
+        # skip invalid equations (very high RMSE)
+        if metrics['rmse'] > 2.0:
+            continue
+        pure_sr_results[comp] = metrics
+        # print(f"    complexity {comp}: ll={metrics['ll']:.4f}")
+
+    # --- Pure SR2 (no intermediate features) ---
+    print("=" * 60)
+    print("Computing pure SR2 results...")
+    pure_sr2_version = version_dict['pure_sr2_version']
+    pure_sr2_nn_version = 28114
+    pure_sr2_table = _get_pysr_results(pure_sr2_version)
+    pure_sr2_complexities = sorted(pure_sr2_table['complexity'].tolist())
+    print(f"  version={pure_sr2_version}: {len(pure_sr2_complexities)} complexities")
+    pure_sr2_results = {}
+    for comp in pure_sr2_complexities:
+        args = SimpleNamespace(
+            eval_type='pysr', version=pure_sr2_nn_version,
+            pysr_version=pure_sr2_version,
+            pysr_model_selection=str(comp), dataset='test',
+        )
+        metrics = calculate_metrics(args)
+        pure_sr2_results[comp] = metrics
+        # print(f"    complexity {comp}: ll={metrics['ll']:.4f}")
+
+    print("=" * 60)
+    print("All results computed.")
+
+    return {
+        'k': k_results,
+        'f2_linear': f2_linear_results,
+        'pure_sr': pure_sr_results,
+        'pure_sr2': pure_sr2_results,
+    }
+
+
+def _extract_metric(results_dict, metric='ll'):
+    """Extract a single metric from a {complexity: metrics_dict} mapping."""
+    return {comp: m[metric] for comp, m in results_dict.items()}
+
+
+def _paretoize_max(x, y, replace=False):
+    """Paretoize for a metric where higher is better (e.g., log likelihood)."""
+    neg_y = [-yi for yi in y]
+    x_p, neg_y_p = paretoize(x, neg_y, replace=replace)
+    return x_p, [-yi for yi in neg_y_p]
 
 
 def get_args():
@@ -168,9 +288,8 @@ def get_results(version_dict):
 
 def main():
     args = get_args()
-    version_dict = load_json(args.version_json)
-    k_results, f2_linear_results, pure_sr_results, pure_sr2_results = get_results(version_dict)
-    plot_combined_pareto(k_results, f2_linear_results, pure_sr_results, pure_sr2_results, args.path)
+    results = compute_results(version_json=args.version_json)
+    plot_combined_pareto(results['k'], results['f2_linear'], results['pure_sr'], results['pure_sr2'], path=args.path)
 
 
 if __name__ == "__main__":

@@ -85,6 +85,7 @@ def parse():
     parser.add_argument('--combined_mass_feature', action='store_true')  # add M = m1 + m2 + m3 as input feature
     parser.add_argument('--predict_eq_uncertainty', action='store_true')  # load pysr net separately and predict uncertainty of that.
     parser.add_argument('--mse_loss', action='store_true')  # use mse loss for neural network
+    parser.add_argument('--fix_classification_loss', action='store_true')  # load pysr net separately and predict uncertainty of that.
 
     args = parser.parse_args()
 

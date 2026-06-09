@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+sbatch -J inner32-e005-100 --partition ellis --cpus-per-task=40 --mem=50G --time=00:30:00 run_cpu.sh resonant_figure.py --Ngrid 100 --grid_mode inner32_phase_slice --ecc_mode middle_0p05 --cache_workers 40 --cpu
+
+sbatch -J inner32-circ-100 --partition ellis --cpus-per-task=40 --mem=50G --time=00:30:00 run_cpu.sh resonant_figure.py --Ngrid 100 --grid_mode inner32_phase_slice --ecc_mode circular --cache_workers 40 --cpu
+
+# sbatch -J cache --partition ellis run.sh resonant_figure.py --Ngrid 300
 
 # sbatch -J nn_extra --partition ellis run.sh five_planet.py --extrapolate --turbo --N 5000 --version 24880
 # sbatch -J extra29 --partition ellis run.sh five_planet.py --extrapolate --turbo --N 5000 --version 24880 --pysr_version 11003 --pysr_model_selection 29

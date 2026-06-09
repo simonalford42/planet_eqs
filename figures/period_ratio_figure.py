@@ -8,8 +8,8 @@ import rebound
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-plt.rcParams["font.family"] = "serif"
-plt.rcParams['mathtext.fontset']='dejavuserif'
+plt.rcParams["font.family"] = "sans-serif"
+plt.rcParams['mathtext.fontset']='dejavusans'
 
 import torch
 import modules
@@ -19,16 +19,22 @@ except ImportError:
     import figures.spock as spock
 import pickle
 import math
-from utils2 import assert_equal, load_pickle, get_script_execution_command, load_json, truncate_cmap
+from utils2 import assert_equal, load_pickle, get_script_execution_command, load_json, truncate_cmap, save_pickle
+import einops
 import multiprocessing as mp
 import argparse
 import time
+import copy
 import spock_reg_model
 from petit20_survival_time import Tsurv
 import cmasher as cmr
 import warnings
 from matplotlib.gridspec import GridSpec
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score, roc_curve
+from resonant_period_ratio_overlay import (
+    add_period_ratio_inner32_slice_overlay,
+    add_period_ratio_resonant_overlay,
+)
 
 warnings.filterwarnings("ignore", category=ResourceWarning)
 warnings.filterwarnings("default", category=UserWarning)
@@ -193,7 +199,9 @@ def get_centered_grid(xlist, ylist, probs):
     ygrid = [y - dy/2 for y in ylist] + [ylist[-1]+dy/2]
 
     X, Y = np.meshgrid(xgrid, ygrid)
-    Z = np.array(probs).reshape(len(ylist),len(xlist))
+    # Z = np.array(probs).reshape(len(ylist),len(xlist))
+    # plotting expects Y then X
+    Z = einops.rearrange(np.array(probs), '(x y) -> y x', x=len(xlist), y=len(ylist))
 
     return X,Y,Z
 
@@ -325,6 +333,112 @@ def compute_results(args):
 
     print('Saved results to', path)
     return results
+
+
+def _result_exists(args):
+    path = get_results_path(
+        args.Ngrid,
+        args.version,
+        args.parallel_ix,
+        args.parallel_total,
+        args.pysr_version,
+        args.pysr_model_selection,
+        args.petit,
+        args.megno,
+        input_cache=args.create_input_cache,
+        ground_truth=args.ground_truth,
+        pure_sr=args.pure_sr,
+    )
+    return os.path.exists(path), path
+
+
+def _run_compute_job(args, **updates):
+    job_args = copy.copy(args)
+    job_args.compute = True
+    job_args.plot = False
+    job_args.collate = False
+    job_args.special = None
+    job_args.petit = False
+    job_args.megno = False
+    job_args.ground_truth = False
+    job_args.pure_sr = False
+    job_args.create_input_cache = False
+    job_args.pysr_version = None
+    job_args.pysr_model_selection = None
+    job_args.pysr_path = None
+    job_args.version = None
+
+    for key, value in updates.items():
+        setattr(job_args, key, value)
+
+    if job_args.pysr_version is not None:
+        job_args.pysr_path = os.path.join(job_args.pysr_dir, f'{job_args.pysr_version}.pkl')
+
+    exists, path = _result_exists(job_args)
+    if exists:
+        print('Already computed, skipping', path)
+        return
+
+    print('Computing', path)
+    if job_args.pysr_path and not job_args.pure_sr:
+        compute_pysr_f2_results(job_args)
+    else:
+        compute_results(job_args)
+
+
+def compute_official_results(args):
+    v = load_json(args.version_json)
+
+    cache_path = get_results_path(args.Ngrid, input_cache=True)
+    if not os.path.exists(cache_path):
+        _run_compute_job(args, version=v['nn_version'], create_input_cache=True)
+    else:
+        print('Input cache already exists, skipping', cache_path)
+
+    _run_compute_job(args, version=v['nn_version'])
+    _run_compute_job(
+        args,
+        version=v['nn_version'],
+        pysr_version=str(v['pysr_version']),
+        pysr_model_selection=str(v['pysr_model_selection']),
+    )
+
+    for complexity in [3, 7, 14, 26]:
+        _run_compute_job(
+            args,
+            version=v['nn_version'],
+            pysr_version=str(v['pysr_version']),
+            pysr_model_selection=str(complexity),
+        )
+
+    _run_compute_job(args, petit=True)
+    _run_compute_job(args, ground_truth=True)
+    _run_compute_job(
+        args,
+        pure_sr=True,
+        pysr_version=str(v['pure_sr_version']),
+        pysr_model_selection=str(v['pure_sr_model_selection']),
+    )
+    _run_compute_job(args, version=v['pure_sr2_nn_version'])
+    _run_compute_job(
+        args,
+        version=v['pure_sr2_nn_version'],
+        pysr_version=str(v['pure_sr2_version']),
+        pysr_model_selection=str(v['pure_sr2_model_selection']),
+    )
+
+
+def should_compute_official_results(args):
+    return (
+        args.compute
+        and args.version is None
+        and args.pysr_version is None
+        and not args.petit
+        and not args.megno
+        and not args.ground_truth
+        and not args.pure_sr
+        and not args.create_input_cache
+    )
 
 
 def get_results_path(Ngrid, version=None, parallel_ix=None, parallel_total=None, pysr_version=None, pysr_model_selection=None, use_petit=False, use_megno=False, input_cache=False, ground_truth=False, special=False, minimal_plot=False, pure_sr=False):
@@ -677,9 +791,6 @@ def _draw_diff_panel(ax, v, special, hide_xlabel=False, exclude_stable=False):
         rmse_eq = np.sqrt((eq_clip - gt_vals) ** 2)
         rmse_nn = np.sqrt((nn_clip - gt_vals) ** 2)
         Z = rmse_nn - rmse_eq
-        if args.exclude_stable:
-            stable_mask = gt_vals >= 9
-            Z[stable_mask] = np.nan
 
         cmap = DIVERGING_CMAP.copy()
         cmap.set_bad(color='white')
@@ -689,6 +800,10 @@ def _draw_diff_panel(ax, v, special, hide_xlabel=False, exclude_stable=False):
 
     else:
         raise ValueError("special must be 'gt_diff' or 'rmse_diff'")
+
+    if exclude_stable:
+        stable_mask = gt_vals >= 9
+        Z[stable_mask] = np.nan
 
     # ------------- draw -------------------------------------------------------
     X, Y, ZZ = get_centered_grid(P12s, P23s, Z)
@@ -714,17 +829,16 @@ def _draw_diff_panel(ax, v, special, hide_xlabel=False, exclude_stable=False):
 
 def plot_results(args, metric=None):
     if (not (args.petit or args.megno or args.ground_truth or args.equation_bounds)) and metric is None:
-        # for metric in ['mean', 'std']:
-            # plot_results(args, metric)
-        # return
-        # just plot mean by default, don't need std
-        metric = 'mean'
+        for metric in ['mean', 'std']:
+            plot_results(args, metric)
+        return
 
     results = load_pickle(get_results_path(args.Ngrid, args.version, pysr_version=args.pysr_version, pysr_model_selection=args.pysr_model_selection, use_petit=args.petit, use_megno=args.megno, ground_truth=args.ground_truth, pure_sr=args.pure_sr))
     P12s, P23s = get_period_ratios(args.Ngrid)
 
     # scale=0.75
-    scale=0.7
+    # scale=0.7
+    scale = 1
     # if args.minimal_plot:
         # scale = 0.775 * scale
     fig, ax = plt.subplots(figsize=(5*scale,4.5*scale))
@@ -830,6 +944,7 @@ def plot_results(args, metric=None):
         cmap = COLOR_MAP.copy().reversed()
         cmap.set_bad(color='white')
         m = Z[~np.isnan(Z)].max()
+        m = 3
         im = ax.pcolormesh(X, Y, Z, vmin=0, vmax=m, cmap=cmap, rasterized=True)
         label = "std(" + INSTABILITY_TIME_LABEL + ")"
     elif args.equation_bounds:
@@ -847,6 +962,25 @@ def plot_results(args, metric=None):
         im = ax.pcolormesh(X, Y, Z, vmin=zmin, vmax=zmax, cmap=cmap, rasterized=True)
         label = INSTABILITY_TIME_LABEL
 
+    if args.highlight_resonant_points:
+        if args.resonant_overlay_mode == 'old_fixed_outer':
+            add_period_ratio_resonant_overlay(
+                ax,
+                args.Ngrid,
+                p2_min=args.resonant_p2_min,
+                p2_max=args.resonant_p2_max,
+                inner_period=args.resonant_inner_period,
+                outer_period=args.resonant_outer_period,
+            )
+        elif args.resonant_overlay_mode == 'inner32_phase_slice':
+            add_period_ratio_inner32_slice_overlay(
+                ax,
+                args.Ngrid,
+                y_min=args.resonant_y_min,
+                y_max=args.resonant_y_max,
+            )
+        else:
+            raise ValueError(f"Unknown resonant_overlay_mode: {args.resonant_overlay_mode}")
 
     if args.minimal_plot:
         # ax.set_xticks([])
@@ -878,6 +1012,8 @@ def plot_results(args, metric=None):
         path += '_std2'
     if metric == 'mean2':
         path += '_mean2'
+    if args.highlight_resonant_points:
+        path += f'_{args.resonant_overlay_mode}_overlay'
 
     # if args.pysr_version is not None:
     #     path += f'_pysr_f2_v={args.pysr_version}/{args.pysr_model_selection}'
@@ -1111,12 +1247,99 @@ def plot_4way_comparison(args):
 
         axs[i].set_title(titles[i])
 
+        if args.resonance_guides:
+            axs[i].axvline(2 / 3, color='black', lw=0.9, ls='--', alpha=0.7)
+            axs[i].axhline(2 / 3, color='black', lw=0.9, ls='--', alpha=0.7)
+
     # Create a single colorbar
     cb = fig.colorbar(im, ax=axs.ravel().tolist(), shrink=0.5)
     cb.set_label(INSTABILITY_TIME_LABEL)
 
     path = 'period_results/4way'
+    if args.resonance_guides:
+        path += '_resonance_guides'
     os.makedirs(os.path.dirname(path), exist_ok=True)
+    img_path = path + ('.png' if args.png else '.pdf')
+    plt.savefig(img_path, dpi=800, bbox_inches='tight')
+    print('Saved figure to', img_path)
+    plt.close(fig)
+
+
+def plot_4way_std(args):
+    v = load_json(args.version_json)
+    nn_version = v['nn_version']
+    pysr_version = v['pysr_version']
+    pysr_model_selection = v.get('pysr_model_selection', 'accuracy')
+
+    nn_results = load_pickle(get_results_path(args.Ngrid, nn_version))
+    eq_results = load_pickle(get_results_path(
+        args.Ngrid, nn_version,
+        pysr_version=pysr_version,
+        pysr_model_selection=pysr_model_selection,
+    ))
+    eq_std_results = load_pickle(get_results_path(args.Ngrid, v['eq_std_nn_version']))
+
+    P12s, P23s = get_period_ratios(args.Ngrid)
+
+    def extract(results, key):
+        arr = [d[key] if d is not None else np.nan for d in results]
+        return np.array(arr)
+
+    panels = [
+        ('Neural network predicted mean', extract(nn_results, 'mean'), 'mean'),
+        ('Neural network predicted std', extract(nn_results, 'std'), 'std'),
+        (f'Distilled equations', extract(eq_results, 'mean'), 'mean'),
+        (f'NN predicted std of distilled equations', extract(eq_std_results, 'std'), 'std'),
+    ]
+
+    scale = 0.85
+    fig, axs = plt.subplots(
+        2, 2,
+        figsize=(12 * scale, 10 * scale),
+        gridspec_kw={'wspace': 0.1, 'hspace': 0.1},
+    )
+    axs = axs.flatten()
+
+    show_xs = [False, False, True, True]
+    show_ys = [True, False, True, False]
+    ticks = [0.55, 0.60, 0.65, 0.70, 0.75]
+
+    mean_im = None
+    std_im = None
+
+    for i, (title, results, kind) in enumerate(panels):
+        ax = axs[i]
+        ax.set_aspect('equal', adjustable='box')
+        ax.set_xticks(ticks)
+        ax.set_yticks(ticks)
+        if not show_xs[i]:
+            ax.set_xticklabels([])
+        if not show_ys[i]:
+            ax.set_yticklabels([])
+
+        X, Y, Z = get_centered_grid(P12s, P23s, results)
+        cmap = COLOR_MAP.copy().reversed()
+        cmap.set_bad(color='white')
+
+        if kind == 'mean':
+            im = ax.pcolormesh(X, Y, Z, vmin=4, vmax=9, cmap=cmap, rasterized=True)
+            mean_im = im
+        else:
+            im = ax.pcolormesh(X, Y, Z, vmin=0, vmax=3, cmap=cmap, rasterized=True)
+            std_im = im
+
+        if show_xs[i]:
+            ax.set_xlabel(r"$P_1/P_2$")
+        if show_ys[i]:
+            ax.set_ylabel(r"$P_2/P_3$")
+        ax.set_title(title)
+
+    cb_mean = fig.colorbar(mean_im, ax=[axs[0], axs[2]], shrink=0.6, location='right')
+    cb_mean.set_label(INSTABILITY_TIME_LABEL)
+    cb_std = fig.colorbar(std_im, ax=[axs[1], axs[3]], shrink=0.6, location='right')
+    cb_std.set_label("std(" + INSTABILITY_TIME_LABEL + ")")
+
+    path = f'period_results/4way_std'
     img_path = path + ('.png' if args.png else '.pdf')
     plt.savefig(img_path, dpi=800, bbox_inches='tight')
     print('Saved figure to', img_path)
@@ -1491,7 +1714,8 @@ def plot_f1_features2(args):
                 feature_nn, feat_i,
                 include_ssx=True,
                 latex=True,
-                include_ssx_bias=not is_std
+                include_ssx_bias=not is_std,
+                drop_mass=True
             )
             if is_std:
                 title = r'$\sigma_{' + str(feat_i) + r'} = {\rm Std} \left(' + feat_str + r'\right)$'
@@ -1649,6 +1873,266 @@ def plot_4way_pysr_comparison(args):
     plt.close(fig)
 
 
+def plot_selective_eq_6way(args):
+    """2x3 plot:
+      col 0: baseline 24880/11003 c=26 prediction (top) + ground truth (bottom)
+      cols 1-2: 4 selective_eq panels at p=0.10, 0.25, 0.50, 0.75 (each at
+                its best complexity from pickles/eval_selective_eq.pkl). Each
+                panel shows baseline predictions, with non-selected points
+                (where the SR score is high) masked white.
+
+    Reads SR equation files from args.pysr_dir and best complexities from
+    pickles/eval_selective_eq.pkl.
+    """
+    import pysr  # only needed for this plot
+
+    v = load_json(args.version_json)
+    Ngrid = args.Ngrid
+
+    # --- load grid data ---
+    nn_data = load_pickle(get_results_path(Ngrid, v['nn_version']))
+    base_data = load_pickle(get_results_path(
+        Ngrid, v['nn_version'],
+        pysr_version=v['pysr_version'],
+        pysr_model_selection=v['pysr_model_selection']))
+    gt_data = load_pickle(get_results_path(Ngrid, ground_truth=True))
+
+    valid = np.array([d is not None for d in nn_data])
+    base_means = np.array([d['mean'] if d is not None else np.nan for d in base_data])
+    gt_log = np.log10(np.array([d['ground_truth'] if d is not None else np.nan for d in gt_data]))
+    gt_log = np.where(gt_log >= 4, gt_log, np.nan)
+
+    f1 = np.full((len(nn_data), 20), np.nan, dtype=np.float64)
+    for i, d in enumerate(nn_data):
+        if d is not None:
+            f1[i] = d['f1']
+
+    # --- load selective_eq best-complexity table ---
+    eval_path = '../pickles/eval_selective_eq.pkl'
+    if not os.path.exists(eval_path):
+        eval_path = 'pickles/eval_selective_eq.pkl'
+    eval_info = load_pickle(eval_path)
+    runs = sorted(eval_info.items(), key=lambda kv: kv[1]['p'])  # p ascending
+
+    # --- compute selector masks ---
+    sel_masks = []
+    for pysr_version, info in runs:
+        path = os.path.join(args.pysr_dir, f'{pysr_version}.pkl')
+        reg = pysr.PySRRegressor.from_file(path)
+        eqs = reg.equations_
+        if isinstance(eqs, list):
+            eqs = eqs[0]
+        c_best = info['best_complexity']
+        ix = int(np.argmin(np.abs(eqs['complexity'].values - c_best)))
+        score_fn = eqs.iloc[ix]['lambda_format']
+
+        scores = np.full(len(nn_data), np.inf)
+        scores[valid] = np.asarray(score_fn(f1[valid]))
+
+        # lowest-p fraction among VALID points
+        p = info['p']
+        valid_ix = np.where(valid)[0]
+        k = max(1, int(np.floor(p * len(valid_ix))))
+        order = np.argsort(scores[valid_ix])
+        mask = np.zeros(len(nn_data), dtype=bool)
+        mask[valid_ix[order[:k]]] = True
+        sel_masks.append(mask)
+
+    # --- plot ---
+    P12s, P23s = get_period_ratios(Ngrid)
+    scale = 0.95
+    fig, axs = plt.subplots(
+        2, 3,
+        figsize=(13 * scale, 8 * scale),
+        gridspec_kw={'wspace': 0.05, 'hspace': 0.12},
+    )
+
+    major_ticks = [0.55, 0.65, 0.75]
+    minor_ticks = [0.55, 0.60, 0.65, 0.70, 0.75]
+
+    def _style(ax, show_x, show_y, title):
+        ax.set_aspect('equal', adjustable='box')
+        ax.set_xticks(major_ticks, major=True)
+        ax.set_xticks(minor_ticks, minor=True)
+        ax.set_yticks(major_ticks, major=True)
+        ax.set_yticks(minor_ticks, minor=True)
+        if not show_x:
+            ax.set_xticklabels([])
+        else:
+            ax.set_xlabel(r"$P_1/P_2$")
+        if not show_y:
+            ax.set_yticklabels([])
+        else:
+            ax.set_ylabel(r"$P_2/P_3$")
+        ax.set_title(title, fontsize=10)
+
+    cmap = COLOR_MAP.copy().reversed()
+    cmap.set_bad(color='white')
+
+    # (0,0) baseline equation prediction
+    X, Y, Z = get_centered_grid(P12s, P23s, base_means)
+    im = axs[0, 0].pcolormesh(X, Y, Z, vmin=4, vmax=9, cmap=cmap, rasterized=True)
+    _style(axs[0, 0], show_x=False, show_y=True,
+           title=f"Baseline (pysr {v['pysr_version']}, c={v['pysr_model_selection']})")
+
+    # (1,0) ground truth
+    X, Y, Z = get_centered_grid(P12s, P23s, gt_log)
+    axs[1, 0].pcolormesh(X, Y, Z, vmin=4, vmax=9, cmap=cmap, rasterized=True)
+    _style(axs[1, 0], show_x=True, show_y=True, title='Ground truth')
+
+    # selective_eq panels — order matches (p ascending) the row-major reading
+    # of (0,1) (0,2) (1,1) (1,2)
+    panel_pos = [(0, 1), (0, 2), (1, 1), (1, 2)]
+    n_valid = int(valid.sum())
+    for (r, c), (pysr_version, info), mask in zip(panel_pos, runs, sel_masks):
+        masked = np.where(mask, base_means, np.nan)
+        X, Y, Z = get_centered_grid(P12s, P23s, masked)
+        axs[r, c].pcolormesh(X, Y, Z, vmin=4, vmax=9, cmap=cmap, rasterized=True)
+        title = (f'selective_eq p={info["p"]:.2f}  c*={info["best_complexity"]}\n'
+                 f'{int(mask.sum()):,}/{n_valid:,} pts highlighted')
+        _style(axs[r, c], show_x=(r == 1), show_y=False, title=title)
+
+    # shared colorbar on the right
+    cb = fig.colorbar(im, ax=axs.ravel().tolist(), shrink=0.7, pad=0.02)
+    cb.set_label(INSTABILITY_TIME_LABEL)
+
+    out_path = 'period_results/selective_eq_6way' + ('.png' if args.png else '.pdf')
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    plt.savefig(out_path, dpi=300, bbox_inches='tight')
+    print('Saved figure to', out_path)
+    plt.close(fig)
+
+
+def plot_selective_eq_6way_rmse(args):
+    """Same layout as plot_selective_eq_6way, but every panel except the
+    ground-truth panel shows baseline-vs-GT RMSE (|clip(pred)-gt|) instead
+    of the prediction value.
+    """
+    import pysr
+
+    v = load_json(args.version_json)
+    Ngrid = args.Ngrid
+
+    nn_data = load_pickle(get_results_path(Ngrid, v['nn_version']))
+    base_data = load_pickle(get_results_path(
+        Ngrid, v['nn_version'],
+        pysr_version=v['pysr_version'],
+        pysr_model_selection=v['pysr_model_selection']))
+    gt_data = load_pickle(get_results_path(Ngrid, ground_truth=True))
+
+    valid = np.array([d is not None for d in nn_data])
+    base_means = np.array([d['mean'] if d is not None else np.nan for d in base_data])
+    gt_raw = np.log10(np.array([d['ground_truth'] if d is not None else np.nan
+                                for d in gt_data]))
+    gt_for_panel = np.where(gt_raw >= 4, gt_raw, np.nan)  # white on <4 like other plots
+
+    # baseline RMSE field (per point); GT outside [4,9] is clipped for comparison
+    base_clip = np.clip(base_means, 4, 9)
+    gt_clip = np.clip(gt_raw, 4, 9)
+    base_rmse = np.abs(base_clip - gt_clip)  # = sqrt((a-b)^2)
+    base_rmse[np.isnan(base_means) | np.isnan(gt_raw)] = np.nan
+
+    f1 = np.full((len(nn_data), 20), np.nan, dtype=np.float64)
+    for i, d in enumerate(nn_data):
+        if d is not None:
+            f1[i] = d['f1']
+
+    eval_path = '../pickles/eval_selective_eq.pkl'
+    if not os.path.exists(eval_path):
+        eval_path = 'pickles/eval_selective_eq.pkl'
+    eval_info = load_pickle(eval_path)
+    runs = sorted(eval_info.items(), key=lambda kv: kv[1]['p'])
+
+    sel_masks = []
+    for pysr_version, info in runs:
+        path = os.path.join(args.pysr_dir, f'{pysr_version}.pkl')
+        reg = pysr.PySRRegressor.from_file(path)
+        eqs = reg.equations_
+        if isinstance(eqs, list):
+            eqs = eqs[0]
+        c_best = info['best_complexity']
+        ix = int(np.argmin(np.abs(eqs['complexity'].values - c_best)))
+        score_fn = eqs.iloc[ix]['lambda_format']
+        scores = np.full(len(nn_data), np.inf)
+        scores[valid] = np.asarray(score_fn(f1[valid]))
+        valid_ix = np.where(valid)[0]
+        k = max(1, int(np.floor(info['p'] * len(valid_ix))))
+        order = np.argsort(scores[valid_ix])
+        mask = np.zeros(len(nn_data), dtype=bool)
+        mask[valid_ix[order[:k]]] = True
+        sel_masks.append(mask)
+
+    # --- plot ---
+    P12s, P23s = get_period_ratios(Ngrid)
+    scale = 0.95
+    fig, axs = plt.subplots(
+        2, 3,
+        figsize=(13 * scale, 8 * scale),
+        gridspec_kw={'wspace': 0.05, 'hspace': 0.12},
+    )
+
+    major_ticks = [0.55, 0.65, 0.75]
+    minor_ticks = [0.55, 0.60, 0.65, 0.70, 0.75]
+
+    def _style(ax, show_x, show_y, title):
+        ax.set_aspect('equal', adjustable='box')
+        ax.set_xticks(major_ticks, major=True)
+        ax.set_xticks(minor_ticks, minor=True)
+        ax.set_yticks(major_ticks, major=True)
+        ax.set_yticks(minor_ticks, minor=True)
+        if not show_x:
+            ax.set_xticklabels([])
+        else:
+            ax.set_xlabel(r"$P_1/P_2$")
+        if not show_y:
+            ax.set_yticklabels([])
+        else:
+            ax.set_ylabel(r"$P_2/P_3$")
+        ax.set_title(title, fontsize=10)
+
+    rmse_cmap = RMSE_CMAP.copy()
+    rmse_cmap.set_bad(color='#d9d9d9')  # light grey for not-selected / invalid sims
+    rmse_norm = plt.Normalize(vmin=0, vmax=5)
+
+    gt_cmap = COLOR_MAP.copy().reversed()
+    gt_cmap.set_bad(color='white')
+
+    # (0,0) baseline RMSE — full grid
+    X, Y, Z = get_centered_grid(P12s, P23s, base_rmse)
+    im_rmse = axs[0, 0].pcolormesh(X, Y, Z, norm=rmse_norm, cmap=rmse_cmap, rasterized=True)
+    _style(axs[0, 0], show_x=False, show_y=True,
+           title=f"Baseline RMSE (pysr {v['pysr_version']}, c={v['pysr_model_selection']})")
+
+    # (1,0) ground truth — unchanged
+    X, Y, Z = get_centered_grid(P12s, P23s, gt_for_panel)
+    im_gt = axs[1, 0].pcolormesh(X, Y, Z, vmin=4, vmax=9, cmap=gt_cmap, rasterized=True)
+    _style(axs[1, 0], show_x=True, show_y=True, title='Ground truth')
+
+    # selective_eq panels — show baseline RMSE masked to selected points
+    panel_pos = [(0, 1), (0, 2), (1, 1), (1, 2)]
+    n_valid = int(valid.sum())
+    for (r, c), (pysr_version, info), mask in zip(panel_pos, runs, sel_masks):
+        masked = np.where(mask, base_rmse, np.nan)
+        X, Y, Z = get_centered_grid(P12s, P23s, masked)
+        axs[r, c].pcolormesh(X, Y, Z, norm=rmse_norm, cmap=rmse_cmap, rasterized=True)
+        title = (f'selective_eq p={info["p"]:.2f}  c*={info["best_complexity"]}\n'
+                 f'{int(mask.sum()):,}/{n_valid:,} pts highlighted')
+        _style(axs[r, c], show_x=(r == 1), show_y=False, title=title)
+
+    # two colorbars — RMSE (shared by 5 panels) + GT (only for the GT panel)
+    cb_rmse = fig.colorbar(im_rmse, ax=[axs[0, 0], axs[0, 1], axs[0, 2], axs[1, 1], axs[1, 2]],
+                           shrink=0.7, pad=0.02)
+    cb_rmse.set_label('RMSE (dex)')
+    cb_gt = fig.colorbar(im_gt, ax=axs[1, 0], shrink=0.7, pad=0.02)
+    cb_gt.set_label(INSTABILITY_TIME_LABEL)
+
+    out_path = 'period_results/selective_eq_6way_rmse' + ('.png' if args.png else '.pdf')
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    plt.savefig(out_path, dpi=300, bbox_inches='tight')
+    print('Saved figure to', out_path)
+    plt.close(fig)
+
+
 def get_truths_and_preds(Ngrid, version=None, pysr_version=None, pysr_model_selection=None, petit=False, pure_sr=False, clip=True, exclude_stable=True):
     results_path = get_results_path(Ngrid, version, pysr_version=pysr_version, pysr_model_selection=pysr_model_selection, use_petit=petit, pure_sr=pure_sr)
     truth_path = get_results_path(Ngrid, ground_truth=True)
@@ -1688,33 +2172,298 @@ def get_truths_and_preds(Ngrid, version=None, pysr_version=None, pysr_model_sele
     return truths, preds
 
 
-def calculate_rmse(Ngrid, version=None, pysr_version=None, pysr_model_selection=None, petit=False, pure_sr=False, clip=True, exclude_stable=True):
-    truths, preds = get_truths_and_preds(Ngrid, version, pysr_version, pysr_model_selection, petit, pure_sr, clip=clip, exclude_stable=exclude_stable)
+def get_truths(Ngrid, clip=True):
+    """Load ground truths and input cache once, returning filtered truths and the bad_ixs mask."""
+    truth_path = get_results_path(Ngrid, ground_truth=True)
+    if not os.path.exists(truth_path):
+        truth_path = 'figures/' + truth_path
+
+    truths_raw = load_pickle(truth_path)
+    truths = np.array([d['ground_truth'] if d is not None else np.nan for d in truths_raw])
+    truths = np.log10(truths)
+
+    input_cache = load_input_cache(Ngrid)
+    bad_input_ixs = np.array([inp is None for inp in input_cache])
+    nan_ixs = np.isnan(truths)
+    bad_ixs = bad_input_ixs | nan_ixs
+
+    truths = truths[~bad_ixs]
+    if clip:
+        truths = np.clip(truths, 4, 9)
+    return truths, bad_ixs
+
+
+def load_full_preds(
+    Ngrid,
+    bad_ixs,
+    version=None,
+    pysr_version=None,
+    pysr_model_selection=None,
+    petit=False,
+    pure_sr=False,
+):
+    """Load cached grid predictions as [N, 2] = (mean, std), using std=1 if missing."""
+    results_path = get_results_path(
+        Ngrid,
+        version,
+        pysr_version=pysr_version,
+        pysr_model_selection=pysr_model_selection,
+        use_petit=petit,
+        pure_sr=pure_sr,
+    )
+    if not os.path.exists(results_path):
+        results_path = 'figures/' + results_path
+
+    preds_raw = load_pickle(results_path)
+    full_preds = []
+    for d in preds_raw:
+        if d is None:
+            full_preds.append([np.nan, np.nan])
+            continue
+        std = d.get('std', 1.0)
+        # assert std >= 0
+        full_preds.append([d['mean'], std])
+
+    full_preds = np.array(full_preds)
+    full_preds = full_preds[~bad_ixs]
+    assert not np.isnan(full_preds).any()
+    return full_preds
+
+
+def load_preds(Ngrid, bad_ixs, version=None, pysr_version=None, pysr_model_selection=None, petit=False, pure_sr=False, clip=True):
+    """Load predictions for a single model, filtering by pre-computed bad_ixs."""
+    results_path = get_results_path(Ngrid, version, pysr_version=pysr_version, pysr_model_selection=pysr_model_selection, use_petit=petit, pure_sr=pure_sr)
+    if not os.path.exists(results_path):
+        results_path = 'figures/' + results_path
+
+    preds_raw = load_pickle(results_path)
+    preds = np.array([d['mean'] if d is not None else np.nan for d in preds_raw])
+    preds = preds[~bad_ixs]
+    assert not np.isnan(preds).any()
+
+    if clip:
+        preds = np.clip(preds, 4, 9)
+    return preds
+
+
+def safe_log_erf(x):
+    base_mask = x < -1
+    value_giving_zero = torch.zeros_like(x, device=x.device)
+    x_under = torch.where(base_mask, x, value_giving_zero)
+    x_over = torch.where(~base_mask, x, value_giving_zero)
+
+    f_under = lambda x: (
+         0.485660082730562*x + 0.643278438654541*torch.exp(x) +
+         0.00200084619923262*x**3 - 0.643250926022749 - 0.955350621183745*x**2
+    )
+    f_over = lambda x: torch.log(1.0+torch.erf(x))
+
+    return f_under(x_under) + f_over(x_over)
+
+
+def lossfnc(testy, y, fixed_std=1.0):
+    """Legacy eval loss used by evaluation.py, adapted to one truth per grid cell."""
+    mu = testy[:, [0]]
+    std = testy[:, [1]]
+    # Match evaluation.py: reported LL uses a fixed uncertainty scale.
+    std[...] = fixed_std
+
+    var = std**2
+    t_greater_9 = y >= 9
+
+    regression_loss = -(y - mu)**2/(2*var)
+    regression_loss += -torch.log(std)
+    regression_loss += -safe_log_erf((mu - 4) / (torch.sqrt(2 * var)))
+
+    classifier_loss = safe_log_erf((mu - 9) / torch.sqrt(2 * var))
+
+    safe_regression_loss = torch.where(
+        ~torch.isfinite(regression_loss),
+        -torch.ones_like(regression_loss) * 100,
+        regression_loss,
+    )
+    safe_classifier_loss = torch.where(
+        ~torch.isfinite(classifier_loss),
+        -torch.ones_like(classifier_loss) * 100,
+        classifier_loss,
+    )
+
+    total_loss = (
+        safe_regression_loss * (~t_greater_9) +
+        safe_classifier_loss * t_greater_9
+    )
+
+    total_regression = -(safe_regression_loss * (~t_greater_9)).sum().item() / len(y)
+    total_classifier = -(safe_classifier_loss * t_greater_9).sum().item() / len(y)
+    total_loss = -(total_loss.sum().item()) / len(y)
+    return total_loss, total_regression, total_classifier
+
+
+FIXED_FPR_TARGETS = (0.05, 0.10, 0.20)
+
+
+def _safe_rate(numerator, denominator):
+    return numerator / denominator if denominator else np.nan
+
+
+def _roc_auc_or_nan(labels, scores):
+    return roc_auc_score(labels, scores) if len(np.unique(labels)) == 2 else np.nan
+
+
+def _fnr_at_fixed_fpr(labels, scores, target_fpr):
+    if len(np.unique(labels)) < 2:
+        return np.nan
+    fprs, tprs, _ = roc_curve(labels, scores)
+    unique_fprs = np.unique(fprs)
+    best_tprs = np.array([np.max(tprs[fprs == fpr]) for fpr in unique_fprs])
+    target_tpr = np.interp(target_fpr, unique_fprs, best_tprs)
+    return 1.0 - target_tpr
+
+
+def _binary_metrics(truths, preds):
+    """Classification metrics with positive = unstable (prediction/truth < 9)."""
+    pred_stable = preds >= 9
+    pred_unstable = ~pred_stable
+    true_stable = truths >= 9
+    true_unstable = ~true_stable
+
+    tp = np.sum(pred_unstable & true_unstable)
+    tn = np.sum(pred_stable & true_stable)
+    fp = np.sum(pred_unstable & true_stable)
+    fn = np.sum(pred_stable & true_unstable)
+    n_stable = np.sum(true_stable)
+    n_unstable = np.sum(true_unstable)
+
+    stable_only_acc = _safe_rate(tn, n_stable)
+    unstable_recall = _safe_rate(tp, n_unstable)
+    fpr = _safe_rate(fp, n_stable)
+    fnr = _safe_rate(fn, n_unstable)
+    precision_unstable = _safe_rate(tp, tp + fp)
+    mcc_denom = np.sqrt(float(tp + fp) * float(tp + fn) * float(tn + fp) * float(tn + fn))
+    unstable_score = -preds
+
+    out = dict(
+        acc=np.mean(pred_stable == true_stable),
+        stable_only_acc=stable_only_acc,
+        balanced_acc=0.5 * (stable_only_acc + unstable_recall),
+        roc_auc=_roc_auc_or_nan(true_unstable, unstable_score),
+        fpr=fpr,
+        fnr=fnr,
+        precision_unstable=precision_unstable,
+        mcc=((tp * tn) - (fp * fn)) / mcc_denom if mcc_denom else 0.0,
+    )
+    out['auc'] = out['roc_auc']
+    for target_fpr in FIXED_FPR_TARGETS:
+        key = f'fnr_at_fpr_{int(round(target_fpr * 100)):03d}'
+        out[key] = _fnr_at_fixed_fpr(true_unstable, unstable_score, target_fpr)
+    return out
+
+
+def calculate_metrics(truths, preds, full_preds=None, truths_for_loss=None, fixed_std=1.0):
+    """Calculate metrics given pre-loaded truths/preds, optionally including eval loss."""
+    stable_ixs = truths >= 9
+    unstable_truths, unstable_preds = truths[~stable_ixs], preds[~stable_ixs]
     rmse = np.average(np.square(truths - preds))**0.5
-    acc = np.mean((truths >= 9) == (preds >= 9))
-    auc = roc_auc_score(truths >= 9, preds)
-    bias = np.mean(preds - truths)
-    return rmse, acc, auc, bias
+    unstable_rmse = np.average(np.square(unstable_truths - unstable_preds))**0.5
+    out = dict(rmse=rmse, unstable_rmse=unstable_rmse, bias=np.mean(preds - truths))
+    out.update(_binary_metrics(truths, preds))
+
+    if full_preds is not None:
+        if truths_for_loss is None:
+            truths_for_loss = truths
+        preds_t = torch.from_numpy(full_preds).float()
+        truths_t = torch.from_numpy(truths_for_loss[:, None]).float()
+        loss, reg_loss, cls_loss = lossfnc(preds_t, truths_t, fixed_std=fixed_std)
+        out.update(loss=loss, reg_loss=reg_loss, cls_loss=cls_loss)
+
+    return out
 
 
-def calculate_rmses(args):
+OFFICIAL_METRIC_COLUMNS = [
+    ('rmse', 'RMSE'),
+    ('unstable_rmse', 'UnstableRMSE'),
+    ('acc', 'Acc'),
+    ('balanced_acc', 'BalancedAcc'),
+    ('roc_auc', 'ROC-AUC'),
+    ('fpr', 'FPR'),
+    ('fnr', 'FNR'),
+    ('fnr_at_fpr_005', 'FNR@FPR=0.05'),
+    ('fnr_at_fpr_010', 'FNR@FPR=0.10'),
+    ('fnr_at_fpr_020', 'FNR@FPR=0.20'),
+    ('precision_unstable', 'PrecisionUnstable'),
+    ('mcc', 'MCC'),
+    ('loss', 'Loss'),
+]
+
+
+def _format_metric(value):
+    if isinstance(value, (float, np.floating)) and np.isnan(value):
+        return 'nan'
+    return f'{value:.3f}'
+
+
+def _format_official_latex_row(latex_name, metrics, ll):
+    """Format columns as RMSE/Acc/LL/ROC/FPR/FNR/bias."""
+    return (
+        f'{latex_name} & {metrics["unstable_rmse"]:.2f} & {metrics["acc"]:.2f} & '
+        f'{ll} & {metrics["roc_auc"]:.2f} & {metrics["fpr"]:.2f} & '
+        f'{metrics["fnr"]:.2f} & {metrics["bias"]:.2f} \\\\'
+    )
+
+
+def _print_metrics_table(table_rows):
+    headers = ['method'] + [label for _, label in OFFICIAL_METRIC_COLUMNS]
+    rows = [[name.strip()] + [_format_metric(metrics[key]) for key, _ in OFFICIAL_METRIC_COLUMNS]
+            for name, metrics in table_rows]
+    widths = [max(len(str(row[i])) for row in [headers] + rows) for i in range(len(headers))]
+
+    def format_row(row):
+        return '\t'.join(str(cell).ljust(widths[i]) for i, cell in enumerate(row))
+
+    print(format_row(headers))
+    for row in rows:
+        print(format_row(row))
+
+
+def official_metrics(args):
     versions = load_json(args.version_json)
-    nn_rmse = calculate_rmse(args.Ngrid, version=versions['nn_version'], exclude_stable=args.exclude_stable)
-    our_rmse = calculate_rmse(args.Ngrid, version=versions['nn_version'], pysr_version=versions['pysr_version'], pysr_model_selection=versions['pysr_model_selection'], exclude_stable=args.exclude_stable)
-    petit_rmse = calculate_rmse(args.Ngrid, petit=True, exclude_stable=args.exclude_stable)
-    pure_sr = calculate_rmse(args.Ngrid, pure_sr=True, pysr_version=versions['pure_sr_version'], pysr_model_selection=versions['pure_sr_model_selection'], exclude_stable=args.exclude_stable)
-    pure_sr2 = calculate_rmse(args.Ngrid, version=28114, pysr_version=versions['pure_sr2_version'], pysr_model_selection=versions['pure_sr2_model_selection'], exclude_stable=args.exclude_stable)
-    # print(f'NN RMSE: {nn_rmse:.3f}')
-    # print(f'Distilled EQs RMSE: {our_rmse:.3f}')
-    # print(f'Petit+2020 RMSE: {petit_rmse:.3f}')
-    # print(f'Pure SR RMSE: {pure_sr:.3f}')
-    # print(f'Pure SR (no intermediate features) RMSE: {pure_sr2:.3f}')
-    for name, vals in zip(
-        ['NN     ', 'Ours    ', 'Petit  ', 'Pure SR', 'Pure SR 2'],
-        [nn_rmse, our_rmse, petit_rmse, pure_sr, pure_sr2]
-    ):
-        print(f'{name} \tRMSE: {vals[0]:.3f}, Accuracy: {vals[1]:.3f}, AUC: {vals[2]:.3f}, Bias: {vals[3]:.3f}')
 
+    truths, bad_ixs = get_truths(args.Ngrid)
+    truths_for_loss, _ = get_truths(args.Ngrid, clip=False)
+
+    models = [
+        ('nn', 'Neural network', dict(version=versions['nn_version'])),
+        ('distilled_eqs', 'Ours', dict(version=versions['nn_version'], pysr_version=versions['pysr_version'], pysr_model_selection=versions['pysr_model_selection'])),
+        ('petit', 'Petit+ 2020', dict(petit=True)),
+        ('pure_sr', 'Pure SR', dict(pure_sr=True, pysr_version=versions['pure_sr_version'], pysr_model_selection=versions['pure_sr_model_selection'])),
+        ('pure_sr2', 'Pure SR 2', dict(version=28114, pysr_version=versions['pure_sr2_version'], pysr_model_selection=versions['pure_sr2_model_selection'])),
+    ]
+
+    results = {}
+    table_rows = []
+    for name, _, kwargs in models:
+        preds = load_preds(args.Ngrid, bad_ixs, **kwargs)
+        full_preds = load_full_preds(args.Ngrid, bad_ixs, **kwargs)
+        fixed_std = 1.47 if name in {'distilled_eqs', 'pure_sr', 'pure_sr2'} else 1.0
+        vals = calculate_metrics(
+            truths,
+            preds,
+            full_preds=full_preds,
+            truths_for_loss=truths_for_loss,
+            fixed_std=fixed_std,
+        )
+        results[name] = vals
+        table_rows.append((name, vals))
+
+    _print_metrics_table(table_rows)
+    print('LaTeX rows')
+    print('% columns: RMSE & Acc & LL & ROC & FPR & FNR & bias')
+    for name, latex_name, _ in models:
+        metrics = results[name]
+        loss = '--' if name == 'petit' else f'{-metrics["loss"]:.2f}'
+        print(_format_official_latex_row(latex_name, metrics, loss))
+
+    return results
 
 def get_citation():
     sim = rebound.Simulation()
@@ -1727,6 +2476,31 @@ def get_citation():
     sim.cite()
 
 
+def load_and_calculate_metrics(args):
+    truths, preds = get_truths_and_preds(args.Ngrid, args.version, args.pysr_version, args.pysr_model_selection, args.petit, args.pure_sr, clip=True, exclude_stable=args.exclude_stable)
+    truths_for_loss, bad_ixs = get_truths(args.Ngrid, clip=False)
+    full_preds = load_full_preds(
+        args.Ngrid,
+        bad_ixs,
+        version=args.version,
+        pysr_version=args.pysr_version,
+        pysr_model_selection=args.pysr_model_selection,
+        petit=args.petit,
+        pure_sr=args.pure_sr,
+    )
+    if args.exclude_stable:
+        stable_ixs = truths_for_loss >= 9
+        truths_for_loss = truths_for_loss[~stable_ixs]
+        full_preds = full_preds[~stable_ixs]
+    result = calculate_metrics(truths, preds, full_preds=full_preds, truths_for_loss=truths_for_loss)
+    print(
+        f'RMSE={result["rmse"]:.3f} UnstableRMSE={result["unstable_rmse"]:.3f} '
+        f'Acc={result["acc"]:.3f} ROC-AUC={result["roc_auc"]:.3f} '
+        f'FPR={result["fpr"]:.3f} FNR={result["fnr"]:.3f} Loss={result["loss"]:.3f}'
+    )
+    print(result)
+
+
 def get_args():
     print(get_script_execution_command())
     parser = argparse.ArgumentParser()
@@ -1735,7 +2509,6 @@ def get_args():
 
     parser.add_argument('--plot', action='store_true')
     parser.add_argument('--compute', action='store_true')
-    parser.add_argument('--rmse', action='store_true')
     parser.add_argument('--collate', action='store_true')
     parser.add_argument('--petit', action='store_true')
     parser.add_argument('--megno', action='store_true')
@@ -1758,10 +2531,23 @@ def get_args():
     parser.add_argument('--equation_bounds', action='store_true')
     parser.add_argument('--job_array', action='store_true')
     parser.add_argument('--max_t', type=float, default=1e9, help='Maximum integration time for ground truth')
-    parser.add_argument('--special', type=str, default=None, choices=['4way', 'main', 'pure_sr', '4way_pysr', 'f1_features', 'exprs', 'rmse', 'rmse_diff', 'gt_diff', 'four_way_rmse'])
+    parser.add_argument('--special', type=str, default=None, choices=['official_plots', '4way', '4way_std', 'main', 'pure_sr', '4way_pysr', 'f1_features', 'exprs', 'metrics', 'official_metrics', 'rmse_diff', 'gt_diff', 'four_way_rmse', 'selective_eq', 'selective_eq_rmse'])
     parser.add_argument('--minimal_plot', action='store_true')
     parser.add_argument('--version_json', type=str, default='../official_versions.json', help='Path to the JSON file containing model versions')
     parser.add_argument('--exclude_stable', action='store_true', help='exclude stable systems from RMSE calculation')
+    parser.add_argument('--resonance_guides', action='store_true', help='draw dashed P1/P2=2/3 and P2/P3=2/3 guide lines on supported plots')
+    parser.add_argument(
+        '--highlight_resonant_points',
+        action='store_true',
+        help='overlay the resonant_figure grid as green points/locus in period-ratio coordinates',
+    )
+    parser.add_argument('--resonant_overlay_mode', choices=['old_fixed_outer', 'inner32_phase_slice'], default='old_fixed_outer')
+    parser.add_argument('--resonant_p2_min', type=float, default=1.47)
+    parser.add_argument('--resonant_p2_max', type=float, default=1.56)
+    parser.add_argument('--resonant_y_min', type=float, default=0.55)
+    parser.add_argument('--resonant_y_max', type=float, default=0.76)
+    parser.add_argument('--resonant_inner_period', type=float, default=1.0)
+    parser.add_argument('--resonant_outer_period', type=float, default=2.04)
 
     args = parser.parse_args()
 
@@ -1813,6 +2599,10 @@ if __name__ == '__main__':
             print('Input cache already exists for this size!')
             import sys; sys.exit(0)
 
+    if should_compute_official_results(args):
+        compute_official_results(args)
+        args.compute = False
+
     if args.compute:
         if args.pysr_path and not args.pure_sr:  # pure sr uses normal compute_results
             compute_pysr_f2_results(args)
@@ -1828,13 +2618,16 @@ if __name__ == '__main__':
         else:
             plot_results(args)
 
-    if args.rmse:
-        rmse = calculate_rmse(args.Ngrid, args.version, args.pysr_version, args.pysr_model_selection, args.petit, args.pure_sr, clip=True)
-        print('RMSE:', rmse)
-
     if args.special:
+        if args.special == 'official_plots':
+            plot_main_figure(args)
+            plot_pure_sr_comparison(args)
+            plot_f1_features2(args)
+            plot_4way_std(args)
         if args.special == '4way':
             plot_4way_comparison(args)
+        if args.special == '4way_std':
+            plot_4way_std(args)
         if args.special == 'main':
             plot_main_figure(args)
         elif args.special == 'pure_sr':
@@ -1845,11 +2638,19 @@ if __name__ == '__main__':
             plot_f1_features2(args)
         elif args.special == 'exprs':
             plot_exprs(args)
-        elif args.special == 'rmse':
-            calculate_rmses(args)
+        elif args.special == 'metrics':
+            load_and_calculate_metrics(args)
+        elif args.special == 'official_metrics':
+            metrics = official_metrics(args)
+            save_pickle(metrics, '../pickles/period_ratio_official_metrics.pkl')
         elif args.special == 'four_way_rmse':
             plot_4way_rmse(args)
+        elif args.special == 'selective_eq':
+            plot_selective_eq_6way(args)
+        elif args.special == 'selective_eq_rmse':
+            plot_selective_eq_6way_rmse(args)
 
     end = time.time()
     formatted_time = time.strftime('%H:%M:%S', time.gmtime(end - start))
     print(f'Done (time taken: {formatted_time})')
+    # print(get_citation())

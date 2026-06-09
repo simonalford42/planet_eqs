@@ -32,9 +32,9 @@ def get_feature_nn(version):
     feature_nn = model.feature_nn
 
     input_linear = feature_nn.linear.weight * feature_nn.mask
-    feature_nn.input_linear = input_linear.detach().numpy()
+    feature_nn.input_linear = input_linear.detach().cpu().numpy()
     if feature_nn.linear.bias is not None:
-        feature_nn.input_bias = feature_nn.linear.bias.detach().numpy()
+        feature_nn.input_bias = feature_nn.linear.bias.detach().cpu().numpy()
     else:
         feature_nn.input_bias = np.zeros(input_linear.shape[0])
 
@@ -259,8 +259,14 @@ def remap_latex_str(s, mapping_dict):
     return pattern.sub(repl, s)
 
 
-def feature_string(feature_nn, i, include_ssx=False, latex=False, include_ssx_bias=True, asterisk=False):
+MASS_INDICES = [LABELS.index('m1'), LABELS.index('m2'), LABELS.index('m3')]
+
+def feature_string(feature_nn, i, include_ssx=False, latex=False, include_ssx_bias=True, asterisk=False, drop_mass=False):
     transformation = linear_transformation(feature_nn, i)
+    if drop_mass:
+        transformation = transformation.copy()
+        for idx in MASS_INDICES:
+            transformation[idx] = 0
     bias = feature_nn.input_bias[i]
 
     if include_ssx:
@@ -442,7 +448,7 @@ def f1_latex_string2(feature_nn, include_ssx=False, include_ssx_bias=True, pysr_
     return s
 
 
-def f1_latex_strings(feature_nn, include_ssx=False, include_ssx_bias=True, pysr_results=None, important_complexities=None, std_biases=False):
+def f1_latex_strings(feature_nn, include_ssx=False, include_ssx_bias=True, pysr_results=None, important_complexities=None, std_biases=False, drop_std_mass=True):
     if pysr_results is not None:
         if important_complexities == None:
             equations = pysr_results['equation']
@@ -473,9 +479,46 @@ def f1_latex_strings(feature_nn, include_ssx=False, include_ssx_bias=True, pysr_
 
     # stds
     for i in std_vars:
-        feature_str = feature_string(feature_nn, i, include_ssx, latex=True, include_ssx_bias=include_ssx_bias and std_biases)
+        feature_str = feature_string(feature_nn, i, include_ssx, latex=True, include_ssx_bias=include_ssx_bias and std_biases, drop_mass=drop_std_mass)
         s = r'\sigma_{' + str(i) + r'} = {\rm Std}\left(' + feature_str + r'\right)'
         strings.append(s)
+
+    return strings
+
+
+def f1_latex_strings_new(feature_nn, include_ssx=False, include_ssx_bias=True, pysr_results=None, important_complexities=None, std_biases=False, drop_std_mass=True):
+    if pysr_results is not None:
+        if important_complexities == None:
+            equations = pysr_results['equation']
+        else:
+            important_ixs = get_important_ixs(pysr_results, important_complexities)
+            equations = pysr_results['equation'][important_ixs]
+
+        all_vars = [get_variables_in_str(e) for e in equations]
+        all_vars = [item for sublist in all_vars for item in sublist]
+        all_vars = list(dict.fromkeys(all_vars))
+        mu_vars = sorted([int(s[1]) for s in all_vars if s[0] == 'm'])
+        std_vars = sorted([int(s[1]) for s in all_vars if s[0] == 's'])
+    else:
+        mu_vars = list(range(feature_nn.input_linear.shape[0]))
+        std_vars = mu_vars
+
+    # collect all unique feature indices (means may include bias, stds may not)
+    all_feature_ixs = sorted(set(mu_vars) | set(std_vars))
+
+    strings = []
+
+    for i in all_feature_ixs:
+        # include bias if used as a mean, or if std_biases is set
+        use_bias = include_ssx_bias and (i in mu_vars or std_biases)
+        # drop mass terms for features only used as stds (mass is constant across integration)
+        use_drop_mass = drop_std_mass and (i not in mu_vars)
+        feature_str = feature_string(feature_nn, i, include_ssx, latex=True, include_ssx_bias=use_bias, drop_mass=use_drop_mass)
+        s = 'f_{' + str(i) + '} = ' + feature_str
+        strings.append(s)
+
+    strings.append(r'\mu_i = {\rm \mathbb{E}}\left[ f_i \right]')
+    strings.append(r'\sigma_i = {\rm Std}\left( f_i \right)')
 
     return strings
 
@@ -529,7 +572,7 @@ def f2_latex_strings(results, important_complexities=None, mapping_dict=None):
 
     from pysr.export_latex import sympy2latex
     latex_strs = [sympy2latex(expr, prec=2) for expr in results['sympy_format'][important_ixs]]
-    latex_strs = ['\\log_{10} T_{\\mathrm{inst}} = ' + s for s in latex_strs]
+    # latex_strs = ['\\log_{10} T_{\\mathrm{inst}} = ' + s for s in latex_strs]
 
     def transform(s):
         if mapping_dict:
@@ -559,24 +602,29 @@ def plot_period_ratio_rmse():
     return plt
 
 
-def make_pareto_plot(results, important_complexities=None, rmse=True, plot_unimportant=False):
-    plt.rcParams["font.family"] = "serif"
-    scale = 0.8
-    plt.figure(figsize=(8*scale, 4.8*scale))  # Width = 10 inches, Height = 6 inches
+def make_pareto_plot(results, important_complexities):
+    color = 'tab:blue'
+    # plt.style.use('seaborn-darkgrid')
+    plt.rcParams["font.family"] = "sans-serif"
+    scale = 0.75
+    plt.figure(figsize=(11*scale, 5.5*scale))  # Width = 10 inches, Height = 6 inches
     ax = plt.gca()
 
-    if plot_unimportant:
-        ax.scatter(results['complexity'], results['rmse' if rmse else 'loss'], s=12)
+    ax.scatter(results['complexity'], results['rmse'], s=22, color=color, alpha=0.35)
 
     ax.set_xlabel('Equation complexity', fontsize=12, labelpad=10)
 
-    ax.set_ylabel('RMSE' if rmse else 'Loss', fontsize=12, labelpad=10)
+    ax.set_ylabel('RMSE', fontsize=12, labelpad=10)
 
-    if important_complexities:
-        important_ixs = get_important_ixs(results, important_complexities)
-        important_ys = [results['rmse' if rmse else 'loss'][i] for i in important_ixs]
-        ax.scatter(important_complexities, important_ys, color='red' if plot_unimportant else None, s=22)
-        ax.plot(important_complexities, important_ys, color='red' if plot_unimportant else None, label='Ours')
+    important_ixs = get_important_ixs(results, important_complexities)
+    important_ys = [results['rmse'][i] for i in important_ixs]
+    ax.scatter(important_complexities, important_ys, s=22, color=color)
+
+    ax.step(important_complexities + [results['complexity'].max()],
+            important_ys + [important_ys[-1]],
+            where='post',
+            color=color,
+            linewidth=0.8)
 
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
@@ -587,7 +635,7 @@ def make_pareto_plot(results, important_complexities=None, rmse=True, plot_unimp
     # Make minor ticks point outward
     ax.tick_params(axis="x", which="minor", direction="out")
 
-    plt.ylim(1.25, 1.75)
+    plt.ylim(1.2, 1.75)
     return plt
 
 
@@ -614,44 +662,45 @@ def official_stuff(args):
     print(f2_str)
     print()
 
-    # these results obtained via calc_rmse.py script (see official_plots.sh)
-    nn_results = load_pickle(f'pickles/nn_results_all_{v["mse_nn_version"]}.pkl')
-    petit_results = load_pickle('pickles/petit_results_all.pkl')
-    pure_sr_results = load_pickle(f'pickles/pure_sr_results_all_{v["mse_pure_sr_version"]}.pkl')
-    pure_sr2_results = load_pickle(f'pickles/pysr_results_all_28114_{v["mse_pure_sr2_version"]}.pkl')
-    pysr_results = load_pickle(f'pickles/pysr_results_all_{v["nn_version"]}_{v["mse_pysr_version"]}.pkl')
-
-    pysr_c, _ = min(pysr_results['val'].items(), key=lambda e: e[1])
-    puresr_c, _ = min(pure_sr_results['val'].items(), key=lambda e: e[1])
-    puresr2_c, _ = min(pure_sr2_results['val'].items(), key=lambda e: e[1])
-
-    # table for paper
-    print('Table of results:\n')
-    print(f'NN: resonant: {nn_results["test"]:.2f}, random {nn_results["random"]:.2f}')
-    print(f'Ours: resonant: {pysr_results["test"][pysr_c]:.2f}, random {pysr_results["random"][pysr_c]:.2f}')
-    print(f'Petit: resonant: {petit_results["test"]:.2f}, random {petit_results["random"]:.2f}')
-    print(f'Pure SR: resonant: {pure_sr_results["test"][puresr_c]:.2f}, random {pure_sr_results["random"][puresr_c]:.2f}')
-    print(f'Pure SR (no intermediate features): resonant: {pure_sr2_results["test"][puresr2_c]:.2f}, random {pure_sr2_results["random"][puresr2_c]:.2f}')
-
     important_complexities = results['complexity'].tolist()
     important_complexities, _ = paretoize(important_complexities, results['rmse'].tolist(), replace=False)
-
-    plot = make_pareto_plot(results, important_complexities=important_complexities, rmse=True, plot_unimportant=False)
+    plot = make_pareto_plot(results, important_complexities=important_complexities)
+    plt.tight_layout()
     plot.savefig('graphics/pareto_fig1.svg', bbox_inches='tight')
     print('Saved pareto plot to graphics/pareto_fig1.svg')
 
-    rmse_dict = {
-        'Neural network':       [nn_results['test'], nn_results['random'], 1.427],
-        'Distilled equations':  [pysr_results['test'][pysr_c], pysr_results['random'][pysr_c], 1.072],
-        'Pure SR':              [pure_sr_results['test'][puresr_c], pure_sr_results['random'][puresr_c], 1.724],
-        'Petit+2020':           [petit_results['test'], petit_results['random'], 1.253],
-    }
-    rmse_plot(rmse_dict)
+    # # these results obtained via calc_rmse.py script (see official_plots.sh)
+    # nn_results = load_pickle(f'pickles/nn_results_all_{v["mse_nn_version"]}.pkl')
+    # petit_results = load_pickle('pickles/petit_results_all.pkl')
+    # pure_sr_results = load_pickle(f'pickles/pure_sr_results_all_{v["mse_pure_sr_version"]}.pkl')
+    # pure_sr2_results = load_pickle(f'pickles/pysr_results_all_28114_{v["mse_pure_sr2_version"]}.pkl')
+    # pysr_results = load_pickle(f'pickles/pysr_results_all_{v["mse_nn_version"]}_{v["mse_pysr_version"]}.pkl')
+
+    # pysr_c, _ = min(pysr_results['val'].items(), key=lambda e: e[1])
+    # puresr_c, _ = min(pure_sr_results['val'].items(), key=lambda e: e[1])
+    # puresr2_c, _ = min(pure_sr2_results['val'].items(), key=lambda e: e[1])
+
+    # # table for paper
+    # print('Table of results:\n')
+    # print(f'NN: resonant: {nn_results["test"]:.2f}, random {nn_results["random"]:.2f}')
+    # print(f'Ours: resonant: {pysr_results["test"][pysr_c]:.2f}, random {pysr_results["random"][pysr_c]:.2f}')
+    # print(f'Petit: resonant: {petit_results["test"]:.2f}, random {petit_results["random"]:.2f}')
+    # print(f'Pure SR: resonant: {pure_sr_results["test"][puresr_c]:.2f}, random {pure_sr_results["random"][puresr_c]:.2f}')
+    # print(f'Pure SR (no intermediate features): resonant: {pure_sr2_results["test"][puresr2_c]:.2f}, random {pure_sr2_results["random"][puresr2_c]:.2f}')
+
+    # rmse_dict = {
+    #     'Neural network':       [nn_results['test'], nn_results['random'], 1.427],
+    #     'Distilled equations':  [pysr_results['test'][pysr_c], pysr_results['random'][pysr_c], 1.072],
+    #     'Pure SR':              [pure_sr_results['test'][puresr_c], pure_sr_results['random'][puresr_c], 1.724],
+    #     'Petit+2020':           [petit_results['test'], petit_results['random'], 1.253],
+    # }
+    # rmse_plot(rmse_dict)
 
 
 def rmse_plot(rmse_dict=None):
     plt.style.use('seaborn-darkgrid')
-    plt.rcParams['font.family'] = 'serif'
+    plt.rcParams['font.family'] = 'sans-serif'
+    plt.rcParams['font.sans-serif'] = ['Helvetica', 'Arial', 'DejaVu Sans']
 
     # ── data ──────────────────────────────────────────────────────────────────
     methods  = ['Neural network', 'Distilled equations', 'Pure SR', 'Petit+2020']

@@ -1,5 +1,33 @@
 #!/usr/bin/env bash
 
+# May 20 2026
+# sbatch -J clip2 sr.sh sr.py --time_in_hours 8 --nn_version 24880 --target f2 --seed 0 --loss_fn clipped2
+# sbatch -J dir_clip2 sr.sh sr.py --time_in_hours 8 --nn_version 24880 --target f2_direct --seed 0 --loss_fn clipped2
+
+# May 14 2026
+# learn equations that predict where pysr_version=11003 (complexity 26) is accurate,
+# using selective_eq loss with various subset fractions
+# sbatch -J sel_eq_p10 sr.sh sr.py --time_in_hours 8 --nn_version 24880 --target selective_eq --seed 0 --loss_fn selective_eq --p 0.1
+# sbatch -J sel_eq_p25 sr.sh sr.py --time_in_hours 8 --nn_version 24880 --target selective_eq --seed 0 --loss_fn selective_eq --p 0.25
+# sbatch -J sel_eq_p50 sr.sh sr.py --time_in_hours 8 --nn_version 24880 --target selective_eq --seed 0 --loss_fn selective_eq --p 0.5
+# sbatch -J sel_eq_p75 sr.sh sr.py --time_in_hours 8 --nn_version 24880 --target selective_eq --seed 0 --loss_fn selective_eq --p 0.75
+
+
+# May 13 2026
+# prune train neural network with fixed classification loss
+# sbatch -J fix_classification_loss --partition ellis prune_train.sh
+
+# sr.py --loss_fn [ll, mse] --target [f2, f2_direct] --version 24880
+# sbatch -J nf2_ll --partition ellis sr.sh sr.py --time_in_hours 8 --nn_version 24880 --target f2 --seed 0 --loss_fn ll
+# sbatch -J nf2_ll2 --partition ellis sr.sh sr.py --time_in_hours 8 --nn_version 24880 --target f2 --seed 0 --loss_fn ll2
+# sbatch -J ngt_ll2 --partition ellis sr.sh sr.py --time_in_hours 8 --nn_version 24880 --target f2_direct --seed 0 --loss_fn ll2
+# sbatch -J nn_std --partition ellis sr.sh sr.py --time_in_hours 8 --nn_version 24880 --target f2_direct --seed 0 --loss_fn nn_std
+
+
+# May 7 2026
+# train neural network to predict equation std
+# sbatch -J eqstd --partition ellis train.sh --predict_eq_uncertainty --freeze_f1 --total_steps 100000 --load_f1_f2 24880
+
 # February 18 2026
 # calculate RMSE scores including stable systems
 # sbatch -J nn --partition gpu run.sh calc_rmse.py --eval_type nn --dataset all --version 24880 --classification
@@ -8,16 +36,16 @@
 # sbatch -J pure_sr --partition gpu run.sh calc_rmse.py --eval_type pure_sr --dataset all --pysr_version 72420 --classification
 # sbatch -J pure_sr2 --partition gpu run.sh calc_rmse.py --eval_type pysr --dataset all --version 28114 --pysr_version 41564 --classification
 
-p calc_rmse.py --pysr_version 72420 --pysr_model_selection 41 --classification --dataset random --eval_type pure_sr
-p calc_rmse.py --version 24880 --classification --dataset random --eval_type nn
-p calc_rmse.py --version 24880 --classification --dataset test --eval_type nn
-p calc_rmse.py --version 24880 --pysr_version 11003 --pysr_model_selection 26 --classification --dataset test
-p calc_rmse.py --pysr_version 72420 --pysr_model_selection 41 --classification --dataset test --eval_type pure_sr
-p calc_rmse.py --version 24880 --classification --dataset test --eval_type nn
-p calc_rmse.py --version 24880 --classification --dataset random --eval_type nn
-p calc_rmse.py --version 24880 --pysr_version 11003 --pysr_model_selection 26 --classification --dataset random
-p calc_rmse.py --eval_type petit --dataset test --classification
-p calc_rmse.py --eval_type petit --dataset random --classification
+# p calc_rmse.py --pysr_version 72420 --pysr_model_selection 41 --classification --dataset random --eval_type pure_sr
+# p calc_rmse.py --version 24880 --classification --dataset random --eval_type nn
+# p calc_rmse.py --version 24880 --classification --dataset test --eval_type nn
+# p calc_rmse.py --version 24880 --pysr_version 11003 --pysr_model_selection 26 --classification --dataset test
+# p calc_rmse.py --pysr_version 72420 --pysr_model_selection 41 --classification --dataset test --eval_type pure_sr
+# p calc_rmse.py --version 24880 --classification --dataset test --eval_type nn
+# p calc_rmse.py --version 24880 --classification --dataset random --eval_type nn
+# p calc_rmse.py --version 24880 --pysr_version 11003 --pysr_model_selection 26 --classification --dataset random
+# p calc_rmse.py --eval_type petit --dataset test --classification
+# p calc_rmse.py --eval_type petit --dataset random --classification
 
 
 # June 17 2025

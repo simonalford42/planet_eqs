@@ -29,19 +29,19 @@ def load(version, seed=None):
 
     f = path + '/version=0-v0.ckpt'
     if os.path.exists(f):
-        return VarModel.load_from_checkpoint(f)
+        return VarModel.load_from_checkpoint(f, weights_only=False)
     f = path + '/version=0.ckpt'
     if os.path.exists(f):
-        return VarModel.load_from_checkpoint(f)
+        return VarModel.load_from_checkpoint(f, weights_only=False)
 
     # try again one directory up, in case we're running from figures/ folder
     path = '../' + path
     f = path + '/version=0-v0.ckpt'
     if os.path.exists(f):
-        return VarModel.load_from_checkpoint(f)
+        return VarModel.load_from_checkpoint(f, weights_only=False)
     f = path + '/version=0.ckpt'
     if os.path.exists(f):
-        return VarModel.load_from_checkpoint(f)
+        return VarModel.load_from_checkpoint(f, weights_only=False)
 
     raise ValueError(f'Could not find model for version {version} and seed {seed}')
 
@@ -1305,13 +1305,18 @@ class VarModel(pl.LightningModule):
         regression_loss = -(y - mu)**2/(2*var)
         regression_loss += -torch.log(std)
 
-        regression_loss += -safe_log_erf(
-                    (mu - 4)/(torch.sqrt(2*var))
-                )
+        regression_loss += -safe_log_erf((mu - 4)/(torch.sqrt(2*var)))
 
-        classifier_loss = safe_log_erf(
-                    (mu - 9)/(torch.sqrt(2*var))
+
+        # note: gpt-5.3 discovered that the loss term was missing this normalization,
+        # but it was not used in the original training.
+        if 'fix_classification_loss' in self.hparams and self.hparams['fix_classification_loss']:
+            classifier_loss = (
+                safe_log_erf((mu - 9) / torch.sqrt(2*var)) -
+                safe_log_erf((mu - 4) / torch.sqrt(2*var))
             )
+        else:
+            classifier_loss = safe_log_erf((mu - 9)/(torch.sqrt(2*var)))
 
         safe_regression_loss = torch.where(
                 ~torch.isfinite(regression_loss),
@@ -1350,33 +1355,29 @@ class VarModel(pl.LightningModule):
 
             testy = self(x, noisy_val=noisy_val)
             with torch.no_grad():
-                eq_testy = self.eq_model[0](x, noisy_val=noisy_val)
-                eq_testy[0, 0] = hard_clamp(eq_testy[0, 0], 4.0, 12.0)
+                eq_testy = self.eq_model[0](x, noisy_val=False)
+                eq_testy[:, 0] = hard_clamp(eq_testy[:, 0], 4.0, 12.0)
 
                 # sometimes the equations predict nan; get rid of those.
                 # [B] tensor of indices of eq_testy that are nan
                 nan_ixs = torch.isnan(eq_testy).any(dim=1)
-                # exclude nan indices; we know those are highly uncertain already!
-                x = x[~nan_ixs]
-                y = y[~nan_ixs]
-                testy = testy[~nan_ixs]
-                eq_testy = eq_testy[~nan_ixs]
+                keep = ~nan_ixs
+                eq_mu = eq_testy[:, [0]]
 
-            # needs to be outside the no_grad otherwise pytorch complains
-            testy[:, 0] = eq_testy[:, 0]
+            # exclude nan indices; we know those are highly uncertain already!
+            y = y[keep]
+            testy = testy[keep]
+            eq_mu = eq_mu[keep]
+
+            # replace the trainable mean with the equation mean, while keeping
+            # gradients through the trainable std prediction.
+            testy = torch.cat([eq_mu, testy[:, [1]]], dim=1)
         else:
-            print('doing here')
-            # testy = self(x, noisy_val=noisy_val)
-            testy = self(x, noisy_val=False)
+            testy = self(x, noisy_val=noisy_val)
 
         if self.mse:
             loss = self.mse_loss(testy, y).sum()
         else:
-            print()
-            print('predy mean:', testy[:, 0].mean().item())
-            print('targett mean:', y.mean().item())
-            print()
-            print(testy.shape, y.shape)
             loss = self._lossfnc(testy, y).sum()
 
         if include_reg:

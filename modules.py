@@ -1,4 +1,3 @@
-import pysr
 import torch
 import torch.nn as nn
 import utils
@@ -112,15 +111,35 @@ class SumModule(nn.Module):
         return self.module1(x) + self.module2(x)
 
 
+def _backfill_pysr_init_defaults(reg):
+    """Backfill missing __init__ params on a PySRRegressor loaded from a pickle
+    created with an older PySR version. sklearn's get_params iterates over the
+    current __init__ signature, so any param the old pickle didn't set will
+    raise AttributeError when .pytorch() (or any set_params call) runs."""
+    import inspect
+    from pysr import PySRRegressor
+    sig = inspect.signature(PySRRegressor.__init__)
+    for name, p in sig.parameters.items():
+        if name == 'self':
+            continue
+        if not hasattr(reg, name):
+            default = None if p.default is inspect.Parameter.empty else p.default
+            setattr(reg, name, default)
+    return reg
+
+
 def load_pysr_module_list(filepath, model_selection):
+    import pysr
     if model_selection in ['best', 'accuracy', 'score']:
         reg = pysr.PySRRegressor.from_file(filepath, model_selection=model_selection)
+        _backfill_pysr_init_defaults(reg)
         if reg.nout_ > 1:
             return nn.ModuleList(reg.pytorch())
         else:
             return nn.ModuleList([reg.pytorch()])
     else:
         reg = pysr.PySRRegressor.from_file(filepath)
+        _backfill_pysr_init_defaults(reg)
         # find the ixs with closest complexity equal to model_selection
 
         if reg.nout_ > 1:
@@ -223,6 +242,8 @@ class PySREQBoundsNet(nn.Module):
 
 def get_pysr_regress_nn(version, model_selection='accuracy', results_dir='sr_results/'):
     pysr_path = os.path.join(results_dir, f'{version}.pkl')
+    if not os.path.exists(pysr_path) and os.path.exists(os.path.join('..', pysr_path)):
+        pysr_path = os.path.join('..', pysr_path)
 
     # detect if the model was direct_f2, if so load other module.
     with open(pysr_path, 'rb') as f:
