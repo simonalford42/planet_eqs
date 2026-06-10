@@ -24,6 +24,7 @@ warnings.filterwarnings("ignore", category=ResourceWarning)
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(SCRIPT_DIR)
+DATA_DIR = os.path.join(REPO_ROOT, "data")
 RESULTS_DIR = os.path.join(SCRIPT_DIR, "resonant_results")
 SR_DIR = os.path.join(REPO_ROOT, "sr_results")
 
@@ -175,7 +176,7 @@ def get_results_path(
     input_cache=False,
 ):
     if input_cache:
-        path = os.path.join(RESULTS_DIR, f"cache_ngrid={ngrid}.pkl")
+        path = os.path.join(DATA_DIR, f"resonant_cache_ngrid={ngrid}.pkl")
     else:
         path = os.path.join(RESULTS_DIR, f"v={version}_ngrid={ngrid}")
         if pysr_version is not None:

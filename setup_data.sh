@@ -14,4 +14,4 @@ echo "$HASH  $FILE" | shasum -a 256 -c -     # verification
 tar -xzf "$FILE"
 
 # move period_results/ to figures/period_results/
-mv data/period_results figures/
+# mv data/period_results figures/

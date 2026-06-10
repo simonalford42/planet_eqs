@@ -31,10 +31,6 @@ import cmasher as cmr
 import warnings
 from matplotlib.gridspec import GridSpec
 from sklearn.metrics import roc_auc_score, roc_curve
-from resonant_period_ratio_overlay import (
-    add_period_ratio_inner32_slice_overlay,
-    add_period_ratio_resonant_overlay,
-)
 
 warnings.filterwarnings("ignore", category=ResourceWarning)
 warnings.filterwarnings("default", category=UserWarning)
@@ -962,26 +958,6 @@ def plot_results(args, metric=None):
         im = ax.pcolormesh(X, Y, Z, vmin=zmin, vmax=zmax, cmap=cmap, rasterized=True)
         label = INSTABILITY_TIME_LABEL
 
-    if args.highlight_resonant_points:
-        if args.resonant_overlay_mode == 'old_fixed_outer':
-            add_period_ratio_resonant_overlay(
-                ax,
-                args.Ngrid,
-                p2_min=args.resonant_p2_min,
-                p2_max=args.resonant_p2_max,
-                inner_period=args.resonant_inner_period,
-                outer_period=args.resonant_outer_period,
-            )
-        elif args.resonant_overlay_mode == 'inner32_phase_slice':
-            add_period_ratio_inner32_slice_overlay(
-                ax,
-                args.Ngrid,
-                y_min=args.resonant_y_min,
-                y_max=args.resonant_y_max,
-            )
-        else:
-            raise ValueError(f"Unknown resonant_overlay_mode: {args.resonant_overlay_mode}")
-
     if args.minimal_plot:
         # ax.set_xticks([])
         # ax.set_yticks([])
@@ -1012,8 +988,6 @@ def plot_results(args, metric=None):
         path += '_std2'
     if metric == 'mean2':
         path += '_mean2'
-    if args.highlight_resonant_points:
-        path += f'_{args.resonant_overlay_mode}_overlay'
 
     # if args.pysr_version is not None:
     #     path += f'_pysr_f2_v={args.pysr_version}/{args.pysr_model_selection}'
@@ -1715,7 +1689,7 @@ def plot_f1_features2(args):
                 include_ssx=True,
                 latex=True,
                 include_ssx_bias=not is_std,
-                drop_mass=True
+                drop_mass=is_std,
             )
             if is_std:
                 title = r'$\sigma_{' + str(feat_i) + r'} = {\rm Std} \left(' + feat_str + r'\right)$'
@@ -2536,11 +2510,6 @@ def get_args():
     parser.add_argument('--version_json', type=str, default='../official_versions.json', help='Path to the JSON file containing model versions')
     parser.add_argument('--exclude_stable', action='store_true', help='exclude stable systems from RMSE calculation')
     parser.add_argument('--resonance_guides', action='store_true', help='draw dashed P1/P2=2/3 and P2/P3=2/3 guide lines on supported plots')
-    parser.add_argument(
-        '--highlight_resonant_points',
-        action='store_true',
-        help='overlay the resonant_figure grid as green points/locus in period-ratio coordinates',
-    )
     parser.add_argument('--resonant_overlay_mode', choices=['old_fixed_outer', 'inner32_phase_slice'], default='old_fixed_outer')
     parser.add_argument('--resonant_p2_min', type=float, default=1.47)
     parser.add_argument('--resonant_p2_max', type=float, default=1.56)
