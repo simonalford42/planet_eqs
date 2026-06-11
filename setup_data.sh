@@ -3,7 +3,7 @@ set -euo pipefail
 
 RECORD_ID=15724986
 FILE=data_bundle.tar.gz
-HASH=603bab8f0c4658d032358e2011946394e7bb5fcada6e77ce4e13b9ffaa396a52
+HASH=f2aefaae33d855c5152416b04af77156318611916c1f26fa5354dec558e0ba9f
 
 # Download data from Zenodo: https://zenodo.org/records/15724986
 curl -L -o "$FILE" \
@@ -15,6 +15,3 @@ tar -xzf "$FILE"
 
 # move period_results/ to figures/period_results/
 cp -r data/period_results figures/
-
-# if you ever need to create the bundle again, you can use the following command:
-# tar -czf data_bundle.tar.gz data/
