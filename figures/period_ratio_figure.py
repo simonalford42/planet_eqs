@@ -18,6 +18,7 @@ try:
 except ImportError:
     import figures.spock as spock
 import pickle
+import io
 import math
 from utils2 import assert_equal, load_pickle, get_script_execution_command, load_json, truncate_cmap, save_pickle
 import einops
@@ -90,12 +91,27 @@ scopy bnn_chaos_model/figures/period_results/v=43139_ngrid=6.pkl ~/code/bnn_chao
 
 
 def load_model(args):
+    use_cuda = should_use_cuda(args)
     if args.pure_sr:
         pure_sr_net = modules.PureSRNet.from_path(args.pysr_path, args.pysr_model_selection)
-        return spock.NonSwagFeatureRegressor(pure_sr_net)
+        return spock.NonSwagFeatureRegressor(pure_sr_net, cuda=use_cuda)
     else:
         model = spock_reg_model.load(args.version, args.seed)
-        return spock.NonSwagFeatureRegressor(model)
+        return spock.NonSwagFeatureRegressor(model, cuda=use_cuda)
+
+
+def should_use_cuda(args):
+    requested = getattr(args, 'cuda', None)
+    if requested is None:
+        return torch.cuda.is_available()
+    if requested and not torch.cuda.is_available():
+        warnings.warn('CUDA requested but not available; falling back to CPU.')
+        return False
+    return requested
+
+
+def get_torch_device(args):
+    return torch.device('cuda' if should_use_cuda(args) else 'cpu')
 
 
 def get_simulation(par):
@@ -244,7 +260,18 @@ def load_input_cache(Ngrid):
             return None
 
     with open(path, 'rb') as f:
-        return pickle.load(f)
+        return _pickle_load_torch_cpu(f)
+
+
+class _TorchCPUUnpickler(pickle.Unpickler):
+    def find_class(self, module, name):
+        if module == 'torch.storage' and name == '_load_from_bytes':
+            return lambda b: torch.load(io.BytesIO(b), map_location='cpu')
+        return super().find_class(module, name)
+
+
+def _pickle_load_torch_cpu(file_obj):
+    return _TorchCPUUnpickler(file_obj).load()
 
 
 def get_list_chunk(lst, ix, total):
@@ -265,6 +292,8 @@ def predict_from_cached_input(model, cached_input, pure_sr=False):
     if cached_input is None:
         # the simulation messed up somehow, return None just like in get_model_prediction
         return None
+    if hasattr(cached_input, 'cuda') and hasattr(model, 'cuda'):
+        cached_input = cached_input.cuda() if model.cuda else cached_input.cpu()
 
     if pure_sr:
         out = model.model(cached_input)
@@ -1000,11 +1029,13 @@ def plot_results(args, metric=None):
     plt.close(fig)
 
 
-def get_pysr_module(sr_results_path, residual_sr_results_path=None, model_selection=None, residual_model_selection=None):
+def get_pysr_module(sr_results_path, residual_sr_results_path=None, model_selection=None, residual_model_selection=None, device=None):
     # TODO: edward
     if residual_sr_results_path is None:
         # nonresidual sr
-        regress_nn = modules.PySRNet(sr_results_path, model_selection).cuda()
+        if device is None:
+            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        regress_nn = modules.PySRNet(sr_results_path, model_selection).to(device)
         return regress_nn
     else:
         # ... do it for residual.
@@ -1033,14 +1064,12 @@ def compute_pysr_f2_results(args):
     good_ixs = np.array([i for i in range(len(f1_results)) if f1_results[i] is not None])
 
     batch = np.array([d for d in f1_results if d is not None])
-    # if cuda is not available, quit
-    if not torch.cuda.is_available():
-        print('CUDA not available, do this on the cluster!')
-        return
-    batch = torch.tensor(batch).float().cuda()
+    device = get_torch_device(args)
+    print(f'Computing PySR f2 on {device}')
+    batch = torch.tensor(batch).float().to(device)
 
     for model_selection in model_selections:
-        regress_nn = modules.PySRNet(args.pysr_path, model_selection).cuda()
+        regress_nn = modules.PySRNet(args.pysr_path, model_selection).to(device)
         pred = regress_nn(batch).detach().cpu().numpy()
         results = np.full((len(f1_results), pred.shape[1]), np.NaN)
         results[good_ixs] = pred
@@ -2494,6 +2523,8 @@ def get_args():
     parser.add_argument('--create_input_cache', action='store_true')
     parser.add_argument('--png', action='store_true')
     parser.add_argument('--seed', type=int, default=0, help='seed for loading NN model')
+    parser.add_argument('--cuda', dest='cuda', action='store_true', default=None, help='force CUDA for model evaluation')
+    parser.add_argument('--cpu', dest='cuda', action='store_false', help='force CPU for model evaluation')
 
     parser.add_argument('--pysr_version', type=str, default=None) # sr_results/11003.pkl
     parser.add_argument('--pysr_dir', type=str, default='../sr_results/')  # folder containing pysr results pkl
