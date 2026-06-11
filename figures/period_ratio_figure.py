@@ -1672,6 +1672,9 @@ def plot_f1_features2(args):
             ])
             valid = vals[~np.isnan(vals)]
             lower, upper = np.percentile(valid, [20, 80])   # middle 50 %
+            if np.isclose(lower, upper):
+                pad = 1e-6 if lower == 0 else abs(lower) * 1e-6
+                lower, upper = lower - pad, upper + pad
             X, Y, Z = get_centered_grid(P12s, P23s, vals)
 
             cmap = COLOR_MAP.copy().reversed()
@@ -2429,7 +2432,7 @@ def official_metrics(args):
         results[name] = vals
         table_rows.append((name, vals))
 
-    _print_metrics_table(table_rows)
+    # _print_metrics_table(table_rows)
     print('LaTeX rows')
     print('% columns: RMSE & Acc & LL & ROC & FPR & FNR & bias')
     for name, latex_name, _ in models:
@@ -2505,19 +2508,11 @@ def get_args():
     parser.add_argument('--equation_bounds', action='store_true')
     parser.add_argument('--job_array', action='store_true')
     parser.add_argument('--max_t', type=float, default=1e9, help='Maximum integration time for ground truth')
-    parser.add_argument('--special', type=str, default=None, choices=['official_plots', '4way', '4way_std', 'main', 'pure_sr', '4way_pysr', 'f1_features', 'exprs', 'metrics', 'official_metrics', 'rmse_diff', 'gt_diff', 'four_way_rmse', 'selective_eq', 'selective_eq_rmse'])
+    parser.add_argument('--special', type=str, default=None, choices=['4way', '4way_std', 'main', 'pure_sr', '4way_pysr', 'f1_features', 'exprs', 'metrics', 'rmse_diff', 'gt_diff', 'four_way_rmse', 'selective_eq', 'selective_eq_rmse'])
+    parser.add_argument('--official', action='store_true', help='compute official metrics and main figure')
     parser.add_argument('--minimal_plot', action='store_true')
     parser.add_argument('--version_json', type=str, default='../official_versions.json', help='Path to the JSON file containing model versions')
     parser.add_argument('--exclude_stable', action='store_true', help='exclude stable systems from RMSE calculation')
-    parser.add_argument('--resonance_guides', action='store_true', help='draw dashed P1/P2=2/3 and P2/P3=2/3 guide lines on supported plots')
-    parser.add_argument('--resonant_overlay_mode', choices=['old_fixed_outer', 'inner32_phase_slice'], default='old_fixed_outer')
-    parser.add_argument('--resonant_p2_min', type=float, default=1.47)
-    parser.add_argument('--resonant_p2_max', type=float, default=1.56)
-    parser.add_argument('--resonant_y_min', type=float, default=0.55)
-    parser.add_argument('--resonant_y_max', type=float, default=0.76)
-    parser.add_argument('--resonant_inner_period', type=float, default=1.0)
-    parser.add_argument('--resonant_outer_period', type=float, default=2.04)
-
     args = parser.parse_args()
 
     if args.pysr_version is not None:
@@ -2587,12 +2582,15 @@ if __name__ == '__main__':
         else:
             plot_results(args)
 
+    if args.official:
+        metrics = official_metrics(args)
+        save_pickle(metrics, '../pickles/period_ratio_official_metrics.pkl')
+        plot_main_figure(args)
+        plot_pure_sr_comparison(args)
+        plot_f1_features2(args)
+        plot_4way_std(args)
+
     if args.special:
-        if args.special == 'official_plots':
-            plot_main_figure(args)
-            plot_pure_sr_comparison(args)
-            plot_f1_features2(args)
-            plot_4way_std(args)
         if args.special == '4way':
             plot_4way_comparison(args)
         if args.special == '4way_std':
@@ -2609,9 +2607,6 @@ if __name__ == '__main__':
             plot_exprs(args)
         elif args.special == 'metrics':
             load_and_calculate_metrics(args)
-        elif args.special == 'official_metrics':
-            metrics = official_metrics(args)
-            save_pickle(metrics, '../pickles/period_ratio_official_metrics.pkl')
         elif args.special == 'four_way_rmse':
             plot_4way_rmse(args)
         elif args.special == 'selective_eq':

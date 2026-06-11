@@ -16,16 +16,13 @@ import matplotlib as mpl
 mpl.use("agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from resonant_period_ratio_overlay import add_resonant_grid_overlay
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 warnings.filterwarnings("ignore", category=ResourceWarning)
 
-
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(SCRIPT_DIR)
 DATA_DIR = os.path.join(REPO_ROOT, "data")
-RESULTS_DIR = os.path.join(SCRIPT_DIR, "resonant_results")
 SR_DIR = os.path.join(REPO_ROOT, "sr_results")
 
 for path in (REPO_ROOT, SCRIPT_DIR):
@@ -176,9 +173,9 @@ def get_results_path(
     input_cache=False,
 ):
     if input_cache:
-        path = os.path.join(DATA_DIR, f"resonant_cache_ngrid={ngrid}.pkl")
+        path = os.path.join(DATA_DIR, "resonant_cache_ngrid=300.pkl")
     else:
-        path = os.path.join(RESULTS_DIR, f"v={version}_ngrid={ngrid}")
+        path = os.path.join(DATA_DIR, f"resonant_v={version}_ngrid={ngrid}")
         if pysr_version is not None:
             path = os.path.join(
                 path + f"_pysr_f2_v={pysr_version}",
@@ -207,10 +204,10 @@ def load_or_create_input_cache(args):
         expected = args.Ngrid * args.Ngrid
         if len(cache) != expected:
             raise ValueError(f"Cache {path} has {len(cache)} entries, expected {expected}")
-        print("Loaded input cache from", path)
+        # print("Loaded input cache from", path)
         return cache
 
-    print("Creating input cache at", path)
+    # print("Creating input cache at", path)
     regressor = load_regressor(args.version, args.seed, cuda=args.cuda)
     angles, middle_periods = get_resonant_grid(args.Ngrid, args.p2_min, args.p2_max)
     parameters = get_parameters(angles, middle_periods)
@@ -313,14 +310,6 @@ def plot_prediction_panel(args, ax, results, title, show_ylabel=False):
         if args.p2_min <= y <= args.p2_max:
             ax.axhline(y, color="black", lw=0.9, alpha=0.45, ls="--")
 
-    if args.highlight_period_ratio_points:
-        add_resonant_grid_overlay(
-            ax,
-            args.Ngrid,
-            p2_min=args.p2_min,
-            p2_max=args.p2_max,
-        )
-
     return im
 
 
@@ -408,7 +397,6 @@ def plot_combined_predictions(args, nn_results, eq_results, output_path):
     cb.set_label(INSTABILITY_TIME_LABEL)
     annotate_resonances_between_panels(args, fig, axes)
 
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.savefig(output_path, dpi=args.dpi, bbox_inches="tight")
     plt.close(fig)
     print("Saved figure to", output_path)
@@ -434,8 +422,8 @@ def plot_results(args):
     nn_results = load_pickle(nn_path)
     eq_results = load_pickle(eq_path)
 
-    filename = "resonant_period_ratio_overlay.pdf" if args.highlight_period_ratio_points else "resonant.pdf"
-    output = os.path.join(RESULTS_DIR, filename)
+    filename = "resonant.pdf"
+    output = os.path.join(filename)
     plot_combined_predictions(
         args,
         nn_results,
@@ -467,11 +455,6 @@ def get_args():
     parser.add_argument("--outer_mass", type=float, default=3e-5)
     parser.add_argument("--middle_eccentricity", type=float, default=0.05)
     parser.add_argument("--pomega0", type=float, default=0.0)
-    parser.add_argument(
-        "--highlight_period_ratio_points",
-        action="store_true",
-        help="mark the resonant-grid points that correspond to the period-ratio overlay",
-    )
     parser.add_argument("--cuda", action="store_true", default=None)
     parser.add_argument("--cpu", dest="cuda", action="store_false")
 

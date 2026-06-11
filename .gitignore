@@ -11,6 +11,7 @@ models
 data_bundle.tar.gz
 data_bundle.tar.gz.sha256
 figures/feature_cache
+.vscode
 
 # ignore everything in these folders
 pickles/**
@@ -60,6 +61,21 @@ graphics/**
 !results/21130_0/*
 !results/21130_0/
 
+!results/15687_0/*
+!results/15687_0/
+
+!results/6631_0/*
+!results/6631_0/
+
+!results/3217_0/*
+!results/3217_0/
+
+!results/40716_0/*
+!results/40716_0/
+
+!results/25646_0/*
+!results/25646_0/
+
 !sr_results/11003.pkl
 !sr_results/11003.pkl
 !sr_results/72420.pkl
@@ -95,10 +111,11 @@ graphics/**
 !pickles/pysr_results_all_11566_94842.pkl
 !pickles/pysr_results_all_72646_42503.pkl
 !pickles/petit_results_all.pkl
+!pickles/period_ratio_official_metrics.pkl
 
 !figures/five_planet_figures/five_planet_main.pdf
 !figures/five_planet_figures/five_planet_all.pdf
 !figures/five_planet_figures/v24880_pysr11003_ms=26_N=5000_turbo_extrapolate.csv
-!figures/five_planet_figures/v24880_pysr11003_ms=29_N=5000_turbo_extrapolate.csv
-!figures/five_planet_figures/v24880_pysr72420_ms=50_N=5000_turbo_extrapolate.csv
-!figures/five_planet_figures/v28114_pysr41564_ms=35_N=5000_turbo_extrapolate.csv
+!figures/five_planet_figures/v24880_pysr72420_ms=41_N=5000_turbo_extrapolate.csv
+!figures/five_planet_figures/v28114_pysr41564_ms=45_N=5000_turbo_extrapolate.csv
+!figures/five_planet_figures/v24880_pysr11003_ms\=26_eqstd15687_N\=5000_turbo_extrapolate.csv
