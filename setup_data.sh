@@ -14,4 +14,7 @@ echo "$HASH  $FILE" | shasum -a 256 -c -     # verification
 tar -xzf "$FILE"
 
 # move period_results/ to figures/period_results/
-mv data/period_results figures/
+cp -r data/period_results figures/
+
+# if you ever need to create the bundle again, you can use the following command:
+# tar -czf data_bundle.tar.gz data/

@@ -2432,7 +2432,7 @@ def official_metrics(args):
         results[name] = vals
         table_rows.append((name, vals))
 
-    _print_metrics_table(table_rows)
+    # _print_metrics_table(table_rows)
     print('LaTeX rows')
     print('% columns: RMSE & Acc & LL & ROC & FPR & FNR & bias')
     for name, latex_name, _ in models:

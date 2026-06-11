@@ -1,0 +1,10 @@
+name: planet_eqs3
+channels:
+  - conda-forge
+dependencies:
+  # note: original project used python 3.7.12
+  - python=3.10.20
+  - pip
+  - pip:
+      - -r requirements.txt
+
