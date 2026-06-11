@@ -801,16 +801,16 @@ def official_calculations(version_json='official_versions.json'):
             metrics = calculate_metrics(args, fixed_std=fixed_std)
             all_results[name][dataset] = metrics
 
-    for dataset, label in datasets:
-        print(label)
-        for name, _, _ in models:
-            metrics = all_results[name][dataset]
-            print(f'[{name:13s}] '
-                f'Unstable RMSE={metrics["rmse"]:.2f} Full RMSE={metrics["full_rmse"]:.2f} Acc={metrics["acc"]:.2f}  '
-                f'ROC-AUC={metrics["roc_auc"]:.2f} FPR (positive=unstable) ={metrics["fpr"]:.2f}  FNR={metrics["fnr"]:.2f} '
-                f'LL={metrics["ll"]:.2f} Full LL={metrics["full_ll"]:.2f}, bias={metrics["bias"]:.2f}'
-                f' (bias below 5.5={metrics["small_bias"]:.2f}, bias above 7.5={metrics["large_bias"]:.2f})'
-            )
+    # for dataset, label in datasets:
+    #     print(label)
+    #     for name, _, _ in models:
+    #         metrics = all_results[name][dataset]
+    #         print(f'[{name:13s}] '
+    #             f'Unstable RMSE={metrics["rmse"]:.2f} Full RMSE={metrics["full_rmse"]:.2f} Acc={metrics["acc"]:.2f}  '
+    #             f'ROC-AUC={metrics["roc_auc"]:.2f} FPR (positive=unstable) ={metrics["fpr"]:.2f}  FNR={metrics["fnr"]:.2f} '
+    #             f'LL={metrics["ll"]:.2f} Full LL={metrics["full_ll"]:.2f}, bias={metrics["bias"]:.2f}'
+    #             f' (bias below 5.5={metrics["small_bias"]:.2f}, bias above 7.5={metrics["large_bias"]:.2f})'
+    #         )
 
     print('LaTeX rows')
     print('% columns: RMSE & Acc & LL & ROC & FPR & FNR & bias')
@@ -885,6 +885,9 @@ def _plot_official_2d_grid(columns, output, max_points=35000, seed=0, dpi=600,
                                   title=title, color=MAIN_COLOR,
                                   max_points=max_points, rng=rng,
                                   show_bias=True)
+            for collection in ax.collections:
+                collection.set_alpha(0.35)
+                collection.set_rasterized(False)
             ax.set_box_aspect(1)
             ax.title.set_fontweight('normal')
             if c == 0 and not wrap_columns:
@@ -1244,8 +1247,8 @@ def get_args():
     parser.add_argument('--include_stable', action='store_true', help='Include stable systems in RMSE calculation (i.e., where ground_truth is 10^9).')
     parser.add_argument('--classification', action='store_true', help='Calculate classification metrics with RMSE.')
     parser.add_argument('--calculate_all', action='store_true', help='Calculate official classification and RMSE metrics on test and random splits and save to pickles/ folder.')
-    parser.add_argument('--official', action='store_true', help='Run official_calculations for all models in official_versions.json.')
-    parser.add_argument('--official_figures', action='store_true')
+    parser.add_argument('--version_json', type=str, default='official_versions.json', help='JSON file specifying versions to use for official calculations.')
+    parser.add_argument('--official', action='store_true')
 
     args = parser.parse_args()
     if args.pysr_version is None:
@@ -1266,9 +1269,7 @@ if __name__ == '__main__':
     args = get_args()
 
     if args.official:
-        official_calculations()
-    elif args.official_figures:
-        official_figures()
+        official_figures(version_json=args.version_json)
     elif args.best_complexity:
         path = get_results_path(args)
         results = load_pickle(path)

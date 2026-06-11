@@ -108,7 +108,7 @@ python five_planet.py --official --version_json ../model_versions.json
 
 # calculate and plot period ratio results
 python period_ratio_figure.py --compute --version_json ../model_versions.json
-python period_ratio_figure.py --special official_plots --version_json ../model_versions.json
+python period_ratio_figure.py --official --version_json ../model_versions.json
 
 # create the separatrix plot
 python resonant_figure.py --Ngrid 300 --version 1 --pysr_version 1 --pysr_model_selection $sr_c
@@ -117,7 +117,6 @@ cd ..
 
 # evaluation metrics and plots
 python evaluation.py --version_json model_versions.json --official
-python evaluation.py --version_json model_versions.json --official_figures
 
 # table 3c, print equations, etc.
 python interpret.py --version_json model_versions.json
