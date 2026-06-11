@@ -19,3 +19,4 @@ xgboost==1.2.0
 cmasher==1.6.3
 brokenaxes==0.5.0
 setuptools<81
+rebound==3.26.3
