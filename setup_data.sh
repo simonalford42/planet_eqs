@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-RECORD_ID=15724986
+RECORD_ID=16578968
 FILE=data_bundle.tar.gz
 HASH=f2aefaae33d855c5152416b04af77156318611916c1f26fa5354dec558e0ba9f
 
-# Download data from Zenodo: https://zenodo.org/records/15724986
+# Download data from Zenodo: https://zenodo.org/records/16578968
 curl -L -o "$FILE" \
   "https://zenodo.org/record/${RECORD_ID}/files/${FILE}?download=1"
 

@@ -1,4 +1,4 @@
-name: planet_eqs3
+name: planet_eqs
 channels:
   - conda-forge
 dependencies:
