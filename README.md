@@ -12,7 +12,7 @@
 Commands that generate the figures from already run experiments are in `official_plots.sh`.
 Commands for rerunning the experiments and generating figures for the paper are in `experiments.sh`.
 
-# Minimal Predictor
+## Minimal Predictor
 
 Installing the dependencies of the old environment can be challenging, so we created a minimal predictor implementation that predicts with our equations using only numpy, rebound, and matplotlib as dependencies. Made with Codex, verified to match original calculations and plots.
 
