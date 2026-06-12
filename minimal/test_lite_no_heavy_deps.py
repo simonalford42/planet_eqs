@@ -61,7 +61,7 @@ import numpy as np  # noqa: E402
 import rebound  # noqa: E402
 import torch  # noqa: E402
 
-REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO_ROOT)
 
 from planet_eqs import LitePredictor  # noqa: E402

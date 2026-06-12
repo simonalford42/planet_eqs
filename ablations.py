@@ -1,7 +1,7 @@
 from matplotlib import pyplot as plt
 import pandas as pd
 from interpret import paretoize, number_of_variables_in_expression
-from utils import load_pickle, load_json
+from utils import load_pickle, load_json, save_pickle
 import argparse
 import numpy as np
 from matplotlib.ticker import MultipleLocator
@@ -288,7 +288,10 @@ def get_results(version_dict):
 
 def main():
     args = get_args()
-    results = compute_results(version_json=args.version_json)
+    # if you want to recompute the results, uncomment this line
+    # results = compute_results(version_json=args.version_json)
+    # save_pickle(results, 'pickles/ablation_results.pkl')
+    results = load_pickle('pickles/ablation_results.pkl')
     plot_combined_pareto(results['k'], results['f2_linear'], results['pure_sr'], results['pure_sr2'], path=args.path)
 
 

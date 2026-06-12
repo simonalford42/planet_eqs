@@ -112,6 +112,7 @@ graphics/**
 !pickles/pysr_results_all_72646_42503.pkl
 !pickles/petit_results_all.pkl
 !pickles/period_ratio_official_metrics.pkl
+!pickles/ablation_results.pkl
 
 !figures/five_planet_figures/five_planet_main.pdf
 !figures/five_planet_figures/five_planet_all.pdf

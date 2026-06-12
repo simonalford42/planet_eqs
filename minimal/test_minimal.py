@@ -17,10 +17,11 @@ import random
 import numpy as np
 import rebound
 
-REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MINIMAL_ROOT = os.path.join(REPO_ROOT, "minimal")
 sys.path.insert(0, REPO_ROOT)
 sys.path.insert(0, os.path.join(REPO_ROOT, "figures"))
-sys.path.insert(0, os.path.join(REPO_ROOT, "minimal"))
+sys.path.insert(0, MINIMAL_ROOT)
 
 from planet_eqs import StabilityPredictor as FullPredictor  # noqa: E402
 from planet_stability import StabilityPredictor as MinimalPredictor  # noqa: E402
