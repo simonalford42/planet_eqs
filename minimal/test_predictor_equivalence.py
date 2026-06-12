@@ -20,7 +20,7 @@ import torch
 
 # Ensure repo root + figures/ are importable, mirroring what
 # period_ratio_figure.py does at top-of-file.
-REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO_ROOT)
 sys.path.insert(0, os.path.join(REPO_ROOT, "figures"))
 
