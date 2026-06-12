@@ -669,33 +669,6 @@ def official_stuff(args):
     plot.savefig('graphics/pareto_fig1.svg', bbox_inches='tight')
     print('Saved pareto plot to graphics/pareto_fig1.svg')
 
-    # # these results obtained via calc_rmse.py script (see official_plots.sh)
-    # nn_results = load_pickle(f'pickles/nn_results_all_{v["mse_nn_version"]}.pkl')
-    # petit_results = load_pickle('pickles/petit_results_all.pkl')
-    # pure_sr_results = load_pickle(f'pickles/pure_sr_results_all_{v["mse_pure_sr_version"]}.pkl')
-    # pure_sr2_results = load_pickle(f'pickles/pysr_results_all_28114_{v["mse_pure_sr2_version"]}.pkl')
-    # pysr_results = load_pickle(f'pickles/pysr_results_all_{v["mse_nn_version"]}_{v["mse_pysr_version"]}.pkl')
-
-    # pysr_c, _ = min(pysr_results['val'].items(), key=lambda e: e[1])
-    # puresr_c, _ = min(pure_sr_results['val'].items(), key=lambda e: e[1])
-    # puresr2_c, _ = min(pure_sr2_results['val'].items(), key=lambda e: e[1])
-
-    # # table for paper
-    # print('Table of results:\n')
-    # print(f'NN: resonant: {nn_results["test"]:.2f}, random {nn_results["random"]:.2f}')
-    # print(f'Ours: resonant: {pysr_results["test"][pysr_c]:.2f}, random {pysr_results["random"][pysr_c]:.2f}')
-    # print(f'Petit: resonant: {petit_results["test"]:.2f}, random {petit_results["random"]:.2f}')
-    # print(f'Pure SR: resonant: {pure_sr_results["test"][puresr_c]:.2f}, random {pure_sr_results["random"][puresr_c]:.2f}')
-    # print(f'Pure SR (no intermediate features): resonant: {pure_sr2_results["test"][puresr2_c]:.2f}, random {pure_sr2_results["random"][puresr2_c]:.2f}')
-
-    # rmse_dict = {
-    #     'Neural network':       [nn_results['test'], nn_results['random'], 1.427],
-    #     'Distilled equations':  [pysr_results['test'][pysr_c], pysr_results['random'][pysr_c], 1.072],
-    #     'Pure SR':              [pure_sr_results['test'][puresr_c], pure_sr_results['random'][puresr_c], 1.724],
-    #     'Petit+2020':           [petit_results['test'], petit_results['random'], 1.253],
-    # }
-    # rmse_plot(rmse_dict)
-
 
 def rmse_plot(rmse_dict=None):
     plt.style.use('seaborn-darkgrid')

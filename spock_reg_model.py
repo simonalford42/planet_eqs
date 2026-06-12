@@ -744,7 +744,8 @@ class VarModel(pl.LightningModule):
         if 'predict_eq_uncertainty' in hparams and hparams['predict_eq_uncertainty']:
             # load old model + pysr equations, but hide it so it's not a submodule
             model = load_with_pysr_f2(version=24880, pysr_version=11003, pysr_model_selection='accuracy')
-            model = model.cuda()
+            if torch.cuda.is_available():
+                model = model.cuda()
             self.eq_model = [model]
             for param in self.eq_model[0].parameters():
                 param.requires_grad = False
