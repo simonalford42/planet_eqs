@@ -1053,8 +1053,6 @@ def _official_2d_grids(v, output='plots/2d_grid.pdf',
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
     fig.savefig(output, bbox_inches='tight', dpi=dpi)
-    png_output = os.path.splitext(output)[0] + '.png'
-    fig.savefig(png_output, bbox_inches='tight', dpi=dpi)
     plt.close(fig)
     print(f'Saved official 2D grid figure to {output}')
     return output
