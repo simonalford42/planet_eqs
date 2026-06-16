@@ -907,8 +907,12 @@ def _plot_official_2d_grid(columns, output, max_points=35000, seed=0, dpi=600,
 
 def _official_2d_grids(v, output='plots/2d_grid.pdf',
                        complexities=(1, 3, 7, 14, 26),
-                       max_points=35000, seed=0, dpi=600):
-    """Save the official 2D grid comparing selected equation complexities."""
+                       max_points=None, seed=0, dpi=600):
+    """Save the official 2D grid comparing selected equation complexities.
+
+    The first two rows show the 2D truth/prediction panels. The third row
+    shows residual trends for the additive terms in the complexity-26 equation.
+    """
     complexity_columns = [
         (f'Complexity {complexity}',
          dict(eval_type='pysr', version=v['nn_version'],
@@ -919,26 +923,297 @@ def _official_2d_grids(v, output='plots/2d_grid.pdf',
     complexity_columns.append(
         ('Neural network', dict(eval_type='nn', version=v['nn_version']))
     )
-    _plot_official_2d_grid(complexity_columns, output,
-                           max_points=max_points, seed=seed, dpi=dpi,
-                           rows=[('Resonant test set', 'test')],
-                           layout_ncols=3, show_rmse_in_title=True,
-                           wrap_columns=True)
+
+    plt.rcParams.update(plt.rcParamsDefault)
+    plt.rc('font', family='sans-serif')
+
+    scale = 0.8
+    fig = plt.figure(figsize=(scale * 18, scale * 15), dpi=dpi)
+    top_bottom_grid = fig.add_gridspec(
+        2, 1,
+        height_ratios=[2.7, 1.0],
+        hspace=0.25,
+    )
+    top_grid = top_bottom_grid[0, 0].subgridspec(
+        2, 12,
+        height_ratios=[1.2, 1.2],
+        hspace=0.35,
+        wspace=0,
+    )
+    rng = np.random.default_rng(seed)
+
+    def square_joint_panel(ax):
+        ax.set_box_aspect(1)
+        fig.canvas.draw()
+
+        ax_histx = getattr(ax, '_joint_histx', None)
+        ax_histy = getattr(ax, '_joint_histy', None)
+        if ax_histx is None or ax_histy is None:
+            return
+
+        ax_pos = ax.get_position()
+        histx_pos = ax_histx.get_position()
+        histy_pos = ax_histy.get_position()
+        top_gap = 0.01
+        side_gap = 0.01
+
+        ax_histx.set_position([
+            ax_pos.x0,
+            ax_pos.y1 + top_gap,
+            ax_pos.width,
+            histx_pos.height,
+        ])
+        ax_histy.set_position([
+            ax_pos.x1 + side_gap,
+            ax_pos.y0,
+            histy_pos.width,
+            ax_pos.height,
+        ])
+
+    for panel_ix, (col_title, cfg) in enumerate(complexity_columns):
+        grid_r = panel_ix // 3
+        grid_c = (panel_ix % 3) * 4
+        args = SimpleNamespace(dataset='test', **cfg)
+        truths_full, preds_full = _load_and_cache(args)
+        truths = truths_full.reshape(-1)
+        preds = preds_full[:, 0] if preds_full.ndim == 2 else preds_full
+        preds = np.repeat(preds, 2)
+        truths = clipped(truths)
+        preds = clipped(preds)
+
+        truths_avg = (
+            np.average(truths_full, axis=1)
+            if truths_full.ndim == 2 else truths_full
+        )
+        preds_avg = preds_full[:, 0] if preds_full.ndim == 2 else preds_full
+        preds_avg = clipped(preds_avg)
+        unstable = truths_avg < 9
+        rmse = np.sqrt(np.mean((preds_avg[unstable] - truths_avg[unstable])**2))
+        title = f'{col_title}, RMSE={rmse:.2f}'
+
+        ax = draw_joint_panel(
+            fig,
+            top_grid[grid_r, grid_c:grid_c + 4],
+            truths,
+            preds,
+            title=title,
+            color=MAIN_COLOR,
+            max_points=max_points,
+            rng=rng,
+            show_bias=True,
+        )
+        for collection in ax.collections:
+            collection.set_alpha(0.15)
+            collection.set_rasterized(False)
+        ax.title.set_fontweight('normal')
+        ax.title.set_y(-0.38)
+        square_joint_panel(ax)
+
+    bins = _official_subterm_bins(v)
+    yticks = np.arange(-1.0, 2.01, 0.5)
+    bottom_grid = top_bottom_grid[1, 0].subgridspec(1, 4, wspace=0.28)
+    panels = [
+        (
+            'gated_quiet_term',
+            r'$0.084^{\sigma_1}[\sigma_6^{0.36}(\sigma_2+\sigma_4)]^{-0.31}$',
+        ),
+        (
+            'gated_sinusoid_term',
+            r'$0.084^{\sigma_1}[-\sin(\mu_2)]$',
+        ),
+        (
+            'gated_mass_eccentricity_term',
+            r'$0.084^{\sigma_1}1.2^{-\mu_1}(\mu_7-\sigma_8)$',
+        ),
+        (
+            'eq_pred',
+            r'Equation predicted $\log_{10} T_{\rm eq}$',
+        ),
+    ]
+    for i, (quantity, xlabel) in enumerate(panels):
+        ax = fig.add_subplot(bottom_grid[0, i])
+        panel = bins[bins['quantity'] == quantity].sort_values('x')
+        ax.plot(panel['x'], panel['residual'], marker='o', lw=2,
+                color='#294475',
+                label=r'$\langle \log_{10} T_{\rm eq}-\log_{10} T_{\rm inst}\rangle$')
+        ax.axhline(0, color='0.75', lw=0.8)
+        ax.set_ylim(-1, 2)
+        ax.set_yticks(yticks)
+        ax.set_xlabel(xlabel)
+        if i == 0:
+            ax.set_ylabel(
+                r'$\log_{10} T_{\rm eq}-\log_{10} T_{\rm inst}$'
+            )
+        else:
+            ax.set_yticklabels([])
+        ax.grid(True, color='0.9')
+        ax.set_box_aspect(1)
+
+    output_dir = os.path.dirname(output)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+    fig.savefig(output, bbox_inches='tight', dpi=dpi)
+    png_output = os.path.splitext(output)[0] + '.png'
+    fig.savefig(png_output, bbox_inches='tight', dpi=dpi)
+    plt.close(fig)
+    print(f'Saved official 2D grid figure to {output}')
     return output
 
 
 def official_figures(version_json='official_versions.json',
-                     output='plots/2d_grid.pdf',
                      max_points=35000, seed=0, dpi=600):
     """Generate official figure set."""
     v = load_json(version_json)
 
-    _official_2d_grids(v, output=output, max_points=max_points,
+    _official_2d_grids(v, output="plots/2d_grid.pdf", max_points=max_points,
                        seed=seed, dpi=dpi)
 
     _official_std_figure(v, dpi=dpi)
     _official_roc_figure(v, dpi=dpi)
     _official_rmse_acc_plot(version_json=version_json)
+
+
+def _complexity26_additive_terms(summary_stats):
+    """Additive components of the official complexity-26 equation.
+
+    summary_stats is [N, 20] = [mu_0..mu_9, sigma_0..sigma_9].
+    The official equation is
+
+      T_eq = 3.6591659 + 0.0841594^sigma1 *
+             (quiet - sin(mu2) + (mu7 - sigma8)/1.2004135^mu1)
+    """
+    mu1 = summary_stats[:, 1]
+    mu2 = summary_stats[:, 2]
+    mu7 = summary_stats[:, 7]
+    sigma1 = summary_stats[:, 11]
+    sigma2 = summary_stats[:, 12]
+    sigma4 = summary_stats[:, 14]
+    sigma6 = summary_stats[:, 16]
+    sigma8 = summary_stats[:, 18]
+
+    gate = 0.0841594**sigma1
+    quiet = (sigma6**0.35633504 * (sigma2 + sigma4))**(-0.3054036)
+    sinusoid = -np.sin(mu2)
+    mass_eccentricity = (mu7 - sigma8) / (1.2004135**mu1)
+
+    return {
+        'gated_quiet_term': gate * quiet,
+        'gated_sinusoid_term': gate * sinusoid,
+        'gated_mass_eccentricity_term': gate * mass_eccentricity,
+    }
+
+
+def _binned_equation_error(truths, preds, x, quantity, nbins=12):
+    data = pd.DataFrame({
+        'truth': truths,
+        'pred': preds,
+        'x': x,
+    }).replace([np.inf, -np.inf], np.nan).dropna()
+    data = data[data['truth'] < 9]
+    data['bin'] = pd.qcut(data['x'], q=nbins, duplicates='drop')
+
+    rows = []
+    for interval, group in data.groupby('bin', observed=True):
+        residual = group['pred'] - group['truth']
+        rows.append({
+            'quantity': quantity,
+            'x': group['x'].median(),
+            'x_lo': interval.left,
+            'x_hi': interval.right,
+            'n': len(group),
+            'rmse': np.sqrt(np.mean(residual**2)),
+            'residual': np.mean(residual),
+        })
+    return pd.DataFrame(rows)
+
+
+def _official_subterm_bins(v):
+    nn_cache = _load_or_create_nn_cache_with_summaries(v['nn_version'], 'test')
+    eq_args = SimpleNamespace(
+        eval_type='pysr',
+        version=v['nn_version'],
+        pysr_version=v['pysr_version'],
+        pysr_model_selection=str(v['pysr_model_selection']),
+        dataset='test',
+    )
+    truths_full, preds_full = _load_and_cache(eq_args)
+    truths = np.average(truths_full, axis=1) if truths_full.ndim == 2 else truths_full
+    preds = preds_full[:, 0] if preds_full.ndim == 2 else preds_full
+    preds = clipped(preds)
+
+    term_values = _complexity26_additive_terms(nn_cache['summary_stats'])
+    term_values['eq_pred'] = preds
+    return pd.concat([
+        _binned_equation_error(truths, preds, values, name)
+        for name, values in term_values.items()
+    ], ignore_index=True)
+
+
+def _official_subterm_figure(
+    v,
+    output='plots/subterm_error.pdf',
+    csv_output='pickles/subterm_error.csv',
+    dpi=300,
+):
+    """Official resonant diagnostic for equation compression.
+
+    Plots binned equation RMSE and mean residual against the additive terms
+    of the complexity-26 equation and against the equation prediction itself.
+    """
+    bins = _official_subterm_bins(v)
+
+    os.makedirs(os.path.dirname(csv_output) or '.', exist_ok=True)
+    bins.to_csv(csv_output, index=False)
+
+    plt.rcParams.update(plt.rcParamsDefault)
+    plt.rc('font', family='sans-serif')
+
+    yticks = np.arange(-1.0, 2.01, 0.5)
+    fig, axes = plt.subplots(1, 4, figsize=(17.8, 3.9), dpi=dpi, sharey=True)
+    panels = [
+        (
+            'gated_quiet_term',
+            r'$0.084^{\sigma_1}[\sigma_6^{0.36}(\sigma_2+\sigma_4)]^{-0.31}$',
+            'Gated variability term',
+        ),
+        (
+            'gated_sinusoid_term',
+            r'$0.084^{\sigma_1}[-\sin(\mu_2)]$',
+            'Gated sinusoid term',
+        ),
+        (
+            'gated_mass_eccentricity_term',
+            r'$0.084^{\sigma_1}1.2^{-\mu_1}(\mu_7-\sigma_8)$',
+            'Gated mass/eccentricity term',
+        ),
+        (
+            'eq_pred',
+            r'Equation predicted $\log_{10} T_{\rm eq}$',
+            'Error vs predicted instability time',
+        ),
+    ]
+    for ax, (quantity, xlabel, title) in zip(axes, panels):
+        panel = bins[bins['quantity'] == quantity].sort_values('x')
+        ax.plot(panel['x'], panel['residual'], marker='o', lw=2,
+                color='#294475',
+                label=r'$\langle \log_{10} T_{\rm eq}-\log_{10} T_{\rm inst}\rangle$')
+        ax.axhline(0, color='0.75', lw=0.8)
+        ax.set_ylim(-1, 2)
+        ax.set_yticks(yticks)
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(
+            r'$\log_{10} T_{\rm eq}-\log_{10} T_{\rm inst}$'
+        )
+        ax.grid(True, color='0.9')
+        ax.legend(frameon=False, loc='upper left', fontsize=8)
+
+    fig.tight_layout()
+    os.makedirs(os.path.dirname(output) or '.', exist_ok=True)
+    fig.savefig(output, bbox_inches='tight', dpi=dpi)
+    png_output = os.path.splitext(output)[0] + '.png'
+    fig.savefig(png_output, bbox_inches='tight', dpi=dpi)
+    plt.close(fig)
+    print(f'Saved official resonant equation-error diagnostic to {output}')
     return output
 
 

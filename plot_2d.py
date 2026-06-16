@@ -164,10 +164,13 @@ def draw_joint_panel(fig, outer_spec, truths, preds, title=None, color=MAIN_COLO
     ax_histy.spines["bottom"].set_visible(False)
     ax_histy.spines["left"].set_color("0.35")
 
+    ax._joint_histx = ax_histx
+    ax._joint_histy = ax_histy
+
     return ax
 
 
-def plot_2d(pred, truth, path, title=None, max_points=35000, seed=0, dpi=300):
+def plot_2d(pred, truth, path, title=None, max_points=35000, seed=0, dpi=300, show_bias=False):
     """Save a single predicted-vs-true 2D comparison panel."""
     rng = np.random.default_rng(seed)
     truth = clipped(truth).reshape(-1)
@@ -181,7 +184,16 @@ def plot_2d(pred, truth, path, title=None, max_points=35000, seed=0, dpi=300):
 
     fig = plt.figure(figsize=(4.6, 4.6), dpi=dpi)
     grid = fig.add_gridspec(1, 1)
-    draw_joint_panel(fig, grid[0, 0], truth, pred, title=title, max_points=max_points, rng=rng)
+    draw_joint_panel(
+        fig,
+        grid[0, 0],
+        truth,
+        pred,
+        title=title,
+        max_points=max_points,
+        rng=rng,
+        show_bias=show_bias,
+    )
 
     directory = os.path.dirname(path)
     if directory:
