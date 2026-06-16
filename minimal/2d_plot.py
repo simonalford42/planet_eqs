@@ -119,7 +119,7 @@ def draw_joint_panel(fig, outer_spec, truths, preds, title, rng, max_points):
         preds,
         s=6,
         color=MAIN_COLOR,
-        alpha=0.35,
+        alpha=0.2,
         edgecolors="none",
         rasterized=False,
     )
