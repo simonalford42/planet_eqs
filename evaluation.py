@@ -905,7 +905,7 @@ def _plot_official_2d_grid(columns, output, max_points=35000, seed=0, dpi=600,
     return output
 
 
-def _official_2d_grids(v, output='plots/2d_grid.pdf',
+def _official_2d_grids(v, output='plots/2d_grid.png',
                        complexities=(1, 3, 7, 14, 26),
                        max_points=None, seed=0, dpi=600):
     """Save the official 2D grid comparing selected equation complexities.
