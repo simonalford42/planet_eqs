@@ -2326,12 +2326,18 @@ def _fnr_at_fixed_fpr(labels, scores, target_fpr):
     return 1.0 - target_tpr
 
 
-def _binary_metrics(truths, preds):
+def _binary_metrics(truths, preds, roc_truths=None, roc_preds=None):
     """Classification metrics with positive = unstable (prediction/truth < 9)."""
+    if roc_truths is None:
+        roc_truths = truths
+    if roc_preds is None:
+        roc_preds = preds
+
     pred_stable = preds >= 9
     pred_unstable = ~pred_stable
     true_stable = truths >= 9
     true_unstable = ~true_stable
+    roc_true_unstable = roc_truths < 9
 
     tp = np.sum(pred_unstable & true_unstable)
     tn = np.sum(pred_stable & true_stable)
@@ -2346,13 +2352,13 @@ def _binary_metrics(truths, preds):
     fnr = _safe_rate(fn, n_unstable)
     precision_unstable = _safe_rate(tp, tp + fp)
     mcc_denom = np.sqrt(float(tp + fp) * float(tp + fn) * float(tn + fp) * float(tn + fn))
-    unstable_score = -preds
+    unstable_score = -roc_preds
 
     out = dict(
         acc=np.mean(pred_stable == true_stable),
         stable_only_acc=stable_only_acc,
         balanced_acc=0.5 * (stable_only_acc + unstable_recall),
-        roc_auc=_roc_auc_or_nan(true_unstable, unstable_score),
+        roc_auc=_roc_auc_or_nan(roc_true_unstable, unstable_score),
         fpr=fpr,
         fnr=fnr,
         precision_unstable=precision_unstable,
@@ -2361,18 +2367,19 @@ def _binary_metrics(truths, preds):
     out['auc'] = out['roc_auc']
     for target_fpr in FIXED_FPR_TARGETS:
         key = f'fnr_at_fpr_{int(round(target_fpr * 100)):03d}'
-        out[key] = _fnr_at_fixed_fpr(true_unstable, unstable_score, target_fpr)
+        out[key] = _fnr_at_fixed_fpr(roc_true_unstable, unstable_score, target_fpr)
     return out
 
 
-def calculate_metrics(truths, preds, full_preds=None, truths_for_loss=None, fixed_std=1.0):
+def calculate_metrics(truths, preds, full_preds=None, truths_for_loss=None,
+                      fixed_std=1.0, roc_truths=None, roc_preds=None):
     """Calculate metrics given pre-loaded truths/preds, optionally including eval loss."""
     stable_ixs = truths >= 9
     unstable_truths, unstable_preds = truths[~stable_ixs], preds[~stable_ixs]
     rmse = np.average(np.square(truths - preds))**0.5
     unstable_rmse = np.average(np.square(unstable_truths - unstable_preds))**0.5
     out = dict(rmse=rmse, unstable_rmse=unstable_rmse, bias=np.mean(preds - truths))
-    out.update(_binary_metrics(truths, preds))
+    out.update(_binary_metrics(truths, preds, roc_truths=roc_truths, roc_preds=roc_preds))
 
     if full_preds is not None:
         if truths_for_loss is None:
@@ -2449,6 +2456,7 @@ def official_metrics(args):
     table_rows = []
     for name, _, kwargs in models:
         preds = load_preds(args.Ngrid, bad_ixs, **kwargs)
+        roc_preds = load_preds(args.Ngrid, bad_ixs, clip=False, **kwargs)
         full_preds = load_full_preds(args.Ngrid, bad_ixs, **kwargs)
         fixed_std = 1.47 if name in {'distilled_eqs', 'pure_sr', 'pure_sr2'} else 1.0
         vals = calculate_metrics(
@@ -2457,6 +2465,8 @@ def official_metrics(args):
             full_preds=full_preds,
             truths_for_loss=truths_for_loss,
             fixed_std=fixed_std,
+            roc_truths=truths_for_loss,
+            roc_preds=roc_preds,
         )
         results[name] = vals
         table_rows.append((name, vals))
@@ -2485,6 +2495,16 @@ def get_citation():
 def load_and_calculate_metrics(args):
     truths, preds = get_truths_and_preds(args.Ngrid, args.version, args.pysr_version, args.pysr_model_selection, args.petit, args.pure_sr, clip=True, exclude_stable=args.exclude_stable)
     truths_for_loss, bad_ixs = get_truths(args.Ngrid, clip=False)
+    roc_truths, roc_preds = get_truths_and_preds(
+        args.Ngrid,
+        args.version,
+        args.pysr_version,
+        args.pysr_model_selection,
+        args.petit,
+        args.pure_sr,
+        clip=False,
+        exclude_stable=args.exclude_stable,
+    )
     full_preds = load_full_preds(
         args.Ngrid,
         bad_ixs,
@@ -2498,7 +2518,14 @@ def load_and_calculate_metrics(args):
         stable_ixs = truths_for_loss >= 9
         truths_for_loss = truths_for_loss[~stable_ixs]
         full_preds = full_preds[~stable_ixs]
-    result = calculate_metrics(truths, preds, full_preds=full_preds, truths_for_loss=truths_for_loss)
+    result = calculate_metrics(
+        truths,
+        preds,
+        full_preds=full_preds,
+        truths_for_loss=truths_for_loss,
+        roc_truths=roc_truths,
+        roc_preds=roc_preds,
+    )
     print(
         f'RMSE={result["rmse"]:.3f} UnstableRMSE={result["unstable_rmse"]:.3f} '
         f'Acc={result["acc"]:.3f} ROC-AUC={result["roc_auc"]:.3f} '

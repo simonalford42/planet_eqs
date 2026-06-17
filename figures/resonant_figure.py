@@ -295,7 +295,7 @@ def plot_prediction_panel(args, ax, results, title, show_ylabel=False):
     ax.set_ylim(args.p2_min, args.p2_max)
     ax.set_xlabel("Resonant Angle")
     if show_ylabel:
-        ax.set_ylabel("Middle Planet Orbital Period")
+        ax.set_ylabel("Middle Planet Orbital Period (yrs)")
     ax.set_title(title)
     ax.set_xticks([-np.pi, -np.pi / 2, 0.0, np.pi / 2, np.pi])
     ax.set_xticklabels(['-π','-π/2', '0', 'π/2', 'π'])

@@ -516,7 +516,8 @@ def calculate_ll(args, fixed_std=1.0):
 
 
 def calculate_metrics(args, plot=False, fixed_std=1.0):
-    truths, preds = get_truths_and_preds(args)
+    truths, preds = get_truths_and_preds(args, clip=True)
+    roc_truths, roc_preds = get_truths_and_preds(args, clip=False)
 
     # calculate rmse excluding stable systems
     pred_stable = preds >= 9
@@ -535,11 +536,11 @@ def calculate_metrics(args, plot=False, fixed_std=1.0):
     # positive = unstable
     fpr = np.mean(~pred_stable[true_stable])       # falsely predict unstable among stable
     fnr = np.mean(pred_stable[~true_stable])           # falsely predict stable among unstable
-    true_unstable = ~true_stable
-    unstable_score = -preds
+    roc_true_unstable = roc_truths < 9
+    unstable_score = -roc_preds
     roc_auc = (
-        roc_auc_score(true_unstable, unstable_score)
-        if len(np.unique(true_unstable)) == 2
+        roc_auc_score(roc_true_unstable, unstable_score)
+        if len(np.unique(roc_true_unstable)) == 2
         else np.nan
     )
     # print(f'RMSE: {rmse:.4f}, Accuracy: {acc:.4f}, FPR: {fpr:.4f}, FNR: {fnr:.4f}')
@@ -548,10 +549,10 @@ def calculate_metrics(args, plot=False, fixed_std=1.0):
         plot_2d(preds, truths, plot_path)
         print(f'Saved 2D comparison plot to {plot_path}')
 
-        stable_truths = truths >= 9
+        stable_truths = roc_truths >= 9
         if len(np.unique(stable_truths)) == 2:
-            auc = roc_auc_score(stable_truths, preds)
-            plot_roc_curve(args, stable_truths, preds, auc)
+            auc = roc_auc_score(stable_truths, roc_preds)
+            plot_roc_curve(args, stable_truths, roc_preds, auc)
         else:
             print(f'Skipping ROC plot for {get_model_name(args)} ({args.dataset}): only one class present')
         # plot_rmse_threshold_curve(args, truths, preds)
