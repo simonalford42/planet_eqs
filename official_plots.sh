@@ -6,7 +6,5 @@ python resonant_figure.py
 python period_ratio_figure.py --official --version_json ../official_versions.json
 
 cd ..
-# this will take 15-45 minutes to run the first time as the predictions are computed.
-# after that, the predictions are cached
 python evaluation.py --official --version_json official_versions.json
 python ablations.py --version_json official_versions.json
