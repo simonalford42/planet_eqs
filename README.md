@@ -21,7 +21,7 @@ Reproduction of the main figures that do not require GPU was reproduced on MacOS
 
 
 ## Reproducing experiments
-Commands that reproduce the figures from already-run experiments are in `official_plots.sh` and takes 15-30 minutes (some of the evaluations are computed from scratch the first time this command is run.)
+Commands that reproduce the figures from already-run experiments are in `official_plots.sh` and takes 15–60 minutes (some of the evaluations are computed from scratch the first time this command is run.)
 
 Commands for rerunning all experiments (training, evaluation, comparisons/ablations) and generating figures for the paper are in `experiments.sh`.
 
